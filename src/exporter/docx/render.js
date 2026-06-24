@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
 import {textContent} from "../tools/doc_content.js"
 import {xmlDOM} from "../tools/xml.js"

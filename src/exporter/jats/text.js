@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 
 export function convertTexts(nodeList) {
     return nodeList.map(node => convertText(node)).join("")

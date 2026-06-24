@@ -1,4 +1,4 @@
-import {escapeText} from "../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {citeprocSys} from "./citeproc_sys.js"
 /*
  * Use CSL and bibDB to format all citations for the given prosemirror json citation nodes

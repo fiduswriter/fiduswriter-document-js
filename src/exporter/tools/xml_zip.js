@@ -1,6 +1,6 @@
 import {xmlDOM} from "./xml.js"
 
-import {get} from "../../common/index.js"
+import {get} from "fwtoolkit"
 // Handle a zip file containing XML files. Make sure files are only opened once,
 // and provide a mechanism to save the file.
 

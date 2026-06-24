@@ -1,4 +1,4 @@
-import {convertDataURIToBlob, get} from "../../common/index.js"
+import {convertDataURIToBlob, get} from "fwtoolkit"
 
 /** Creates a zip file.
  * @function zipFileCreator

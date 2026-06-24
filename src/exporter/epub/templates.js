@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {mathliveOpfIncludes} from "../../mathlive/opf_includes.js"
 
 /** A template for the OPF file of an epub. */

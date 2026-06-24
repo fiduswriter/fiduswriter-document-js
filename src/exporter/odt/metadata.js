@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 
 export class ODTExporterMetadata {
     constructor(xml, styles, metadata, csl = null) {

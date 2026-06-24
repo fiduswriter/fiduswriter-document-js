@@ -1,7 +1,7 @@
 import download from "downloadjs"
 import pretty from "pretty"
 
-import {shortFileTitle} from "../../common/index.js"
+import {shortFileTitle} from "fwtoolkit"
 import {removeHidden} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"

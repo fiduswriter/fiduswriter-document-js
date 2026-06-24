@@ -1,4 +1,4 @@
-import {addAlert} from "../../common/index.js"
+import {addAlert} from "fwtoolkit"
 import {docSchema} from "../../schema/document/index.js"
 import {toMiniJSON} from "../../schema/mini_json.js"
 // Generate a copy of the fidus doc, imageDB and bibDB with all clutter removed.

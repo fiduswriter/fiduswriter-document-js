@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 
 /** A template for HTML export of a document. */
 export const htmlExportTemplate = ({

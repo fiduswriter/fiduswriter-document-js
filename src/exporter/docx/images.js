@@ -1,4 +1,4 @@
-import {get} from "../../common/index.js"
+import {get} from "fwtoolkit"
 import {descendantNodes} from "../tools/doc_content.js"
 import {svg2png} from "../tools/svg.js"
 

@@ -1,5 +1,5 @@
 import {FormatCitations} from "../../citations/format.js"
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
 
 export class HTMLExporterCitations {

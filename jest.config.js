@@ -12,7 +12,8 @@ export default {
         "^biblatex-csl-converter$": "<rootDir>/test/exporter/mocks/biblatex-csl-converter.js",
         "^jszip$": "<rootDir>/test/importer/mocks/jszip.js",
         "^mathml-to-latex$": "<rootDir>/test/importer/mocks/mathml-to-latex.js",
-        "^@fiduswriter/document/common$": "<rootDir>/test/exporter/mocks/common.js",
+        "^fwtoolkit$": "<rootDir>/test/exporter/mocks/common.js",
+        "^fwtoolkit/.*": "<rootDir>/test/exporter/mocks/common.js",
         "^@fiduswriter/document/citations/format$": "<rootDir>/test/exporter/mocks/citations-format.js",
         "^@fiduswriter/document/bibliography/csl_bib$": "<rootDir>/test/exporter/mocks/csl-bib-schema.js",
         "^@fiduswriter/document/mathlive/opf_includes$": "<rootDir>/test/exporter/mocks/empty-module.js"

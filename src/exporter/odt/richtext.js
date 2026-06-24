@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {CATS} from "../../schema/i18n.js"
 import {createZoteroCitation} from "../tools/zotero_csl.js"
 

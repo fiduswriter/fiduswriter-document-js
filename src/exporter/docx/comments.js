@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {descendantNodes} from "../tools/doc_content.js"
 
 const DEFAULT_COMMENTS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

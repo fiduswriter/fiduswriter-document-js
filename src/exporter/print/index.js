@@ -1,5 +1,5 @@
 import {printHTML} from "@vivliostyle/print"
-import {addAlert, shortFileTitle} from "../../common/index.js"
+import {addAlert, shortFileTitle} from "fwtoolkit"
 import {PAPER_SIZES} from "../../schema/const.js"
 import {HTMLExporter} from "../html/index.js"
 import {HTMLExporterConvert} from "../html/convert.js"

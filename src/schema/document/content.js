@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {parseTracks} from "../common/index.js"
 import {fnNodeToHtml, htmlToFnNode} from "../footnotes_convert.js"
 

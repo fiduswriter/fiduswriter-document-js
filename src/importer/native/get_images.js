@@ -1,4 +1,4 @@
-import {get} from "../../common/index.js"
+import {get} from "fwtoolkit"
 
 export class GetImages {
     constructor(images, entries) {

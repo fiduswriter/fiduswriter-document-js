@@ -1,4 +1,4 @@
-import {convertDataURIToBlob} from "../../common/index.js"
+import {convertDataURIToBlob} from "fwtoolkit"
 
 export function svg2png(blob) {
     const img = document.createElement("img")

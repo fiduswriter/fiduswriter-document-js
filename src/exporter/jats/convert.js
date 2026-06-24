@@ -1,6 +1,6 @@
 import {convertLatexToMathMl} from "mathlive"
 
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 import {CATS} from "../../schema/i18n.js"
 
 import {removeHidden} from "../tools/doc_content.js"

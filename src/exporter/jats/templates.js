@@ -1,4 +1,4 @@
-import {escapeText, noSpaceTmp} from "../../common/index.js"
+import {escapeText, noSpaceTmp} from "fwtoolkit"
 
 export const articleTemplate = ({front, body, back}) =>
     `<?xml version="1.0" encoding="UTF-8"?>

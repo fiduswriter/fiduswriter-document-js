@@ -1,17 +1,14 @@
 {
   "name": "@fiduswriter/document",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Fidus Writer document schema, importers and exporters",
-  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@codeberg.org/fiduswriter/fiduswriter-document.git"
+  },
   "license": "AGPL-3.0",
   "author": "Johannes Wilm",
-  "files": [
-    "src/",
-    "scripts/",
-    "schema.json",
-    "README.md",
-    "LICENSE"
-  ],
+  "type": "module",
   "exports": {
     ".": "./src/index.js",
     "./schema": "./src/schema/index.js",
@@ -19,10 +16,19 @@
     "./importer/*": "./src/importer/*",
     "./exporter/*": "./src/exporter/*",
     "./citations/*": "./src/citations/*",
-    "./bibliography/*": "./src/bibliography/*",
-    "./common": "./src/common/index.js",
-    "./common/*": "./src/common/*"
+    "./bibliography/*": "./src/bibliography/*"
   },
+  "main": "jest.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "files": [
+    "src/",
+    "scripts/",
+    "schema.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build-schema": "node scripts/export-schema.js",
     "prepare": "node scripts/export-schema.js",
@@ -30,6 +36,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js"
   },
   "dependencies": {
+    "fwtoolkit": "^0.1.0-alpha.1",
     "biblatex-csl-converter": "^3.0.0",
     "downloadjs": "^1.4.7",
     "fast-deep-equal": "^3.1.3",

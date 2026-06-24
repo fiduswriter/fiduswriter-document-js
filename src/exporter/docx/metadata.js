@@ -1,4 +1,4 @@
-import {escapeText} from "../../common/index.js"
+import {escapeText} from "fwtoolkit"
 
 export class DOCXExporterMetadata {
     constructor(xml, metadata, csl = null) {
