@@ -1,23 +1,37 @@
 /* Connects Fidus Writer citation system with citeproc */
 import {CSLExporter} from "biblatex-csl-converter"
 
+import type {BibDB} from "../types.js"
+
 export class citeprocSys {
-    constructor(bibDB) {
+    bibDB: BibDB
+    abbreviations: Record<string, Record<string, Record<string, string>>>
+    abbrevsname: string
+    // We cache values retrieved once.
+    items: Record<string, Record<string, unknown>>
+    missingItems: string[]
+
+    constructor(bibDB: BibDB) {
         this.bibDB = bibDB
         this.abbreviations = {
             default: {}
         }
         this.abbrevsname = "default"
-        // We cache values retrieved once.
         this.items = {}
         this.missingItems = []
     }
 
-    retrieveItem(id) {
+    retrieveItem(id: string): Record<string, unknown> {
         if (!this.items[id]) {
             if (this.bibDB.db[id]) {
-                const cslGetter = new CSLExporter(this.bibDB.db, [id])
-                const cslOutput = cslGetter.parse()
+                const cslGetter = new CSLExporter(
+                    this.bibDB.db as Record<string, any>,
+                    [id]
+                )
+                const cslOutput = cslGetter.parse() as Record<
+                    string,
+                    Record<string, unknown>
+                >
                 Object.assign(this.items, cslOutput)
             } else {
                 this.missingItems.push(id)
@@ -27,7 +41,13 @@ export class citeprocSys {
         return this.items[id]
     }
 
-    getAbbreviation(_dummy, obj, _jurisdiction, vartype, key) {
+    getAbbreviation(
+        _dummy: string,
+        obj: Record<string, Record<string, Record<string, string>>>,
+        _jurisdiction: string,
+        vartype: string,
+        key: string
+    ): void {
         try {
             if (this.abbreviations[this.abbrevsname][vartype][key]) {
                 obj["default"][vartype][key] =

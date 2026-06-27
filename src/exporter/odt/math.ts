@@ -1,12 +1,22 @@
+import type {XmlZip} from "../tools/xml_zip.js"
+import type {XMLElement} from "../tools/xml.js"
+
 export class ODTExporterMath {
-    constructor(xml) {
+    xml: XmlZip
+    objectCounter: number
+    manifestXml: XMLElement | false
+    domParser: DOMParser
+    mathLive: typeof import("mathlive") | null
+
+    constructor(xml: XmlZip) {
         this.xml = xml
         this.objectCounter = 1
         this.manifestXml = false
         this.domParser = new DOMParser()
+        this.mathLive = null
     }
 
-    init() {
+    init(): Promise<void> {
         return this.xml
             .getXml("META-INF/manifest.xml")
             .then(manifestXml => {
@@ -15,16 +25,26 @@ export class ODTExporterMath {
                 return Promise.resolve()
             })
             .then(() => import("mathlive"))
-            .then(MathLive => (this.mathLive = MathLive))
+            .then(MathLive => {
+                this.mathLive = MathLive
+            })
     }
 
-    checkObjectCounter() {
+    checkObjectCounter(): void {
+        if (!this.manifestXml) {
+            return
+        }
         const manifestEl = this.manifestXml.query("manifest:manifest")
+        if (!manifestEl) {
+            return
+        }
         const fileEntries = manifestEl.queryAll("manifest:file-entry")
 
         fileEntries.forEach(fileEntry => {
-            const fullPath = fileEntry.getAttribute("manifest:full-path")
-            const dir = fullPath.split("/")[0]
+            const fullPath = String(
+                fileEntry.getAttribute("manifest:full-path") || ""
+            )
+            const dir = fullPath.split("/")[0] || ""
             const dirParts = dir.split(" ")
             if (dirParts.length === 2 && dirParts[0] === "Object") {
                 const objectNumber = Number.parseInt(dirParts[1])
@@ -35,11 +55,21 @@ export class ODTExporterMath {
         })
     }
 
-    latexToMathML(latex) {
+    latexToMathML(latex: string): string {
+        if (!this.mathLive) {
+            throw new Error("MathLive not initialised")
+        }
         return this.mathLive.convertLatexToMathMl(latex)
     }
 
-    addMath(latex) {
+    addMath(latex: string): number {
+        if (!this.manifestXml) {
+            throw new Error("Manifest XML not loaded")
+        }
+        const manifestEl = this.manifestXml.query("manifest:manifest")
+        if (!manifestEl) {
+            throw new Error("No manifest:manifest element found")
+        }
         const objectNumber = this.objectCounter++
         this.xml.addExtraFile(
             `Object ${objectNumber}/content.xml`,
@@ -47,7 +77,6 @@ export class ODTExporterMath {
                 latex
             )}</math>`
         )
-        const manifestEl = this.manifestXml.query("manifest:manifest")
         const stringOne = `<manifest:file-entry manifest:full-path="Object ${objectNumber}/content.xml" manifest:media-type="text/xml"/>`
         manifestEl.appendXML(stringOne)
         const stringTwo = `<manifest:file-entry manifest:full-path="Object ${objectNumber}/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.formula"/>`

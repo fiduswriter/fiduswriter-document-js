@@ -1,18 +1,40 @@
-import {addAlert} from "fwtoolkit"
+import {addAlert, gettext} from "fwtoolkit"
+
 import {docSchema} from "../../schema/document/index.js"
 import {toMiniJSON} from "../../schema/mini_json.js"
+import type {BibDB, FidusNode, ImageDB} from "../../types.js"
+
+interface ShrinkDoc {
+    content: FidusNode
+    [key: string]: unknown
+}
+
+interface ShrinkResult {
+    doc: Record<string, unknown>
+    shrunkImageDB: Record<string, Record<string, unknown>>
+    shrunkBibDB: Record<string, Record<string, unknown>>
+    httpIncludes: Array<{url: string; filename: string}>
+}
+
 // Generate a copy of the fidus doc, imageDB and bibDB with all clutter removed.
 export class ShrinkFidus {
+    doc: ShrinkDoc
+    imageDB: ImageDB
+    bibDB: BibDB
+    silent: boolean
+    imageList: (number | string)[]
+    citeList: (number | string)[]
+
     /**
-     * @param {Object}  doc      - Full document object.
-     * @param {Object}  imageDB  - Image database, e.g. {db: {...}}.
-     * @param {Object}  bibDB    - Bibliography database, e.g. {db: {...}}.
-     * @param {boolean} [silent=false] - When true, suppresses the
+     * @param doc      - Full document object.
+     * @param imageDB  - Image database wrapper, e.g. {db: {...}}.
+     * @param bibDB    - Bibliography database wrapper, e.g. {db: {...}}.
+     * @param silent   - When true, suppresses the
      *   "File export has been initiated" info alert.  Pass true when
      *   shrinking multiple documents in a loop (e.g. one per book chapter)
      *   and the caller already shows its own progress notification.
      */
-    constructor(doc, imageDB, bibDB, silent = false) {
+    constructor(doc: ShrinkDoc, imageDB: ImageDB, bibDB: BibDB, silent = false) {
         this.doc = doc
         this.imageDB = imageDB
         this.bibDB = bibDB
@@ -21,9 +43,9 @@ export class ShrinkFidus {
         this.citeList = []
     }
 
-    init() {
-        const shrunkImageDB = {},
-            httpIncludes = []
+    init(): Promise<ShrinkResult> {
+        const shrunkImageDB: Record<string, Record<string, unknown>> = {},
+            httpIncludes: Array<{url: string; filename: string}> = []
 
         if (!this.silent) {
             addAlert("info", gettext("File export has been initiated."))
@@ -34,22 +56,27 @@ export class ShrinkFidus {
         this.imageList = [...new Set(this.imageList)] // unique values
 
         this.imageList.forEach(itemId => {
-            shrunkImageDB[itemId] = Object.assign({}, this.imageDB.db[itemId])
+            const key = String(itemId)
+            shrunkImageDB[key] = Object.assign(
+                {},
+                this.imageDB.db[key]
+            ) as Record<string, unknown>
             // Remove parts that are connected to a particular user/server
-            delete shrunkImageDB[itemId].cats
-            delete shrunkImageDB[itemId].thumbnail
-            delete shrunkImageDB[itemId].pk
-            delete shrunkImageDB[itemId].added
-            const imageUrl = shrunkImageDB[itemId].image
-            let filename
+            delete shrunkImageDB[key].cats
+            delete shrunkImageDB[key].thumbnail
+            delete shrunkImageDB[key].pk
+            delete shrunkImageDB[key].added
+            const imageUrl = shrunkImageDB[key].image as string
+            let filename: string
             if (imageUrl.startsWith("blob:")) {
                 // Blob URL produced by decrypting an E2EE image client-side.
                 // The URL itself carries no useful file extension, so derive
                 // one from the image entry's MIME type instead.  Without this
                 // the server rejects the upload because get_encrypted_file_path
                 // requires a recognised extension.
-                const mime = shrunkImageDB[itemId].file_type || "image/png"
-                const mimeExtMap = {
+                const mime =
+                    (shrunkImageDB[key].file_type as string) || "image/png"
+                const mimeExtMap: Record<string, string> = {
                     "image/png": "png",
                     "image/jpeg": "jpg",
                     "image/jpg": "jpg",
@@ -59,11 +86,11 @@ export class ShrinkFidus {
                     "image/avif": "avif"
                 }
                 const ext = mimeExtMap[mime] || "png"
-                filename = `images/${itemId}.${ext}`
+                filename = `images/${key}.${ext}`
             } else {
                 filename = `images/${imageUrl.split("/").pop()}`
             }
-            shrunkImageDB[itemId].image = filename
+            shrunkImageDB[key].image = filename
             httpIncludes.push({
                 url: imageUrl,
                 filename
@@ -72,12 +99,16 @@ export class ShrinkFidus {
 
         this.citeList = [...new Set(this.citeList)] // unique values
 
-        const shrunkBibDB = {}
+        const shrunkBibDB: Record<string, Record<string, unknown>> = {}
         this.citeList.forEach(itemId => {
-            shrunkBibDB[itemId] = Object.assign({}, this.bibDB.db[itemId])
+            const key = String(itemId)
+            shrunkBibDB[key] = Object.assign(
+                {},
+                this.bibDB.db[key]
+            ) as Record<string, unknown>
             // Remove the cats, as it is only a list of IDs for one
             // particular user/server.
-            delete shrunkBibDB[itemId].cats
+            delete shrunkBibDB[key].cats
         })
 
         const docCopy = Object.assign({}, this.doc)
@@ -93,7 +124,9 @@ export class ShrinkFidus {
         delete docCopy.updated
         delete docCopy.revisions
 
-        docCopy.content = toMiniJSON(docSchema.nodeFromJSON(docCopy.content))
+        docCopy.content = toMiniJSON(
+            docSchema.nodeFromJSON(docCopy.content as unknown as Record<string, unknown>)
+        ) as unknown as FidusNode
 
         return new Promise(resolve =>
             resolve({
@@ -105,21 +138,23 @@ export class ShrinkFidus {
         )
     }
 
-    walkTree(node) {
+    walkTree(node: FidusNode): void {
         switch (node.type) {
             case "citation":
                 this.citeList = this.citeList.concat(
-                    node.attrs.references.map(ref => ref.id)
+                    (node.attrs?.references as Array<{id: number | string}>).map(
+                        ref => ref.id
+                    )
                 )
                 break
             case "image":
-                if (node.attrs.image !== false) {
-                    this.imageList.push(node.attrs.image)
+                if (node.attrs && node.attrs.image !== false) {
+                    this.imageList.push(node.attrs.image as number | string)
                 }
                 break
             case "footnote":
                 if (node.attrs?.footnote) {
-                    node.attrs.footnote.forEach(childNode =>
+                    ;(node.attrs.footnote as FidusNode[]).forEach(childNode =>
                         this.walkTree(childNode)
                     )
                 }

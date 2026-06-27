@@ -6,14 +6,7 @@
 
 import {CSLExporter} from "biblatex-csl-converter"
 
-interface BibDB {
-    db: Record<string, BibEntry>
-}
-
-interface BibEntry {
-    entry_key?: string
-    [key: string]: unknown
-}
+import type {BibDB} from "../../types.js"
 
 interface CitationReference {
     id: number

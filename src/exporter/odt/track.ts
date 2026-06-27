@@ -1,23 +1,39 @@
 import {escapeText} from "fwtoolkit"
 
-export class ODTExporterTracks {
-    constructor(xml) {
-        this.xml = xml
+import type {XmlZip} from "../tools/xml_zip.js"
+import type {XMLElement} from "../tools/xml.js"
 
+export interface TrackInfo {
+    type: "deletion" | "insertion" | "block_change"
+    username: string
+    date: number
+}
+
+export class ODTExporterTracks {
+    xml: XmlZip
+    contentXml: XMLElement | false
+    trackChangesSection: XMLElement | false | undefined
+    counter: number
+
+    constructor(xml: XmlZip) {
+        this.xml = xml
         this.contentXml = false
         this.trackChangesSection = false
         this.counter = 0
     }
 
-    init() {
+    init(): Promise<void> {
         return this.xml.getXml("content.xml").then(contentXml => {
             this.contentXml = contentXml
         })
     }
 
-    checkTrackedChangesSection() {
+    checkTrackedChangesSection(): void {
         if (this.trackChangesSection) {
             return
+        }
+        if (!this.contentXml) {
+            throw new Error("content.xml not loaded")
         }
         const trackChangesSection = this.contentXml.query(
             "text:tracked-changes"
@@ -36,7 +52,7 @@ export class ODTExporterTracks {
         }
     }
 
-    addChange(trackInfo, deletionString = "") {
+    addChange(trackInfo: TrackInfo, deletionString = ""): string {
         if (!this.trackChangesSection) {
             this.checkTrackedChangesSection()
         }
@@ -62,7 +78,7 @@ export class ODTExporterTracks {
                       : ""
             }
         </text:changed-region>`
-        this.trackChangesSection.appendXML(changeXml)
+        ;(this.trackChangesSection as XMLElement).appendXML(changeXml)
         return trackId
     }
 }

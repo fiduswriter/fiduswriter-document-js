@@ -1,5 +1,45 @@
 import {escapeText} from "fwtoolkit"
+
 import {mathliveOpfIncludes} from "../../mathlive/opf_includes.js"
+
+interface EpubImage {
+    filename: string
+    mimeType: string
+    coverImage?: boolean
+}
+
+interface EpubFile {
+    filename: string
+    mimeType: string
+}
+
+interface EpubStyleSheet {
+    filename: string
+}
+
+interface EpubTocItem {
+    id: string
+    title: string
+    docNum?: number
+    link?: string
+    children: EpubTocItem[]
+}
+
+interface OpfTemplateOptions {
+    id: string
+    idType: string
+    title: string
+    language: string
+    authors: string[]
+    keywords: string[]
+    date: string
+    modified: string
+    images: EpubImage[]
+    fontFiles: EpubFile[]
+    styleSheets: EpubStyleSheet[]
+    math: boolean
+    copyright?: {holder?: string; year?: number}
+}
 
 /** A template for the OPF file of an epub. */
 export const opfTemplate = ({
@@ -16,7 +56,7 @@ export const opfTemplate = ({
     styleSheets,
     math,
     copyright
-}) =>
+}: OpfTemplateOptions): string =>
     `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="${idType}" xml:lang="${language}" prefix="cc: http://creativecommons.org/ns#">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -65,8 +105,8 @@ ${images
     </spine>
 </package>`
 
-/** A template for the contianer XML of an epub file. */
-export const containerTemplate = () =>
+/** A template for the container XML of an epub file. */
+export const containerTemplate = (): string =>
     `<?xml version="1.0" encoding="UTF-8"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
     <rootfiles>
@@ -74,8 +114,22 @@ export const containerTemplate = () =>
     </rootfiles>
 </container>`
 
+interface NcxTemplateOptions {
+    shortLang: string
+    idType: string
+    id: string
+    title: string
+    toc: EpubTocItem[]
+}
+
 /** A template of the NCX file of an epub. */
-export const ncxTemplate = ({shortLang, idType, id, title, toc}) =>
+export const ncxTemplate = ({
+    shortLang,
+    idType,
+    id,
+    title,
+    toc
+}: NcxTemplateOptions): string =>
     `<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns:ncx="http://www.daisy.org/z3986/2005/ncx/" xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="${shortLang}">
     <head>
@@ -91,7 +145,7 @@ ${toc.map(item => ncxItemTemplate({item})).join("")}
 </ncx>`
 
 /** A template for each list item in the navMap of an epub's NCX file. */
-export const ncxItemTemplate = ({item}) =>
+export const ncxItemTemplate = ({item}: {item: EpubTocItem}): string =>
     `        <navPoint id="t${item.docNum ? `${item.id}-${item.docNum}` : item.id}">
             <navLabel><text>${escapeText(item.title)}</text></navLabel>
             <content src="${item.link ? item.link : item.docNum ? `document-${item.docNum}.xhtml#${item.id}` : `document.xhtml#${item.id}`}"/>
@@ -99,7 +153,7 @@ ${item.children?.map(item => ncxItemTemplate({item})).join("") || ""}
         </navPoint>\n`
 
 /** A template for each item in an epub's navigation document. */
-const navItemTemplate = ({item}) =>
+const navItemTemplate = ({item}: {item: EpubTocItem}): string =>
     `\t\t\t\t<li><a href="${
         item.link
             ? item.link
@@ -116,8 +170,18 @@ ${
 }
 </li>`
 
+interface NavTemplateOptions {
+    shortLang: string
+    toc: EpubTocItem[]
+    styleSheets: EpubStyleSheet[]
+}
+
 /** A template for an epub's navigation document. */
-export const navTemplate = ({shortLang, toc, styleSheets}) =>
+export const navTemplate = ({
+    shortLang,
+    toc,
+    styleSheets
+}: NavTemplateOptions): string =>
     `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${shortLang}" lang="${shortLang}" xmlns:epub="http://www.idpf.org/2007/ops">
     <head>

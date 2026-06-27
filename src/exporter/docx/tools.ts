@@ -1,13 +1,14 @@
 import {descendantNodes} from "../tools/doc_content.js"
+import type {FidusNode} from "../../types.js"
 
-export const moveFootnoteComments = topNode => {
+export const moveFootnoteComments = (topNode: FidusNode): FidusNode => {
     // DOCX doesn't support comments in footnotes. So we copy all comment marks from footnote
     // to parent node.
     descendantNodes(topNode).forEach(node => {
         if (node.type === "footnote") {
             descendantNodes({
                 type: "footnotecontainer",
-                content: node.attrs.footnote
+                content: node.attrs?.footnote as FidusNode[] | undefined
             }).forEach(fnNode => {
                 if (fnNode.marks) {
                     fnNode.marks
@@ -26,7 +27,7 @@ export const moveFootnoteComments = topNode => {
     return topNode
 }
 
-export const translateBlockType = blockType => {
+export const translateBlockType = (blockType: string): string => {
     switch (blockType) {
         case "heading1":
             return "Heading1"

@@ -1,33 +1,33 @@
-export function getTimestamp(date) {
+export function getTimestamp(date: Date): string {
     let second = date.getUTCSeconds()
     let minute = date.getUTCMinutes()
     let hour = date.getUTCHours()
     let day = date.getUTCDate()
-    let month = date.getUTCMonth() + 1 //January is 0!
+    let month = date.getUTCMonth() + 1 // January is 0!
     const year = date.getUTCFullYear()
 
     if (second < 10) {
-        second = "0" + second
+        second = Number("0" + second)
     }
     if (minute < 10) {
-        minute = "0" + minute
+        minute = Number("0" + minute)
     }
     if (hour < 10) {
-        hour = "0" + hour
+        hour = Number("0" + hour)
     }
     if (day < 10) {
-        day = "0" + day
+        day = Number("0" + day)
     }
     if (month < 10) {
-        month = "0" + month
+        month = Number("0" + month)
     }
 
     return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
 }
 
-export function getFontMimeType(filename) {
+export function getFontMimeType(filename: string): string | null {
     // Define a mapping of font file extensions to MIME types
-    const fontMimeTypes = {
+    const fontMimeTypes: Record<string, string> = {
         ttf: "font/ttf",
         otf: "font/otf",
         woff: "font/woff",
@@ -36,15 +36,15 @@ export function getFontMimeType(filename) {
     }
 
     // Extract the file extension from the filename
-    const extension = filename.split(".").pop().toLowerCase()
+    const extension = filename.split(".").pop()?.toLowerCase()
 
     // Check if the extension matches a known font type and return the MIME type
-    return fontMimeTypes[extension] || null // Return null if it's not a font file
+    return extension ? fontMimeTypes[extension] || null : null
 }
 
-export function getImageMimeType(filename) {
+export function getImageMimeType(filename: string): string | null {
     // Define a mapping of image file extensions to MIME types
-    const imageMimeTypes = {
+    const imageMimeTypes: Record<string, string> = {
         jpg: "image/jpeg",
         jpeg: "image/jpeg",
         png: "image/png",
@@ -58,36 +58,38 @@ export function getImageMimeType(filename) {
     }
 
     // Extract the file extension from the filename
-    const extension = filename.split(".").pop().toLowerCase()
+    const extension = filename.split(".").pop()?.toLowerCase()
 
     // Check if the extension matches a known image type and return the MIME type
-    return imageMimeTypes[extension] || null // Return null if it's not an image file
+    return extension ? imageMimeTypes[extension] || null : null
 }
 
-export function buildHierarchy(flatList) {
-    const hierarchy = []
-    const levelMap = {}
+export interface HierarchyItem extends Record<string, unknown> {
+    level: number
+    children: HierarchyItem[]
+}
+
+export function buildHierarchy(flatList: HierarchyItem[]): HierarchyItem[] {
+    const hierarchy: HierarchyItem[] = []
+    const levelMap: Record<number, HierarchyItem[]> = {}
 
     flatList.forEach(item => {
         // Ensure there's an array for the current level in the map
         levelMap[item.level] = levelMap[item.level] || []
 
         // Add the current item to its level in the map
-        levelMap[item.level].push({...item, children: []})
+        const itemWithChildren: HierarchyItem = {...item, children: []}
+        levelMap[item.level].push(itemWithChildren)
 
         if (item.level === 0) {
             // Top-level items are added directly to the hierarchy
-            hierarchy.push(
-                levelMap[item.level][levelMap[item.level].length - 1]
-            )
+            hierarchy.push(itemWithChildren)
         } else {
             // Non-top-level items are added as children of the last item at the previous level
             const parentLevel = levelMap[item.level - 1]
             if (parentLevel) {
                 const parent = parentLevel[parentLevel.length - 1]
-                parent.children.push(
-                    levelMap[item.level][levelMap[item.level].length - 1]
-                )
+                parent.children.push(itemWithChildren)
             }
         }
     })

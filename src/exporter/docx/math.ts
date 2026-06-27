@@ -1,7 +1,9 @@
 import {mml2omml} from "mathml2omml"
 
+import type {XmlZip} from "../tools/xml_zip.js"
+
 // Not entirely sure if we need this font here. This is included whenever Word
-// itself adds a formula, but our ooml doesn't refer to the font, so it may be pointless.
+// itself adds a formula, but our omml doesn't refer to the font, so it may be pointless.
 const CAMBRIA_MATH_FONT_DECLARATION = `
     <w:font w:name="Cambria Math">
         <w:panose1 w:val="02040503050406030204" />
@@ -12,35 +14,53 @@ const CAMBRIA_MATH_FONT_DECLARATION = `
     </w:font>`
 
 export class DOCXExporterMath {
-    constructor(xml) {
+    xml: XmlZip
+    fontTablesXML: import("../tools/xml.js").XMLElement | false
+    addedCambriaMath: boolean
+    domParser: DOMParser
+    mathLive: typeof import("mathlive") | null
+
+    constructor(xml: XmlZip) {
         this.xml = xml
-        this.fontTableXML = false
+        this.fontTablesXML = false
         this.addedCambriaMath = false
         this.domParser = new DOMParser()
+        this.mathLive = null
     }
 
-    init() {
+    init(): Promise<typeof import("mathlive")> {
         return this.xml
             .getXml("word/fontTable.xml")
             .then(fontTablesXML => {
                 this.fontTablesXML = fontTablesXML
                 return import("mathlive")
             })
-            .then(MathLive => (this.mathLive = MathLive))
+            .then(MathLive => {
+                this.mathLive = MathLive
+                return MathLive
+            })
     }
 
-    latexToMathML(latex) {
+    latexToMathML(latex: string): string {
+        if (!this.mathLive) {
+            throw new Error("MathLive not initialised")
+        }
         return this.mathLive.convertLatexToMathMl(latex)
     }
 
-    getOmml(latex) {
+    getOmml(latex: string): string {
+        if (!this.fontTablesXML) {
+            throw new Error("Font table XML not loaded")
+        }
         if (!this.addedCambriaMath) {
             const fontsEl = this.fontTablesXML.query("w:fonts")
+            if (!fontsEl) {
+                throw new Error("No w:fonts element found in font table")
+            }
             fontsEl.appendXML(CAMBRIA_MATH_FONT_DECLARATION)
             this.addedCambriaMath = true
         }
         const mathmlString = `<math xmlns="http://www.w3.org/1998/Math/MathML"><semantics>${this.latexToMathML(latex)}</semantics></math>`
-        const ommlString = mml2omml(mathmlString)
-        return ommlString
+        return mml2omml(mathmlString)
     }
 }

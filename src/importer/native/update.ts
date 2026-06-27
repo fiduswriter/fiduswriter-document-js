@@ -1,13 +1,13 @@
 import {updateDoc} from "../../schema/convert.js"
 
-import type {FidusDoc, ImageDB} from "../../types.js"
+import type {FidusDoc, ImageDBEntries} from "../../types.js"
 
 export function updateFile(
     doc: FidusDoc,
     filetypeVersion: number,
     bibliography: Record<string, unknown>,
-    images: ImageDB
-): {doc: FidusDoc; bibliography: Record<string, unknown>; images: ImageDB} {
+    images: ImageDBEntries
+): {doc: FidusDoc; bibliography: Record<string, unknown>; images: ImageDBEntries} {
     // update bibliography -- currently not needed
     // bibliography = updateBib(bibliography)
     if (filetypeVersion < 3.2) {

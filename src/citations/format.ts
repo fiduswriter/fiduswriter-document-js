@@ -1,16 +1,42 @@
 import {escapeText} from "fwtoolkit"
-import {citeprocSys} from "./citeproc_sys.js"
-/*
- * Use CSL and bibDB to format all citations for the given prosemirror json citation nodes
- */
 
+import type {
+    BibDB,
+    BibliographyResult,
+    CiteprocInstance,
+    CSL
+} from "../types.js"
+import {citeprocSys} from "./citeproc_sys.js"
+
+interface CitationInfo {
+    format: string
+    references: Array<{id: number; [key: string]: unknown}>
+}
+
+/**
+ * Use CSL and bibDB to format all citations for the given ProseMirror JSON citation nodes.
+ */
 export class FormatCitations {
+    csl: CSL
+    allCitationInfos: CitationInfo[]
+    citationStyle: string
+    bibliographyHeader: string
+    bibDB: BibDB
+    synchronous: boolean
+    lang: string
+
+    bibliography: BibliographyResult | false
+    citations: Array<{citationItems: unknown[]; properties: {noteIndex: number}}>
+    bibFormats: string[]
+    citationTexts: string[]
+    citationType: string
+
     constructor(
-        csl,
-        allCitationInfos,
-        citationStyle,
-        bibliographyHeader,
-        bibDB,
+        csl: CSL,
+        allCitationInfos: CitationInfo[],
+        citationStyle: string,
+        bibliographyHeader: string,
+        bibDB: BibDB,
         synchronous = false,
         lang = "en-US"
     ) {
@@ -21,9 +47,15 @@ export class FormatCitations {
         this.bibDB = bibDB
         this.synchronous = synchronous
         this.lang = lang
+
+        this.bibliography = false
+        this.citations = []
+        this.bibFormats = []
+        this.citationTexts = []
+        this.citationType = ""
     }
 
-    init() {
+    init(): boolean | Promise<void> {
         this.bibliography = false
         this.citations = []
         this.bibFormats = []
@@ -33,7 +65,7 @@ export class FormatCitations {
         return this.getFormattedCitations()
     }
 
-    formatAllCitations() {
+    formatAllCitations(): void {
         this.allCitationInfos.forEach(cInfo => {
             this.bibFormats.push(cInfo.format)
             this.citations.push({
@@ -45,7 +77,7 @@ export class FormatCitations {
         })
     }
 
-    get bibHTML() {
+    get bibHTML(): string {
         if (!this.bibliography || !this.bibliography[0].entry_ids.length) {
             return ""
         }
@@ -55,7 +87,7 @@ export class FormatCitations {
     }
 
     // CSS
-    get bibCSS() {
+    get bibCSS(): string {
         if (!this.bibliography || !this.bibliography[0].entry_ids.length) {
             return ""
         }
@@ -86,7 +118,7 @@ export class FormatCitations {
         return css
     }
 
-    reloadCitations(missingItems) {
+    reloadCitations(missingItems: string[]): Promise<void> {
         // Not all citations could be found in the database.
         // Reload the database if possible, but don't cycle if no new matches are found.
         if (!this.bibDB.getDB) {
@@ -95,16 +127,19 @@ export class FormatCitations {
 
         return this.bibDB.getDB().then(() => {
             if (missingItems.some(item => this.bibDB.db.hasOwnProperty(item))) {
-                return this.init()
+                return this.init() as Promise<void>
             } else {
                 return Promise.resolve()
             }
         })
     }
 
-    getFormattedCitations() {
+    getFormattedCitations(): boolean | Promise<void> {
         const citeprocConnector = new citeprocSys(this.bibDB)
         if (this.synchronous) {
+            if (!this.csl.getEngineSync) {
+                return false
+            }
             const citeprocInstance = this.csl.getEngineSync(
                 citeprocConnector,
                 this.citationStyle,
@@ -116,6 +151,9 @@ export class FormatCitations {
             this.process(citeprocInstance)
             return true
         } else {
+            if (!this.csl.getEngine) {
+                return Promise.resolve()
+            }
             return this.csl
                 .getEngine(citeprocConnector, this.citationStyle, this.lang)
                 .then(citeprocInstance => {
@@ -131,10 +169,10 @@ export class FormatCitations {
         }
     }
 
-    process(citeprocInstance) {
-        const allIds = []
+    process(citeprocInstance: CiteprocInstance): void {
+        const allIds: string[] = []
         this.citations.forEach(cit =>
-            cit.citationItems.forEach(item => allIds.push(String(item.id)))
+            cit.citationItems.forEach(item => allIds.push(String((item as {id: number}).id)))
         )
         citeprocInstance.updateItems(allIds)
 
@@ -147,18 +185,32 @@ export class FormatCitations {
                     true
                 )
             if (inText && "textcite" == this.bibFormats[i]) {
-                const items = citation.citationItems
+                const items = citation.citationItems as Array<{
+                    id: number
+                    locator?: string
+                    prefix?: string
+                }>
                 let newCiteText = ""
 
                 for (let j = 0; j < items.length; j++) {
-                    const onlyNameOption = [
+                    const onlyNameOption: Array<{
+                        id: number
+                        "author-only": number
+                        locator?: string
+                        prefix?: string
+                    }> = [
                         {
                             id: items[j].id,
                             "author-only": 1
                         }
                     ]
 
-                    const onlyDateOption = [
+                    const onlyDateOption: Array<{
+                        id: number
+                        "suppress-author": number
+                        locator?: string
+                        prefix?: string
+                    }> = [
                         {
                             id: items[j].id,
                             "suppress-author": 1
@@ -180,8 +232,12 @@ export class FormatCitations {
                     }
                     newCiteText += `${citeprocInstance.makeCitationCluster(onlyNameOption)} ${citeprocInstance.makeCitationCluster(onlyDateOption)}`
                 }
-                citationTexts.find(citationText => citationText[0] === i)[1] =
-                    newCiteText
+                const target = citationTexts.find(
+                    citationText => citationText[0] === i
+                )
+                if (target) {
+                    target[1] = newCiteText
+                }
             }
             citationTexts.forEach(
                 ([index, citationText]) =>
@@ -189,6 +245,6 @@ export class FormatCitations {
             )
         }
         this.citationType = citeprocInstance.cslXml.dataObj.attrs.class
-        this.bibliography = citeprocInstance.makeBibliography()
+        this.bibliography = citeprocInstance.makeBibliography() as BibliographyResult
     }
 }

@@ -94,10 +94,20 @@ export interface CommentData {
 
 /** A bibliographic database entry (format depends on the CSL engine). */
 export interface BibDBEntry {
+    entry_key?: string
+    bib_type?: string
+    fields?: Record<string, JSONValue>
     [key: string]: JSONValue | undefined
 }
 
-export type BibDB = Record<string, BibDBEntry>
+/** Flat map of bibliography entries keyed by internal ID. */
+export type BibDBEntries = Record<string, BibDBEntry>
+
+/** Bibliography database wrapper used by importers/exporters. */
+export interface BibDB {
+    db: BibDBEntries
+    getDB?: () => Promise<void>
+}
 
 /** An entry in the image database. */
 export interface ImageDBEntry {
@@ -109,12 +119,56 @@ export interface ImageDBEntry {
     [key: string]: unknown
 }
 
-export type ImageDB = Record<string, ImageDBEntry>
+/** Flat map of image entries keyed by internal ID. */
+export type ImageDBEntries = Record<string, ImageDBEntry>
 
-/** A CSL/CSL-M stylesheet reference. */
+/** Image database wrapper used by importers/exporters. */
+export interface ImageDB {
+    db: ImageDBEntries
+}
+
+/** A CSL/CSL-M stylesheet reference / engine provider. */
 export interface CSL {
     citationType?: string
-    [key: string]: JSONValue | undefined
+    getEngine?: (
+        sys: unknown,
+        styleId: string,
+        lang: string
+    ) => Promise<CiteprocInstance>
+    getEngineSync?: (
+        sys: unknown,
+        styleId: string,
+        lang: string
+    ) => CiteprocInstance | undefined
+}
+
+/** A minimal citeproc-js engine interface. */
+export interface CiteprocInstance {
+    updateItems: (ids: string[]) => void
+    appendCitationCluster: (
+        citation: unknown,
+        flag?: boolean
+    ) => Array<[number, string]>
+    makeCitationCluster: (items: unknown[]) => string
+    cslXml: {dataObj: {attrs: {class: string}}}
+    citation: {opt: {layout_delimiter?: string}}
+    makeBibliography: () => BibliographyResult
+    sys?: unknown
+}
+
+/** citeproc-js makeBibliography() result tuple. */
+export interface BibliographyResult extends Array<unknown> {
+    0: {
+        entry_ids: string[]
+        bibstart: string
+        bibend: string
+        entryspacing: number
+        linespacing: number
+        hangingindent?: boolean
+        maxoffset: number
+        "second-field-align"?: "margin" | "flush"
+    }
+    1: string[]
 }
 
 /** Common constructor options for exporters. */

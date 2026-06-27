@@ -1,4 +1,4 @@
-export const escapeLatexText = text =>
+export const escapeLatexText = (text: string): string =>
     text
         // Remove line breaks
         .replace(/\r|\n/g, "")

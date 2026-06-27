@@ -1,10 +1,12 @@
 import {escapeText} from "fwtoolkit"
 
-export function convertTexts(nodeList) {
+import type {FidusNode} from "../../types.js"
+
+export function convertTexts(nodeList: FidusNode[]): string {
     return nodeList.map(node => convertText(node)).join("")
 }
 
-export function convertText(node) {
+export function convertText(node: FidusNode): string {
     let start = ""
     let end = ""
     let strong, em, underline, hyperlink, anchor, sup, sub, code
@@ -19,7 +21,7 @@ export function convertText(node) {
         sub = node.marks.find(mark => mark.type === "sub")
         code = node.marks.find(mark => mark.type === "code")
     }
-    let attrs = anchor ? ` id="${anchor.attrs.id}"` : ""
+    let attrs = anchor ? ` id="${anchor.attrs?.id}"` : ""
     if (em) {
         start += `<italic${attrs}>`
         end = "</italic>" + end
@@ -51,14 +53,14 @@ export function convertText(node) {
         attrs = ""
     }
     if (hyperlink) {
-        const href = hyperlink.attrs.href
+        const href = hyperlink.attrs?.href as string
         if (href[0] === "#") {
             // Internal link
             start += `<xref rid="${href.substring(1)}"${attrs}>`
             end = "</xref>" + end
         } else {
             // External link
-            start += `<ext-link xlink:href="${escapeText(href)}" ext-link-type="uri" xlink:title="${escapeText(hyperlink.attrs.title)}"${attrs}>`
+            start += `<ext-link xlink:href="${escapeText(href)}" ext-link-type="uri" xlink:title="${escapeText(hyperlink.attrs?.title as string)}"${attrs}>`
             end = "</ext-link>" + end
         }
         attrs = ""
@@ -68,5 +70,5 @@ export function convertText(node) {
         end = "</named-content>" + end
         attrs = ""
     }
-    return start + escapeText(node.text) + end
+    return start + escapeText(node.text || "") + end
 }

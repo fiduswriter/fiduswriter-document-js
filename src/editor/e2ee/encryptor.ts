@@ -17,11 +17,11 @@ export class E2EEEncryptor {
     /**
      * Encrypt a string with AES-GCM.
      *
-     * @param {string} plaintext - The plaintext string to encrypt
-     * @param {CryptoKey} key - An AES-GCM key (from E2EEKeyManager.deriveKey)
-     * @returns {Promise<string>} Base64-encoded string (iv + ciphertext + auth tag)
+     * @param plaintext - The plaintext string to encrypt
+     * @param key - An AES-GCM key (from E2EEKeyManager.deriveKey)
+     * @returns Base64-encoded string (iv + ciphertext + auth tag)
      */
-    static async encrypt(plaintext, key) {
+    static async encrypt(plaintext: string, key: CryptoKey): Promise<string> {
         const iv = crypto.getRandomValues(new Uint8Array(12))
         const encoded = new TextEncoder().encode(plaintext)
         const ciphertext = await crypto.subtle.encrypt(
@@ -39,11 +39,14 @@ export class E2EEEncryptor {
     /**
      * Decrypt a Base64-encoded AES-GCM ciphertext.
      *
-     * @param {string} ciphertextBase64 - Base64-encoded (iv + ciphertext + auth tag)
-     * @param {CryptoKey} key - An AES-GCM key (from E2EEKeyManager.deriveKey)
-     * @returns {Promise<string>} The decrypted plaintext string
+     * @param ciphertextBase64 - Base64-encoded (iv + ciphertext + auth tag)
+     * @param key - An AES-GCM key (from E2EEKeyManager.deriveKey)
+     * @returns The decrypted plaintext string
      */
-    static async decrypt(ciphertextBase64, key) {
+    static async decrypt(
+        ciphertextBase64: string,
+        key: CryptoKey
+    ): Promise<string> {
         const combined = E2EEEncryptor._base64ToUint8Array(ciphertextBase64)
         const iv = combined.slice(0, 12)
         const ciphertext = combined.slice(12)
@@ -60,11 +63,14 @@ export class E2EEEncryptor {
      *
      * Serializes the object to JSON, then encrypts the JSON string.
      *
-     * @param {Object} obj - A JSON-serializable object
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<string>} Base64-encoded encrypted data
+     * @param obj - A JSON-serializable object
+     * @param key - An AES-GCM key
+     * @returns Base64-encoded encrypted data
      */
-    static encryptObject(obj, key) {
+    static encryptObject(
+        obj: Record<string, unknown> | unknown[],
+        key: CryptoKey
+    ): Promise<string> {
         return E2EEEncryptor.encrypt(JSON.stringify(obj), key)
     }
 
@@ -73,11 +79,14 @@ export class E2EEEncryptor {
      *
      * Decrypts the Base64-encoded ciphertext, then parses the result as JSON.
      *
-     * @param {string} ciphertextBase64 - Base64-encoded encrypted data
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<Object>} The decrypted and parsed object
+     * @param ciphertextBase64 - Base64-encoded encrypted data
+     * @param key - An AES-GCM key
+     * @returns The decrypted and parsed object
      */
-    static async decryptObject(ciphertextBase64, key) {
+    static async decryptObject(
+        ciphertextBase64: string,
+        key: CryptoKey
+    ): Promise<unknown> {
         const plaintext = await E2EEEncryptor.decrypt(ciphertextBase64, key)
         return JSON.parse(plaintext)
     }
@@ -85,11 +94,14 @@ export class E2EEEncryptor {
     /**
      * Encrypt an ArrayBuffer (for images and other binary data).
      *
-     * @param {ArrayBuffer} buffer - The binary data to encrypt
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<string>} Base64-encoded encrypted data (iv + ciphertext)
+     * @param buffer - The binary data to encrypt
+     * @param key - An AES-GCM key
+     * @returns Base64-encoded encrypted data (iv + ciphertext)
      */
-    static async encryptBuffer(buffer, key) {
+    static async encryptBuffer(
+        buffer: ArrayBuffer,
+        key: CryptoKey
+    ): Promise<string> {
         const iv = crypto.getRandomValues(new Uint8Array(12))
         const ciphertext = await crypto.subtle.encrypt(
             {name: "AES-GCM", iv: iv},
@@ -106,15 +118,22 @@ export class E2EEEncryptor {
     /**
      * Decrypt to an ArrayBuffer.
      *
-     * @param {string} ciphertextBase64 - Base64-encoded encrypted data
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<ArrayBuffer>} The decrypted binary data
+     * @param ciphertextBase64 - Base64-encoded encrypted data
+     * @param key - An AES-GCM key
+     * @returns The decrypted binary data
      */
-    static decryptBuffer(ciphertextBase64, key) {
+    static decryptBuffer(
+        ciphertextBase64: string,
+        key: CryptoKey
+    ): Promise<ArrayBuffer> {
         const combined = E2EEEncryptor._base64ToUint8Array(ciphertextBase64)
         const iv = combined.slice(0, 12)
         const ciphertext = combined.slice(12)
-        return crypto.subtle.decrypt({name: "AES-GCM", iv: iv}, key, ciphertext)
+        return crypto.subtle.decrypt(
+            {name: "AES-GCM", iv: iv},
+            key,
+            ciphertext
+        )
     }
 
     /**
@@ -124,11 +143,14 @@ export class E2EEEncryptor {
      * a Blob with application/octet-stream type (since the encrypted
      * data is opaque binary).
      *
-     * @param {File|Blob} file - The image file to encrypt
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<Blob>} An encrypted Blob with type application/octet-stream
+     * @param file - The image file to encrypt
+     * @param key - An AES-GCM key
+     * @returns An encrypted Blob with type application/octet-stream
      */
-    static async encryptImage(file, key) {
+    static async encryptImage(
+        file: Blob,
+        key: CryptoKey
+    ): Promise<Blob> {
         const buffer = await file.arrayBuffer()
         const iv = crypto.getRandomValues(new Uint8Array(12))
         const ciphertext = await crypto.subtle.encrypt(
@@ -146,11 +168,14 @@ export class E2EEEncryptor {
     /**
      * Decrypt an encrypted image back to an ArrayBuffer.
      *
-     * @param {string} ciphertextBase64 - Base64-encoded encrypted image data
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<ArrayBuffer>} The decrypted image data
+     * @param ciphertextBase64 - Base64-encoded encrypted image data
+     * @param key - An AES-GCM key
+     * @returns The decrypted image data
      */
-    static decryptImage(ciphertextBase64, key) {
+    static decryptImage(
+        ciphertextBase64: string,
+        key: CryptoKey
+    ): Promise<ArrayBuffer> {
         return E2EEEncryptor.decryptBuffer(ciphertextBase64, key)
     }
 
@@ -160,11 +185,14 @@ export class E2EEEncryptor {
      * Useful for decrypting encrypted images that need to be stored
      * as Base64 data URLs or re-exported.
      *
-     * @param {string} ciphertextBase64 - Base64-encoded encrypted data
-     * @param {CryptoKey} key - An AES-GCM key
-     * @returns {Promise<string>} Base64-encoded decrypted data
+     * @param ciphertextBase64 - Base64-encoded encrypted data
+     * @param key - An AES-GCM key
+     * @returns Base64-encoded decrypted data
      */
-    static async decryptBufferToBase64(ciphertextBase64, key) {
+    static async decryptBufferToBase64(
+        ciphertextBase64: string,
+        key: CryptoKey
+    ): Promise<string> {
         const buffer = await E2EEEncryptor.decryptBuffer(ciphertextBase64, key)
         const bytes = new Uint8Array(buffer)
         let binary = ""
@@ -180,12 +208,16 @@ export class E2EEEncryptor {
      * Fetches the encrypted image file from the given URL, decrypts it,
      * and creates a temporary object URL that can be used as an img src.
      *
-     * @param {string} imageUrl - The URL of the encrypted image file
-     * @param {CryptoKey} key - An AES-GCM key
-     * @param {string} mimeType - The MIME type of the decrypted image
-     * @returns {Promise<string>} A blob URL for the decrypted image
+     * @param imageUrl - The URL of the encrypted image file
+     * @param key - An AES-GCM key
+     * @param mimeType - The MIME type of the decrypted image
+     * @returns A blob URL for the decrypted image
      */
-    static async decryptImageToUrl(imageUrl, key, mimeType = "image/png") {
+    static async decryptImageToUrl(
+        imageUrl: string,
+        key: CryptoKey,
+        mimeType = "image/png"
+    ): Promise<string> {
         const response = await fetch(imageUrl)
         const arrayBuffer = await response.arrayBuffer()
         const bytes = new Uint8Array(arrayBuffer)
@@ -205,7 +237,7 @@ export class E2EEEncryptor {
      * Convert a Uint8Array to a Base64-encoded string.
      * @private
      */
-    static _uint8ArrayToBase64(bytes) {
+    private static _uint8ArrayToBase64(bytes: Uint8Array): string {
         let binary = ""
         for (let i = 0; i < bytes.length; i++) {
             binary += String.fromCharCode(bytes[i])
@@ -217,7 +249,7 @@ export class E2EEEncryptor {
      * Convert a Base64-encoded string to a Uint8Array.
      * @private
      */
-    static _base64ToUint8Array(base64) {
+    private static _base64ToUint8Array(base64: string): Uint8Array {
         const binary = atob(base64)
         const bytes = new Uint8Array(binary.length)
         for (let i = 0; i < binary.length; i++) {

@@ -1,8 +1,10 @@
-export const text = {
+import type {MarkSpec, NodeSpec} from "prosemirror-model"
+
+export const text: NodeSpec = {
     group: "inline"
 }
 
-export const literal = {
+export const literal: NodeSpec = {
     content: "inline*",
     marks: "_",
     parseDOM: [{tag: "div.literal"}],
@@ -17,7 +19,7 @@ export const literal = {
     }
 }
 
-export const variable = {
+export const variable: NodeSpec = {
     inline: true,
     group: "inline",
     attrs: {
@@ -27,8 +29,9 @@ export const variable = {
         {
             tag: "span[data-variable]",
             getAttrs(dom) {
+                const element = dom as Element
                 return {
-                    variable: dom.getAttribute("data-variable")
+                    variable: element.getAttribute("data-variable")
                 }
             }
         }
@@ -36,13 +39,13 @@ export const variable = {
     toDOM(node) {
         return [
             "span",
-            {"data-variable": node.attrs.variable},
-            node.attrs.variable
+            {"data-variable": node.attrs.variable as string},
+            node.attrs.variable as string
         ]
     }
 }
 
-export const sup = {
+export const sup: MarkSpec = {
     parseDOM: [
         {tag: "sup"},
         {style: "vertical-align", getAttrs: value => value == "super" && null}
@@ -52,7 +55,7 @@ export const sup = {
     }
 }
 
-export const sub = {
+export const sub: MarkSpec = {
     parseDOM: [
         {tag: "sub"},
         {style: "vertical-align", getAttrs: value => value == "sub" && null}
@@ -62,7 +65,7 @@ export const sub = {
     }
 }
 
-export const smallcaps = {
+export const smallcaps: MarkSpec = {
     parseDOM: [
         {tag: "span.smallcaps"},
         {
@@ -75,16 +78,16 @@ export const smallcaps = {
     }
 }
 
-//Currently unsupported
+// Currently unsupported
 
-export const url = {
+export const url: MarkSpec = {
     parseDOM: [{tag: "span.url"}],
     toDOM() {
         return ["span", {class: "url"}]
     }
 }
 
-export const enquote = {
+export const enquote: MarkSpec = {
     parseDOM: [{tag: "span.enquote"}],
     toDOM() {
         return ["span", {class: "enquote"}]

@@ -4,5 +4,4 @@ using pandoc like this:
 pandoc document.json -o document.html
 
 Replace "document.html" with other formats you may want.
-
 `

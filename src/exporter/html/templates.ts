@@ -1,5 +1,25 @@
 import {escapeText} from "fwtoolkit"
 
+import type {DocSettings} from "../../types.js"
+
+interface HtmlExportSettings extends DocSettings {
+    copyright?: {
+        holder?: string
+        year?: number
+        licenses?: Array<{url: string; title: string; start?: number}>
+    }
+}
+
+interface HtmlExportTemplateOptions {
+    head: string
+    body: string
+    back: string
+    settings: HtmlExportSettings
+    lang: string
+    xhtml?: boolean
+    epub?: boolean
+}
+
 /** A template for HTML export of a document. */
 export const htmlExportTemplate = ({
     head,
@@ -9,7 +29,7 @@ export const htmlExportTemplate = ({
     lang,
     xhtml,
     epub
-}) =>
+}: HtmlExportTemplateOptions): string =>
     `${xhtml ? '<?xml version="1.0" encoding="UTF-8"?>' : "<!DOCTYPE html>"}
     <html ${xhtml ? `xmlns="http://www.w3.org/1999/xhtml" ${epub ? 'xmlns:epub="http://www.idpf.org/2007/ops"' : ""}` : ""} lang="${lang}"${xhtml ? ` xml:lang="${lang}"` : ""}>
     <head>
@@ -26,7 +46,7 @@ export const htmlExportTemplate = ({
                 : ""
         }
         ${
-            settings.copyright && settings.copyright.licenses.length
+            settings.copyright && settings.copyright.licenses?.length
                 ? `<div>${settings.copyright.licenses.map(license => `<a rel="license" href="${escapeText(license.url)}">${escapeText(license.title)}${license.start ? ` (${license.start})` : ""}</a>`).join("</div><div>")}</div>`
                 : ""
         }

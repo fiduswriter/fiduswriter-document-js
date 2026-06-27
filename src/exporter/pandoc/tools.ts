@@ -1,5 +1,26 @@
-export const convertText = text => {
-    const textContent = []
+interface PandocText {
+    t: "Str"
+    c: string
+}
+
+interface PandocSpace {
+    t: "Space"
+}
+
+interface PandocNote {
+    t: "Note"
+    c: Array<{t: "Para"; c: Array<PandocText | PandocSpace>}>
+}
+
+interface PandocMetaInlines {
+    t: "MetaInlines"
+    c: Array<PandocText | PandocSpace | PandocNote>
+}
+
+type PandocInline = PandocText | PandocSpace | PandocNote | PandocMetaInlines
+
+export const convertText = (text: string): Array<PandocText | PandocSpace> => {
+    const textContent: Array<PandocText | PandocSpace> = []
     if (!text.length) {
         return []
     }
@@ -20,10 +41,12 @@ export const convertText = text => {
     return textContent
 }
 
-export const convertContributor = contributor => {
-    const contributorContent = []
+export const convertContributor = (
+    contributor: Record<string, string>
+): PandocMetaInlines | false => {
+    const contributorContent: Array<PandocText | PandocSpace | PandocNote> = []
     if (contributor.firstname || contributor.lastname) {
-        const nameParts = []
+        const nameParts: string[] = []
         if (contributor.lastname) {
             nameParts.push(contributor.lastname)
         }

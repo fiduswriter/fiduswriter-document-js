@@ -1,13 +1,14 @@
 import {Schema} from "prosemirror-model"
 import {marks} from "prosemirror-schema-basic"
+
 import {smallcaps, sub, sup, text} from "./common.js"
 
-const doc = {content: "cslbib"}
+const doc: import("prosemirror-model").NodeSpec = {content: "cslbib"}
 
-const cslbib = {
+const cslbib: import("prosemirror-model").NodeSpec = {
     content: "cslentry*",
     parseDOM: [{tag: "div.csl-bib-body"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -18,10 +19,10 @@ const cslbib = {
     }
 }
 
-const cslentry = {
+const cslentry: import("prosemirror-model").NodeSpec = {
     content: "block*",
     parseDOM: [{tag: "div.csl-entry"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -36,12 +37,12 @@ const cslentry = {
 // system doesn't allow for the mixing of inline and block content, it "imagines"
 // that this block exists. This---rather than other blocks---is chosen, because
 // it's the first in the list.
-const cslinline = {
+const cslinline: import("prosemirror-model").NodeSpec = {
     group: "block",
     content: "text*",
     marks: "_",
     parseDOM: [{tag: "div.csl-inline"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -52,12 +53,12 @@ const cslinline = {
     }
 }
 
-const cslblock = {
+const cslblock: import("prosemirror-model").NodeSpec = {
     group: "block",
     content: "text*",
     marks: "_",
     parseDOM: [{tag: "div.csl-block"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -68,12 +69,12 @@ const cslblock = {
     }
 }
 
-const cslleftmargin = {
+const cslleftmargin: import("prosemirror-model").NodeSpec = {
     group: "block",
     content: "text*",
     marks: "_",
     parseDOM: [{tag: "div.csl-left-margin"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -84,12 +85,12 @@ const cslleftmargin = {
     }
 }
 
-const cslrightinline = {
+const cslrightinline: import("prosemirror-model").NodeSpec = {
     group: "block",
     content: "text*",
     marks: "_",
     parseDOM: [{tag: "div.csl-right-inline"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {
@@ -100,12 +101,12 @@ const cslrightinline = {
     }
 }
 
-const cslindent = {
+const cslindent: import("prosemirror-model").NodeSpec = {
     group: "block",
     content: "text*",
     marks: "_",
     parseDOM: [{tag: "div.csl-indent"}],
-    toDOM(_node) {
+    toDOM() {
         return [
             "div",
             {

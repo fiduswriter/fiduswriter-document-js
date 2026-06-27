@@ -1,6 +1,6 @@
-const numberToRoman = number => {
+const numberToRoman = (number: number): string => {
     let roman = ""
-    const romanNumList = {
+    const romanNumList: Record<string, number> = {
         M: 1000,
         CM: 900,
         D: 500,
@@ -15,7 +15,7 @@ const numberToRoman = number => {
         IV: 4,
         I: 1
     }
-    let a
+    let a: number
     for (const key in romanNumList) {
         a = Math.floor(number / romanNumList[key])
         if (a >= 0) {
@@ -28,10 +28,10 @@ const numberToRoman = number => {
     return roman
 }
 
-const numberToAlpha = number => {
+const numberToAlpha = (number: number): string => {
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     let alpha = ""
-    let a
+    let a: number
     for (let i = 0; i < number; i++) {
         a = i % 26
         alpha += alphabet[a]
@@ -39,7 +39,10 @@ const numberToAlpha = number => {
     return alpha
 }
 
-export const displayNumber = (number, system) => {
+export const displayNumber = (
+    number: number,
+    system?: string
+): string | number => {
     if (system === "roman") {
         return numberToRoman(number)
     }
