@@ -2,20 +2,40 @@ import {BibLatexExporter} from "biblatex-csl-converter"
 import download from "downloadjs"
 
 import {shortFileTitle} from "fwtoolkit"
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
 import {PandocExporterCitations} from "./citations.js"
 import {PandocExporterConvert} from "./convert.js"
 import {readMe} from "./readme.js"
+
 /*
  Exporter to Pandoc JSON
 */
 
 export class PandocExporter {
-    constructor(doc, bibDB, imageDB, csl, updated) {
+    doc: ExportDoc
+    docTitle: string
+    bibDB: BibDB
+    imageDB: ImageDB
+    csl: CSL
+    updated: any
+
+    docContent: any
+    zipFileName: string
+    textFiles: Array<{filename: string; contents: string}>
+    httpFiles: Array<{filename: string; url: string}>
+
+    constructor(
+        doc: ExportDoc,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL,
+        updated: any
+    ) {
         this.doc = doc
-        this.docTitle = shortFileTitle(this.doc.title, this.doc.path)
+        this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.csl = csl
@@ -27,23 +47,23 @@ export class PandocExporter {
         this.httpFiles = []
     }
 
-    init() {
+    init(): Promise<void> {
         //this.docContent = removeHidden(this.doc.content) //
-        this.docContent = fixTables(removeHidden(this.doc.content))
-        this.citations = new PandocExporterCitations(
+        this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
+        const citations = new PandocExporterCitations(
             this,
             this.bibDB,
             this.csl,
             this.docContent
         )
-        this.converter = new PandocExporterConvert(
+        const converter = new PandocExporterConvert(
             this,
             this.imageDB,
             this.bibDB,
             this.doc.settings
         )
-        return this.citations.init().then(() => {
-            this.conversion = this.converter.init(this.docContent)
+        return citations.init().then(() => {
+            this.conversion = converter.init(this.docContent)
             if (Object.keys(this.conversion.usedBibDB).length > 0) {
                 const bibExport = new BibLatexExporter(
                     this.conversion.usedBibDB
@@ -54,17 +74,20 @@ export class PandocExporter {
                 })
             }
 
-            this.conversion.imageIds.forEach(id => {
+            this.conversion.imageIds.forEach((id: string) => {
+                const imageUrl = this.imageDB.db[id].image as string
                 this.httpFiles.push({
-                    filename: this.imageDB.db[id].image.split("/").pop(),
-                    url: this.imageDB.db[id].image
+                    filename: imageUrl.split("/").pop()!,
+                    url: imageUrl
                 })
             })
             return this.createExport()
         })
     }
 
-    createExport() {
+    conversion: any
+
+    createExport(): Promise<void> {
         // Override this function if adding a conversion-through-pandoc step.
         this.textFiles.push({
             filename: "document.json",
@@ -75,7 +98,7 @@ export class PandocExporter {
         return this.createDownload()
     }
 
-    createDownload() {
+    createDownload(): Promise<void> {
         // This creates a ZIP file with JSON sources included and then returns a promise for the download of the file.
         const zipper = new ZipFileCreator(
             this.textFiles,

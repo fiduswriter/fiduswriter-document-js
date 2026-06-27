@@ -2,9 +2,17 @@ import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
 import {textContent} from "../tools/doc_content.js"
 import {xmlDOM} from "../tools/xml.js"
+import type {XMLElement} from "../tools/xml.js"
+import type {XmlZip} from "../tools/xml_zip.js"
 
 export class DOCXExporterRender {
-    constructor(xml) {
+    xml: XmlZip
+
+    filePath: string | false // "word/document.xml" or "word/document2.xml" in some cases
+    ctXML: XMLElement | false
+    text: XMLElement | false
+
+    constructor(xml: XmlZip) {
         this.xml = xml
 
         this.filePath = false // "word/document.xml" or "word/document2.xml" in some cases
@@ -12,7 +20,7 @@ export class DOCXExporterRender {
         this.text = false
     }
 
-    init() {
+    init(): Promise<void> {
         return this.xml
             .getXml("[Content_Types].xml")
             .then(ctXML => {
@@ -21,9 +29,9 @@ export class DOCXExporterRender {
                     ContentType:
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
                 })
-                this.filePath = documentOverride
-                    .getAttribute("PartName")
-                    .slice(1)
+                this.filePath = String(
+                    documentOverride!.getAttribute("PartName")
+                ).slice(1)
                 return this.xml.getXml(this.filePath)
             })
             .then(xml => {
@@ -31,20 +39,20 @@ export class DOCXExporterRender {
                 // Ensure we support the three latest docx feature sets:
                 // wp14 (drawing 2010), w14 (word 2010), w15 (word 2012)
                 const documentEl = this.text.query("w:document")
-                if (!documentEl.getAttribute("xmlns:wp14")) {
-                    documentEl.setAttribute(
+                if (!documentEl!.getAttribute("xmlns:wp14")) {
+                    documentEl!.setAttribute(
                         "xmlns:wp14",
                         "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
                     )
                 }
-                if (!documentEl.getAttribute("xmlns:w14")) {
-                    documentEl.setAttribute(
+                if (!documentEl!.getAttribute("xmlns:w14")) {
+                    documentEl!.setAttribute(
                         "xmlns:w14",
                         "http://schemas.microsoft.com/office/word/2010/wordml"
                     )
                 }
-                if (!documentEl.getAttribute("xmlns:w15")) {
-                    documentEl.setAttribute(
+                if (!documentEl!.getAttribute("xmlns:w15")) {
+                    documentEl!.setAttribute(
                         "xmlns:w15",
                         "http://schemas.microsoft.com/office/word/2012/wordml"
                     )
@@ -52,19 +60,18 @@ export class DOCXExporterRender {
                 const ignorable = [
                     ...new Set(
                         ["w14", "wp14", "w15"].concat(
-                            documentEl
-                                .getAttribute("mc:Ignorable", "")
+                            String(documentEl!.getAttribute("mc:Ignorable") || "")
                                 .split(" ")
                                 .filter(item => item.length)
                         )
                     )
                 ]
-                documentEl.setAttribute("mc:Ignorable", ignorable.join(" "))
+                documentEl!.setAttribute("mc:Ignorable", ignorable.join(" "))
                 return Promise.resolve()
             })
     }
 
-    parseStructuredTags(block, tag) {
+    parseStructuredTags(block: XMLElement, tag: any): void {
         let blockText = block.textContent
         const tagName = tag.title
 
@@ -83,7 +90,7 @@ export class DOCXExporterRender {
             const limit = beginStartMatch[1]
                 ? parseInt(beginStartMatch[1])
                 : null
-            const beginStart = beginStartMatch.index
+            const beginStart = beginStartMatch.index as number
             const beginEnd = beginStart + beginStartMatch[0].length
 
             // Find matching {END_tag}
@@ -122,9 +129,9 @@ export class DOCXExporterRender {
         }
     }
 
-    processLoop(templateXml, items, tagName, limit = null) {
+    processLoop(templateXml: string, items: any[], tagName: string, limit: number | null = null): string {
         const effectiveItems = limit !== null ? items.slice(0, limit) : items
-        const results = []
+        const results: string[] = []
 
         effectiveItems.forEach((item, index) => {
             const loopCtx = {
@@ -178,7 +185,7 @@ export class DOCXExporterRender {
         return results.join("")
     }
 
-    processConditionals(text, ctx) {
+    processConditionals(text: string, ctx: any): string {
         let result = text
         let changed = true
         while (changed) {
@@ -224,14 +231,14 @@ export class DOCXExporterRender {
                 }
                 const innerContent = result.slice(innerStart, pos)
 
-                const conditions = []
+                const conditions: any[] = []
                 conditions.push({expr: ifExpr, content: ""})
 
                 const remaining = innerContent
                 let lastIndex = 0
 
                 const elifRegex = /\{ELIF\(([^)]+)\)\}/g
-                let elifMatch
+                let elifMatch: RegExpExecArray | null
                 while ((elifMatch = elifRegex.exec(remaining)) !== null) {
                     conditions[conditions.length - 1].content = remaining.slice(
                         lastIndex,
@@ -245,12 +252,12 @@ export class DOCXExporterRender {
                 if (elseMatch) {
                     conditions[conditions.length - 1].content = remaining.slice(
                         lastIndex,
-                        lastIndex + elseMatch.index
+                        lastIndex + elseMatch.index!
                     )
                     conditions.push({
                         expr: null,
                         content: remaining.slice(
-                            lastIndex + elseMatch.index + elseMatch[0].length
+                            lastIndex + elseMatch.index! + elseMatch[0].length
                         )
                     })
                 } else {
@@ -279,7 +286,7 @@ export class DOCXExporterRender {
         return result
     }
 
-    evaluateExpression(expr, ctx) {
+    evaluateExpression(expr: string, ctx: any): any {
         try {
             // Allow explicit tag name references (e.g., authors.count -> ctx.count)
             if (ctx.tagName) {
@@ -317,7 +324,7 @@ export class DOCXExporterRender {
             // Check for unknown identifiers
             const bareIdRegex = /\b[a-zA-Z_]\w*\b/g
             const allowed = ["true", "false", "null", "undefined"]
-            let m
+            let m: RegExpExecArray | null
             while ((m = bareIdRegex.exec(safeExpr)) !== null) {
                 if (!allowed.includes(m[0])) {
                     console.warn(
@@ -343,8 +350,8 @@ export class DOCXExporterRender {
         }
     }
 
-    processMultiBlockStructuredTags(blocks, tags) {
-        const tagMap = {}
+    processMultiBlockStructuredTags(blocks: XMLElement[], tags: any[]): void {
+        const tagMap: Record<string, any> = {}
         tags.forEach(tag => {
             if (tag.title) {
                 tagMap[tag.title] = tag
@@ -425,7 +432,13 @@ export class DOCXExporterRender {
         }
     }
 
-    _replaceMultiBlockLoop(blocks, beginIndex, endIndex, tag, limit) {
+    _replaceMultiBlockLoop(
+        blocks: XMLElement[],
+        beginIndex: number,
+        endIndex: number,
+        tag: any,
+        limit: number | null
+    ): void {
         const tagName = tag.title
         const beginBlock = blocks[beginIndex]
 
@@ -447,7 +460,7 @@ export class DOCXExporterRender {
 
         const beforeXml = combinedXml.slice(0, beginMatch.index)
         const templateXml = combinedXml.slice(
-            beginMatch.index + beginMatch[0].length,
+            (beginMatch.index as number) + beginMatch[0].length,
             endPos
         )
         const afterXml = combinedXml.slice(endPos + endTag.length)
@@ -466,25 +479,33 @@ export class DOCXExporterRender {
         const parent = beginBlock.parentElement
         const dom = xmlDOM(`<root>${fullReplacement}</root>`)
         const root = dom.query("root")
-        const newBlocks = root.children.filter(
-            child => child.tagName === "w:p" || child.tagName === "w:sectPr"
-        )
+        const newBlocks = root!.children.filter(
+            child =>
+                (child as XMLElement).tagName === "w:p" ||
+                (child as XMLElement).tagName === "w:sectPr"
+        ) as XMLElement[]
 
         // Insert new blocks before begin block
         for (let i = newBlocks.length - 1; i >= 0; i--) {
-            parent.insertBefore(newBlocks[i], beginBlock)
+            parent!.insertBefore(newBlocks[i], beginBlock)
         }
 
         // Remove old blocks
         for (let i = endIndex; i >= beginIndex; i--) {
-            parent.removeChild(blocks[i])
+            parent!.removeChild(blocks[i])
         }
 
         // Update blocks array
         blocks.splice(beginIndex, endIndex - beginIndex + 1, ...newBlocks)
     }
 
-    _replaceMultiBlockConditional(blocks, ifIndex, endIndex, expr, tagMap) {
+    _replaceMultiBlockConditional(
+        blocks: XMLElement[],
+        ifIndex: number,
+        endIndex: number,
+        expr: string,
+        tagMap: Record<string, any>
+    ): void {
         const ifBlock = blocks[ifIndex]
 
         // Concatenate all blocks from if to endif
@@ -494,9 +515,12 @@ export class DOCXExporterRender {
         }
 
         // Determine which tag the expression references
-        let ctx = {count: 0, content: []}
+        let ctx: any = {count: 0, content: []}
         for (const tagName in tagMap) {
-            const safeTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            const safeTagName = tagName.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+            )
             if (new RegExp(`\\b${safeTagName}\\b`).test(expr)) {
                 const tag = tagMap[tagName]
                 ctx = {
@@ -521,25 +545,27 @@ export class DOCXExporterRender {
         const parent = ifBlock.parentElement
         const dom = xmlDOM(`<root>${processedXml}</root>`)
         const root = dom.query("root")
-        const newBlocks = root.children.filter(
-            child => child.tagName === "w:p" || child.tagName === "w:sectPr"
-        )
+        const newBlocks = root!.children.filter(
+            child =>
+                (child as XMLElement).tagName === "w:p" ||
+                (child as XMLElement).tagName === "w:sectPr"
+        ) as XMLElement[]
 
         for (let i = newBlocks.length - 1; i >= 0; i--) {
-            parent.insertBefore(newBlocks[i], ifBlock)
+            parent!.insertBefore(newBlocks[i], ifBlock)
         }
 
         for (let i = endIndex; i >= ifIndex; i--) {
-            parent.removeChild(blocks[i])
+            parent!.removeChild(blocks[i])
         }
 
         blocks.splice(ifIndex, endIndex - ifIndex + 1, ...newBlocks)
     }
 
     // Define the tags that are to be looked for in the document
-    getTagData(docContent, pmBib, settings) {
-        const tags = docContent.content.map(node => {
-            const tag = {}
+    getTagData(docContent: any, pmBib: any, settings: any): any[] {
+        const tags = docContent.content.map((node: any) => {
+            const tag: any = {}
             switch (node.type) {
                 case "title":
                     tag.title = "title"
@@ -558,7 +584,7 @@ export class DOCXExporterRender {
                     tag.title = node.attrs.id
                     // Return array of structured objects for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map(node => {
+                        ? node.content.map((node: any) => {
                               const c = node.attrs
                               return {
                                   firstname: c.firstname || "",
@@ -575,14 +601,14 @@ export class DOCXExporterRender {
                     tag.title = node.attrs.id
                     // Return array of tag strings for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map(node => node.attrs.tag)
+                        ? node.content.map((node: any) => node.attrs.tag)
                         : []
                     break
             }
             return tag
         })
 
-        let bibliographyContent
+        let bibliographyContent: any[]
         if (pmBib && pmBib.content && pmBib.content.length > 0) {
             // Add bibliography heading and mark first/last items
             const firstPmBib = pmBib.content[0]
@@ -591,9 +617,10 @@ export class DOCXExporterRender {
             firstPmBib.attrs.first = true
             lastPmBib.attrs = lastPmBib.attrs || {}
             lastPmBib.attrs.last = true
+            const lang = settings.language as string
             const bibliographyHeader =
-                settings.bibliography_header[settings.language] ||
-                BIBLIOGRAPHY_HEADERS[settings.language]
+                (settings.bibliography_header as Record<string, string> | undefined)?.[lang] ||
+                (BIBLIOGRAPHY_HEADERS as Record<string, string>)[lang]
             bibliographyContent = [
                 {
                     type: "bibliography_heading",
@@ -640,7 +667,7 @@ export class DOCXExporterRender {
             title: "@licenses", // The '@' triggers handling as block
             content:
                 settings.copyright && settings.copyright.licenses.length
-                    ? settings.copyright.licenses.map(license => ({
+                    ? settings.copyright.licenses.map((license: any) => ({
                           type: "paragraph",
                           content: [
                               {
@@ -677,16 +704,23 @@ export class DOCXExporterRender {
 
     // go through document.xml looking for tags and replace them with the given
     // replacements.
-    render(docContent, pmBib, settings, richtext, citations) {
+    render(
+        docContent: any,
+        pmBib: any,
+        settings: any,
+        richtext: any,
+        citations: any
+    ): void {
         const tags = this.getTagData(docContent, pmBib, settings)
 
         // Including global page definition at end
-        const blocks = this.text.queryAll(["w:p", "w:sectPr"])
+        const textEl = this.text as XMLElement
+        const blocks = textEl.queryAll(["w:p", "w:sectPr"])
 
         // Process multi-block structured tags first (BEGIN...END across paragraphs)
         this.processMultiBlockStructuredTags(blocks, tags)
 
-        const currentTags = []
+        const currentTags: any[] = []
         blocks.forEach(block => {
             // Assuming there is nothing outside of <w:t>...</w:t>
             const text = block.textContent
@@ -720,22 +754,22 @@ export class DOCXExporterRender {
             if (pageSize && pageMargins) {
                 // Not sure if these all need to come together
                 let width =
-                    Number.parseInt(pageSize.getAttribute("w:w")) -
-                    Number.parseInt(pageMargins.getAttribute("w:right")) -
-                    Number.parseInt(pageMargins.getAttribute("w:left"))
+                    Number.parseInt(String(pageSize.getAttribute("w:w"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:right"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:left")))
                 const height =
-                    Number.parseInt(pageSize.getAttribute("w:h")) -
-                    Number.parseInt(pageMargins.getAttribute("w:bottom")) -
-                    Number.parseInt(pageMargins.getAttribute("w:top")) -
-                    Number.parseInt(pageMargins.getAttribute("w:header")) -
-                    Number.parseInt(pageMargins.getAttribute("w:footer"))
+                    Number.parseInt(String(pageSize.getAttribute("w:h"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:bottom"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:top"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:header"))) -
+                    Number.parseInt(String(pageMargins.getAttribute("w:footer")))
 
                 const colCount = cols
-                    ? Number.parseInt(cols.getAttribute("w:num"))
+                    ? Number.parseInt(String(cols.getAttribute("w:num")))
                     : 1
-                if (colCount > 1) {
+                if (cols && colCount > 1) {
                     const colSpace = Number.parseInt(
-                        cols.getAttribute("w:space")
+                        String(cols.getAttribute("w:space"))
                     )
                     width = width - colSpace * (colCount - 1)
                     width = width / colCount
@@ -749,7 +783,7 @@ export class DOCXExporterRender {
                 }
             }
         })
-        tags.forEach(tag => {
+        tags.forEach((tag: any) => {
             if (!tag.title) {
                 return
             } else if (tag.title[0] === "@") {
@@ -761,7 +795,7 @@ export class DOCXExporterRender {
     }
 
     // Render Tags that only exchange inline content
-    inlineRender(tag) {
+    inlineRender(tag: any): void {
         if (!tag.block) {
             return
         }
@@ -787,7 +821,7 @@ export class DOCXExporterRender {
 
             // Process each item with the format string
             const formattedItems = tag.content
-                .map(item => {
+                .map((item: any) => {
                     if (typeof item === "string") {
                         // For tags (simple strings)
                         return format.replace(/%tag/g, item)
@@ -802,10 +836,10 @@ export class DOCXExporterRender {
                             .replace(/%id_value/g, item.id_value || "")
                     }
                 })
-                .filter(s => s.trim() !== "")
+                .filter((s: string) => s.trim() !== "")
 
             // Handle special delimiters
-            let delimiterText = delimiter
+            let delimiterText: string = delimiter
             delimiterText = delimiterText.replace(/\\n/g, "\n")
             delimiterText = delimiterText.replace(/\\p/g, "\n\n")
 
@@ -813,7 +847,7 @@ export class DOCXExporterRender {
             fullText = blockText.replace(formatRegex, replacement)
         } else {
             // Fall back to simple string replacement (backward compatible)
-            let contentStr = tag.content || ""
+            let contentStr: any = tag.content || ""
             if (Array.isArray(contentStr)) {
                 if (contentStr.length === 0) {
                     contentStr = ""
@@ -822,9 +856,9 @@ export class DOCXExporterRender {
                 } else {
                     // Contributors - backward compatible formatting
                     contentStr = contentStr
-                        .map(item => {
-                            const nameParts = []
-                            let affiliation = false
+                        .map((item: any) => {
+                            const nameParts: string[] = []
+                            let affiliation: string | false = false
                             if (item.firstname) {
                                 nameParts.push(item.firstname)
                             }
@@ -842,6 +876,7 @@ export class DOCXExporterRender {
                             if (affiliation) {
                                 parts.push(affiliation)
                             }
+
                             if (item.email) {
                                 parts.push(item.email)
                             }
@@ -859,13 +894,13 @@ export class DOCXExporterRender {
 
         // Apply the replacement
         const rs = tag.block.queryAll("w:r").reverse()
-        let lastR
+        let lastR: XMLElement | undefined
         // Remove all <w:r> with text in them (<w:t>).
         // Exclude <w:r> used for other things, like page breaks.
-        rs.forEach(r => {
+        rs.forEach((r: XMLElement) => {
             if (r.query("w:t")) {
                 if (lastR) {
-                    r.parentElement.removeChild(r)
+                    r.parentElement!.removeChild(r)
                 } else {
                     lastR = r
                 }
@@ -896,17 +931,17 @@ export class DOCXExporterRender {
                 lastR.innerXML = `<w:t ${textAttr}>${escapeText(fullText)}</w:t>`
             }
         } else {
-            lastR.parentElement.removeChild(lastR)
+            lastR.parentElement!.removeChild(lastR)
         }
     }
 
     // Render tags that exchange paragraphs
-    blockRender(tag, citations, richtext) {
+    blockRender(tag: any, citations: any, richtext: any): void {
         if (!tag.block) {
             return
         }
         const pStyle = tag.block.query("w:pStyle")
-        const options = {
+        const options: any = {
             dimensions: tag.dimensions,
             citationType: citations.citFm.citationType,
             section: pStyle ? pStyle.getAttribute("w:val") : "Normal",
@@ -914,7 +949,7 @@ export class DOCXExporterRender {
         }
         const outXML = tag.content
             ? tag.content
-                  .map((content, i) =>
+                  .map((content: any, i: number) =>
                       richtext.run(content, options, tag.content[i + 1])
                   )
                   .join("")
@@ -922,20 +957,22 @@ export class DOCXExporterRender {
         if (!outXML.length) {
             // If there is no content, we need to put in a space to prevent the
             // tag from being removed.
-            tag.block.innerXML = '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
+            tag.block.innerXML =
+                '<w:r><w:t xml:space="preserve"> </w:t></w:r>'
             return
         }
         const parentElement = tag.block.parentElement
         const dom = xmlDOM(outXML)
-        const domPars = dom.node["#document"]?.slice() || [dom]
-        domPars.forEach(node => parentElement.insertBefore(node, tag.block))
+        const domPars =
+            (dom.node["#document"] as XMLElement[] | undefined)?.slice() || [dom]
+        domPars.forEach(node => parentElement!.insertBefore(node, tag.block))
         // sectPr contains information about columns, etc. We need to move this
         // to the last paragraph we will be adding.
         const sectPr = tag.block.query("w:sectPr")
         if (sectPr) {
-            const pPr = tag.block.previousSibling.query("w:pPr")
-            pPr.appendChild(sectPr)
+            const pPr = tag.block.previousSibling!.query("w:pPr")
+            pPr!.appendChild(sectPr as unknown as never)
         }
-        parentElement.removeChild(tag.block)
+        parentElement!.removeChild(tag.block)
     }
 }

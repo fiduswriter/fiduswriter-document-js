@@ -2,7 +2,7 @@ import {printHTML} from "@vivliostyle/print"
 import {addAlert, shortFileTitle, gettext, staticUrl} from "fwtoolkit"
 
 import {PAPER_SIZES} from "../../schema/const.js"
-import type {ExportDoc} from "../../types.js"
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {HTMLExporter} from "../html/index.js"
 import {HTMLExporterConvert} from "../html/convert.js"
 import {removeHidden} from "../tools/doc_content.js"
@@ -10,9 +10,9 @@ import {removeHidden} from "../tools/doc_content.js"
 export class PrintExporter extends HTMLExporter {
     constructor(
         doc: ExportDoc,
-        bibDB: unknown,
-        imageDB: unknown,
-        csl: unknown,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL,
         updated: unknown,
         documentStyles: Array<{
             slug: string
@@ -28,9 +28,9 @@ export class PrintExporter extends HTMLExporter {
     async init(): Promise<void> {
         addAlert(
             "info",
-            `${shortFileTitle(this.doc.title, this.doc.path)}: ${gettext("Printing has been initiated.")}`
+            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Printing has been initiated.")}`
         )
-        this.docContent = removeHidden(this.doc.content) as any
+        this.docContent = removeHidden(this.doc.content) as FidusNode
 
         const styleSheets: Array<{
             url?: string

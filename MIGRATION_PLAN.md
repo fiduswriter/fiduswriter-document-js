@@ -32,13 +32,12 @@ For each phase/group:
 
 All committed phases pass `npm run typecheck`, `npm run build`, `npm run build-schema`, and `npm test` (139 tests).
 
-### 🚧 Phase 4 — Converted but not yet committed
+### ✅ Phase 4 — Converted and committed
 
 The remaining exporter entry points and large converters have been converted to
-TypeScript and the original `.js` files removed, but the working tree has
-**not yet passed typecheck** and is therefore **not committed**.
+TypeScript and the original `.js` files removed.
 
-Converted files in the working tree:
+Converted files:
 - `src/exporter/docx/index.ts`
 - `src/exporter/docx/render.ts`
 - `src/exporter/docx/richtext.ts`
@@ -55,54 +54,21 @@ Converted files in the working tree:
 - `src/exporter/pandoc/convert.ts`
 - `src/exporter/epub/index.ts`
 
-Also modified by the conversion:
+Also adjusted during the conversion:
 - `src/exporter/epub/tools.ts`
+- `src/exporter/jats/citations.ts`
 - `src/exporter/print/index.ts`
 - `src/schema/i18n.ts`
 - `src/types.ts`
 
-### 🔴 Current blocker
+Phase 4 passes `npm run typecheck`, `npm run build`, `npm run build-schema`, and
+`npm test` (139 tests), and `find src -name '*.js'` returns no source files.
 
-`npm run typecheck` fails on `src/exporter/epub/index.ts` with syntax errors.
-The file appears to be missing its class declaration/constructor wrapper; only
-method bodies are present. Example errors:
-
-```
-src/exporter/epub/index.ts(20,16): error TS1005: ';' expected.
-src/exporter/epub/index.ts(20,30): error TS1109: Expression expected.
-```
-
-This needs to be fixed first; after that, re-run `npm run typecheck` to see if
-any other errors surface in the Phase 4 files.
-
-## Next steps for the next worker
-
-1. **Fix `src/exporter/epub/index.ts`**
-   - Restore the `class EPUBExporter extends HTMLExporter` wrapper and
-     constructor that were lost during conversion.
-   - Keep the converted method bodies.
-
-2. **Run `npm run typecheck` and fix all remaining errors**
-   - Iterate until `tsc --noEmit` is clean.
-   - Use real types for exported classes/functions; `any`/`unknown` casts are
-     acceptable inside complex legacy internals.
-
-3. **Run full validation**
-   - `npm run typecheck`
-   - `npm run build`
-   - `npm run build-schema`
-   - `npm test` (139 tests should pass)
-
-4. **Verify zero `.js` source files remain**
-   - `find src -name '*.js'` should return nothing.
-
-5. **Commit Phase 4**
-   - Message suggestion: `Phase 4: convert remaining exporter entry points and converters to TypeScript`
-   - Include a brief body listing the converted modules.
-
-6. **Final cleanup (if any)**
-   - Make sure every subpath export in `package.json` resolves to a `.d.ts` in `dist/`.
-   - Remove any stale TODOs or commented-out code introduced during conversion.
+## Definition of done
+- No `.js` source files remain in `src/`.
+- `npm run typecheck`, `npm run build`, `npm run build-schema`, and `npm test` pass.
+- At least one new real-file round-trip test is present and passing.
+- All changes are committed in the `fiduswriter-document` repository.
 
 ## Conventions used so far
 

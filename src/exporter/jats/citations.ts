@@ -38,7 +38,7 @@ export class JATSExporterCitations {
         this.citInfos = []
     }
 
-    init(citInfos: Record<string, unknown>[]): Promise<void> | undefined {
+    init(citInfos: Record<string, unknown>[]): Promise<void> {
         this.citInfos = citInfos
         if (!citInfos.length) {
             return Promise.resolve()

@@ -2,31 +2,38 @@ import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
 import {textContent} from "../tools/doc_content.js"
 import {xmlDOM} from "../tools/xml.js"
+import type {XMLElement} from "../tools/xml.js"
+import type {XmlZip} from "../tools/xml_zip.js"
 
 /**
  * Create Zotero bibliography reference mark name for ODT.
- * @returns {string} Reference mark name
+ * @returns Reference mark name
  */
-export function createOdtBibliographyMark() {
+export function createOdtBibliographyMark(): string {
     return "ZOTERO_BIBL CSL_BIBLIOGRAPHY"
 }
 
 export class ODTExporterRender {
-    constructor(xml) {
+    xml: XmlZip
+
+    filePath: string
+    text: XMLElement | false
+
+    constructor(xml: XmlZip) {
         this.xml = xml
 
         this.filePath = "content.xml"
         this.text = false
     }
 
-    init() {
+    init(): Promise<void> {
         return this.xml.getXml(this.filePath).then(xml => {
-            this.text = xml.query("office:text")
+            this.text = xml.query("office:text") || false
             return Promise.resolve()
         })
     }
 
-    parseStructuredTags(block, tag) {
+    parseStructuredTags(block: XMLElement, tag: any): void {
         let blockText = block.textContent
         const tagName = tag.title
 
@@ -45,7 +52,7 @@ export class ODTExporterRender {
             const limit = beginStartMatch[1]
                 ? parseInt(beginStartMatch[1])
                 : null
-            const beginStart = beginStartMatch.index
+            const beginStart = beginStartMatch.index as number
             const beginEnd = beginStart + beginStartMatch[0].length
 
             // Find matching {END_tag}
@@ -84,9 +91,9 @@ export class ODTExporterRender {
         }
     }
 
-    processLoop(templateXml, items, tagName, limit = null) {
+    processLoop(templateXml: string, items: any[], tagName: string, limit: number | null = null): string {
         const effectiveItems = limit !== null ? items.slice(0, limit) : items
-        const results = []
+        const results: string[] = []
 
         effectiveItems.forEach((item, index) => {
             const loopCtx = {
@@ -140,7 +147,7 @@ export class ODTExporterRender {
         return results.join("")
     }
 
-    processConditionals(text, ctx) {
+    processConditionals(text: string, ctx: any): string {
         let result = text
         let changed = true
         while (changed) {
@@ -186,14 +193,14 @@ export class ODTExporterRender {
                 }
                 const innerContent = result.slice(innerStart, pos)
 
-                const conditions = []
+                const conditions: any[] = []
                 conditions.push({expr: ifExpr, content: ""})
 
                 const remaining = innerContent
                 let lastIndex = 0
 
                 const elifRegex = /\{ELIF\(([^)]+)\)\}/g
-                let elifMatch
+                let elifMatch: RegExpExecArray | null
                 while ((elifMatch = elifRegex.exec(remaining)) !== null) {
                     conditions[conditions.length - 1].content = remaining.slice(
                         lastIndex,
@@ -207,12 +214,12 @@ export class ODTExporterRender {
                 if (elseMatch) {
                     conditions[conditions.length - 1].content = remaining.slice(
                         lastIndex,
-                        lastIndex + elseMatch.index
+                        lastIndex + elseMatch.index!
                     )
                     conditions.push({
                         expr: null,
                         content: remaining.slice(
-                            lastIndex + elseMatch.index + elseMatch[0].length
+                            lastIndex + elseMatch.index! + elseMatch[0].length
                         )
                     })
                 } else {
@@ -241,7 +248,7 @@ export class ODTExporterRender {
         return result
     }
 
-    evaluateExpression(expr, ctx) {
+    evaluateExpression(expr: string, ctx: any): any {
         try {
             // Allow explicit tag name references (e.g., authors.count -> ctx.count)
             if (ctx.tagName) {
@@ -279,7 +286,7 @@ export class ODTExporterRender {
             // Check for unknown identifiers
             const bareIdRegex = /\b[a-zA-Z_]\w*\b/g
             const allowed = ["true", "false", "null", "undefined"]
-            let m
+            let m: RegExpExecArray | null
             while ((m = bareIdRegex.exec(safeExpr)) !== null) {
                 if (!allowed.includes(m[0])) {
                     console.warn(
@@ -306,9 +313,9 @@ export class ODTExporterRender {
     }
 
     // Define the tags that are to be looked for in the document
-    getTagData(docContent, pmBib, settings) {
-        const tags = docContent.content.map(node => {
-            const tag = {}
+    getTagData(docContent: any, pmBib: any, settings: any): any[] {
+        const tags = docContent.content.map((node: any) => {
+            const tag: any = {}
             switch (node.type) {
                 case "title":
                     tag.title = "title"
@@ -327,7 +334,7 @@ export class ODTExporterRender {
                     tag.title = node.attrs.id
                     // Return array of structured objects for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map(node => {
+                        ? node.content.map((node: any) => {
                               const c = node.attrs
                               return {
                                   firstname: c.firstname || "",
@@ -344,15 +351,16 @@ export class ODTExporterRender {
                     tag.title = node.attrs.id
                     // Return array of tag strings for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map(node => node.attrs.tag)
+                        ? node.content.map((node: any) => node.attrs.tag)
                         : []
                     break
             }
             return tag
         })
+        const lang = settings.language as string
         const bibliographyHeader =
-            settings.bibliography_header[settings.language] ||
-            BIBLIOGRAPHY_HEADERS[settings.language]
+            (settings.bibliography_header as Record<string, string> | undefined)?.[lang] ||
+            (BIBLIOGRAPHY_HEADERS as Record<string, string>)[lang]
         tags.push({
             title: "@bibliography", // The '@' triggers handling as block
             content: pmBib
@@ -391,7 +399,7 @@ export class ODTExporterRender {
             title: "@licenses", // The '@' triggers handling as block
             content:
                 settings.copyright && settings.copyright.licenses.length
-                    ? settings.copyright.licenses.map(license => ({
+                    ? settings.copyright.licenses.map((license: any) => ({
                           type: "paragraph",
                           content: [
                               {
@@ -425,8 +433,8 @@ export class ODTExporterRender {
         return tags
     }
 
-    processMultiBlockStructuredTags(blocks, tags) {
-        const tagMap = {}
+    processMultiBlockStructuredTags(blocks: XMLElement[], tags: any[]): void {
+        const tagMap: Record<string, any> = {}
         tags.forEach(tag => {
             if (tag.title) {
                 tagMap[tag.title] = tag
@@ -469,7 +477,7 @@ export class ODTExporterRender {
                 const limit = beginMatch[1] ? parseInt(beginMatch[1]) : null
                 this._replaceMultiBlockLoop(blocks, i, endIndex, tag, limit)
                 i = Math.min(i, blocks.length - 1)
-                break
+                break // Only process one loop per block per iteration
             }
         }
 
@@ -506,7 +514,13 @@ export class ODTExporterRender {
         }
     }
 
-    _replaceMultiBlockLoop(blocks, beginIndex, endIndex, tag, limit) {
+    _replaceMultiBlockLoop(
+        blocks: XMLElement[],
+        beginIndex: number,
+        endIndex: number,
+        tag: any,
+        limit: number | null
+    ): void {
         const tagName = tag.title
         const beginBlock = blocks[beginIndex]
 
@@ -528,7 +542,7 @@ export class ODTExporterRender {
 
         const beforeXml = combinedXml.slice(0, beginMatch.index)
         const templateXml = combinedXml.slice(
-            beginMatch.index + beginMatch[0].length,
+            (beginMatch.index as number) + beginMatch[0].length,
             endPos
         )
         const afterXml = combinedXml.slice(endPos + endTag.length)
@@ -547,25 +561,33 @@ export class ODTExporterRender {
         const parent = beginBlock.parentElement
         const dom = xmlDOM(`<root>${fullReplacement}</root>`)
         const root = dom.query("root")
-        const newBlocks = root.children.filter(
-            child => child.tagName === "text:p" || child.tagName === "text:h"
-        )
+        const newBlocks = root!.children.filter(
+            child =>
+                (child as XMLElement).tagName === "text:p" ||
+                (child as XMLElement).tagName === "text:h"
+        ) as XMLElement[]
 
         // Insert new blocks before begin block
         for (let i = newBlocks.length - 1; i >= 0; i--) {
-            parent.insertBefore(newBlocks[i], beginBlock)
+            parent!.insertBefore(newBlocks[i], beginBlock)
         }
 
         // Remove old blocks
         for (let i = endIndex; i >= beginIndex; i--) {
-            parent.removeChild(blocks[i])
+            parent!.removeChild(blocks[i])
         }
 
         // Update blocks array
         blocks.splice(beginIndex, endIndex - beginIndex + 1, ...newBlocks)
     }
 
-    _replaceMultiBlockConditional(blocks, ifIndex, endIndex, expr, tagMap) {
+    _replaceMultiBlockConditional(
+        blocks: XMLElement[],
+        ifIndex: number,
+        endIndex: number,
+        expr: string,
+        tagMap: Record<string, any>
+    ): void {
         const ifBlock = blocks[ifIndex]
 
         // Concatenate all blocks from if to endif
@@ -575,9 +597,12 @@ export class ODTExporterRender {
         }
 
         // Determine which tag the expression references
-        let ctx = {count: 0, content: []}
+        let ctx: any = {count: 0, content: []}
         for (const tagName in tagMap) {
-            const safeTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            const safeTagName = tagName.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+            )
             if (new RegExp(`\\b${safeTagName}\\b`).test(expr)) {
                 const tag = tagMap[tagName]
                 ctx = {
@@ -602,16 +627,18 @@ export class ODTExporterRender {
         const parent = ifBlock.parentElement
         const dom = xmlDOM(`<root>${processedXml}</root>`)
         const root = dom.query("root")
-        const newBlocks = root.children.filter(
-            child => child.tagName === "text:p" || child.tagName === "text:h"
-        )
+        const newBlocks = root!.children.filter(
+            child =>
+                (child as XMLElement).tagName === "text:p" ||
+                (child as XMLElement).tagName === "text:h"
+        ) as XMLElement[]
 
         for (let i = newBlocks.length - 1; i >= 0; i--) {
-            parent.insertBefore(newBlocks[i], ifBlock)
+            parent!.insertBefore(newBlocks[i], ifBlock)
         }
 
         for (let i = endIndex; i >= ifIndex; i--) {
-            parent.removeChild(blocks[i])
+            parent!.removeChild(blocks[i])
         }
 
         blocks.splice(ifIndex, endIndex - ifIndex + 1, ...newBlocks)
@@ -619,20 +646,21 @@ export class ODTExporterRender {
 
     // go through content.xml looking for tags and replace them with the given
     // replacements.
-    render(docContent, pmBib, settings, richtext, citations) {
+    render(docContent: any, pmBib: any, settings: any, richtext: any, citations: any): void {
         const tags = this.getTagData(docContent, pmBib, settings)
-        const textBlocks = this.text.queryAll(["text:p", "text:h"])
+        const textEl = this.text as XMLElement
+        const textBlocks = textEl.queryAll(["text:p", "text:h"])
 
         // Process multi-block structured tags first (BEGIN...END across paragraphs)
         this.processMultiBlockStructuredTags(textBlocks, tags)
 
         textBlocks.forEach(block => {
-            if (block.parentElement.nodeName === "text:deletion") {
+            if (block.parentElement?.tagName === "text:deletion") {
                 // Inside of tracked changes deletion, don't do anything
                 return
             }
             const text = block.textContent
-            tags.forEach(tag => {
+            tags.forEach((tag: any) => {
                 const tagString = tag.title
                 const hasInlineTag =
                     text.includes(`{${tagString}}`) ||
@@ -652,7 +680,7 @@ export class ODTExporterRender {
             })
 
             // Parse structured tags (BEGIN...END and IF...ENDIF)
-            tags.forEach(tag => {
+            tags.forEach((tag: any) => {
                 if (tag.block) {
                     this.parseStructuredTags(tag.block, tag)
                 }
@@ -661,7 +689,7 @@ export class ODTExporterRender {
     }
 
     // Render Tags that only exchange inline content
-    inlineRender(tag) {
+    inlineRender(tag: any): void {
         const blockText = tag.block.textContent
         const tagString = tag.title
 
@@ -684,7 +712,7 @@ export class ODTExporterRender {
 
             // Process each item with the format string
             const formattedItems = tag.content
-                .map(item => {
+                .map((item: any) => {
                     if (typeof item === "string") {
                         // For tags (simple strings)
                         return format.replace(/%tag/g, item)
@@ -699,10 +727,10 @@ export class ODTExporterRender {
                             .replace(/%id_value/g, item.id_value || "")
                     }
                 })
-                .filter(s => s.trim() !== "")
+                .filter((s: string) => s.trim() !== "")
 
             // Handle special delimiters for ODT
-            let delimiterXml = delimiter
+            let delimiterXml: string = delimiter
             delimiterXml = delimiterXml.replace(/\\n/g, "<text:line-break/>")
             delimiterXml = delimiterXml.replace(
                 /\\p/g,
@@ -713,7 +741,7 @@ export class ODTExporterRender {
             fullText = blockText.replace(formatRegex, replacement)
         } else {
             // Fall back to simple string replacement (backward compatible)
-            let contentStr = tag.content || ""
+            let contentStr: any = tag.content || ""
             if (Array.isArray(contentStr)) {
                 if (contentStr.length === 0) {
                     contentStr = ""
@@ -722,9 +750,9 @@ export class ODTExporterRender {
                 } else {
                     // Contributors - backward compatible formatting
                     contentStr = contentStr
-                        .map(item => {
-                            const nameParts = []
-                            let affiliation = false
+                        .map((item: any) => {
+                            const nameParts: string[] = []
+                            let affiliation: string | false = false
                             if (item.firstname) {
                                 nameParts.push(item.firstname)
                             }
@@ -769,13 +797,13 @@ export class ODTExporterRender {
     }
 
     // Render tags that exchange text blocks
-    blockRender(tag, richtext, citations) {
+    blockRender(tag: any, richtext: any, citations: any): void {
         const section = tag.block.hasAttribute("text:style-name")
             ? tag.block.getAttribute("text:style-name")
             : "Text_20_body"
         const outXML = tag.content
             ? tag.content
-                  .map((content, contentIndex) =>
+                  .map((content: any, contentIndex: number) =>
                       richtext.run(
                           content,
                           {
@@ -798,9 +826,10 @@ export class ODTExporterRender {
         }
         const parentElement = tag.block.parentElement
         const dom = xmlDOM(outXML)
-        const domPars = dom.node["#document"]?.slice() || [dom]
-        domPars.forEach(node => parentElement.insertBefore(node, tag.block))
+        const domPars =
+            (dom.node["#document"] as XMLElement[] | undefined)?.slice() || [dom]
+        domPars.forEach(node => parentElement!.insertBefore(node, tag.block))
 
-        parentElement.removeChild(tag.block)
+        parentElement!.removeChild(tag.block)
     }
 }

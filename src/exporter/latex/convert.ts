@@ -1,8 +1,21 @@
-import {BIBLIOGRAPHY_HEADERS, CATS} from "../../schema/i18n.js"
+import {gettext} from "fwtoolkit"
+import {BIBLIOGRAPHY_HEADERS, getCat} from "../../schema/i18n.js"
+import {descendantNodes} from "../tools/doc_content.js"
 import {escapeLatexText} from "./escape_latex.js"
 
 export class LatexExporterConvert {
-    constructor(exporter, imageDB, bibDB, settings) {
+    exporter: any
+    settings: any
+    imageDB: any
+    bibDB: any
+    imageIds: string[]
+    usedBibDB: any
+    features: Record<string, boolean>
+    internalLinks: string[]
+    categoryCounter: Record<string, number>
+    authorsTex: string
+
+    constructor(exporter: any, imageDB: any, bibDB: any, settings: any) {
         this.exporter = exporter
         this.settings = settings
         this.imageDB = imageDB
@@ -18,7 +31,7 @@ export class LatexExporterConvert {
         this.authorsTex = ""
     }
 
-    init(docContent) {
+    init(docContent: any): any {
         this.preWalkJson(docContent)
         const rawTransformation = this.walkJson(docContent)
         const body = this.postProcess(rawTransformation)
@@ -42,19 +55,19 @@ export class LatexExporterConvert {
         return returnObject
     }
 
-    get docDeclaration() {
+    get docDeclaration(): string {
         return "\\documentclass{article}\n"
     }
 
     // Check for things needed before creating raw transform
-    preWalkJson(node) {
+    preWalkJson(node: any): void {
         switch (node.type) {
             // Collect all internal links so that we only set the anchors for those
             // that are being linked to.
             case "text":
                 if (node.marks) {
                     const hyperlink = node.marks.find(
-                        mark => mark.type === "link"
+                        (mark: any) => mark.type === "link"
                     )
                     if (hyperlink) {
                         const href = hyperlink.attrs.href
@@ -69,11 +82,11 @@ export class LatexExporterConvert {
                 break
         }
         if (node.content) {
-            node.content.forEach(child => this.preWalkJson(child))
+            node.content.forEach((child: any) => this.preWalkJson(child))
         }
     }
 
-    walkJson(node, options = {}) {
+    walkJson(node: any, options: any = {}): string {
         let start = "",
             content = "",
             end = "",
@@ -102,7 +115,7 @@ export class LatexExporterConvert {
                 break
             case "contributors_part":
                 if (node.content) {
-                    const contributorLabels = {
+                    const contributorLabels: Record<string, string> = {
                         authors: gettext("Authors"),
                         editors: gettext("Editors"),
                         translators: gettext("Translators"),
@@ -113,9 +126,9 @@ export class LatexExporterConvert {
 
                     if (node.attrs.metadata === "authors") {
                         const authorsPerAffil = node.content
-                            .map(node => {
+                            .map((node: any) => {
                                 const author = node.attrs,
-                                    nameParts = []
+                                    nameParts: string[] = []
                                 let affiliation = false
                                 if (author.firstname) {
                                     nameParts.push(author.firstname)
@@ -137,31 +150,33 @@ export class LatexExporterConvert {
                                     id_value: author.id_value
                                 }
                             })
-                            .reduce((affils, author) => {
+                            .reduce((affils: any, author: any) => {
                                 const affil = author.affiliation
                                 affils[affil] = affils[affil] || []
                                 affils[affil].push(author)
                                 return affils
                             }, {})
 
-                        Object.values(authorsPerAffil).forEach(affil => {
-                            affil.forEach(author => {
-                                let thanks = ""
-                                if (author.email) {
-                                    thanks += `\\thanks{${escapeLatexText(author.email)}}`
-                                }
-                                if (author.id_type && author.id_value) {
-                                    thanks += `\\thanks{${escapeLatexText(author.id_type)}: ${escapeLatexText(author.id_value)}}`
-                                }
-                                this.authorsTex += `\n\\author{${escapeLatexText(author.name)}${thanks}}`
-                            })
+                        Object.values(authorsPerAffil).forEach(
+                            (affil: any) => {
+                                affil.forEach((author: any) => {
+                                    let thanks = ""
+                                    if (author.email) {
+                                        thanks += `\\thanks{${escapeLatexText(author.email)}}`
+                                    }
+                                    if (author.id_type && author.id_value) {
+                                        thanks += `\\thanks{${escapeLatexText(author.id_type)}: ${escapeLatexText(author.id_value)}}`
+                                    }
+                                    this.authorsTex += `\n\\author{${escapeLatexText(author.name)}${thanks}}`
+                                })
 
-                            this.authorsTex += `\n\\affil{${
-                                affil[0].affiliation
-                                    ? escapeLatexText(affil[0].affiliation)
-                                    : ""
-                            }}`
-                        })
+                                this.authorsTex += `\n\\affil{${
+                                    affil[0].affiliation
+                                        ? escapeLatexText(affil[0].affiliation)
+                                        : ""
+                                }}`
+                            }
+                        )
                         this.authorsTex += "\n\n"
                         this.features.authors = true
                     } else {
@@ -170,9 +185,9 @@ export class LatexExporterConvert {
                             options.madeTitle = true
                         }
                         const contributorNames = node.content
-                            .map(contributorNode => {
+                            .map((contributorNode: any) => {
                                 const attrs = contributorNode.attrs
-                                const nameParts = []
+                                const nameParts: string[] = []
                                 if (attrs.firstname) {
                                     nameParts.push(attrs.firstname)
                                 }
@@ -189,7 +204,7 @@ export class LatexExporterConvert {
                                 }
                                 return name
                             })
-                            .filter(name => name.length)
+                            .filter((name: string) => name.length)
                             .join(", ")
                         if (contributorNames.length) {
                             content += `\n\\noindent\\textbf{${roleLabel}:} ${contributorNames}\n\n`
@@ -209,7 +224,7 @@ export class LatexExporterConvert {
                         options.madeTitle = true
                     }
                     content += node.content
-                        .map(keyword => escapeLatexText(keyword.attrs.tag))
+                        .map((keyword: any) => escapeLatexText(keyword.attrs.tag))
                         .join("\\sep ")
                 }
                 break
@@ -285,30 +300,28 @@ export class LatexExporterConvert {
             case "code_block": {
                 // Support language and category attributes
                 if (node.attrs.category && node.attrs.id) {
-                    const language = this.doc.attrs.language || "en-US"
-                    const {CATS} = require("../../schema/i18n")
-                    const categoryLabel =
-                        CATS[node.attrs.category]?.[language] ||
-                        node.attrs.category
+                    const language = this.settings.language || "en-US"
+                    const categoryLabel = getCat(node.attrs.category, language)
 
                     // Count code blocks to get the number
-                    const categories = {}
-                    this.doc.descendants(n => {
+                    const categories: Record<string, number> = {}
+                    for (const n of descendantNodes(this.exporter.doc.content)) {
                         if (
                             n.type === "code_block" &&
-                            n.attrs.category &&
+                            n.attrs?.category &&
                             n.attrs.id
                         ) {
-                            if (!categories[n.attrs.category]) {
-                                categories[n.attrs.category] = 0
+                            const category = n.attrs.category as string
+                            if (!categories[category]) {
+                                categories[category] = 0
                             }
-                            categories[n.attrs.category]++
+                            categories[category]++
                             if (n.attrs.id === node.attrs.id) {
-                                return false
+                                break
                             }
                         }
-                    })
-                    const number = categories[node.attrs.category] || 1
+                    }
+                    const number = categories[node.attrs.category as string] || 1
                     const caption = node.attrs.title
                         ? `${categoryLabel} ${number}: ${this.convertText(node.attrs.title)}`
                         : `${categoryLabel} ${number}`
@@ -368,7 +381,7 @@ export class LatexExporterConvert {
                     options.unplacedFootnotes.push(node.attrs.footnote)
                 } else {
                     if (
-                        !node.attrs.footnote.find(par => par.type === "figure")
+                        !node.attrs.footnote.find((par: any) => par.type === "figure")
                     ) {
                         // LaTeX doesn't allow figures in footnotes, so well move
                         // this footnote into the regular text.
@@ -376,26 +389,39 @@ export class LatexExporterConvert {
                         end = "}" + end
                     }
                     let fnContent = ""
-                    node.attrs.footnote.forEach(footPar => {
+                    node.attrs.footnote.forEach((footPar: any) => {
                         fnContent += this.walkJson(footPar, options)
                     })
                     content += fnContent.replace(/^\s+|\s+$/g, "")
                 }
                 break
             case "text": {
-                let strong, em, underline, hyperlink, anchor, sup, sub, code
+                let strong: any,
+                    em: any,
+                    underline: any,
+                    hyperlink: any,
+                    anchor: any,
+                    sup: any,
+                    sub: any,
+                    code: any
                 // Check for hyperlink, bold/strong, italic/em and underline
                 if (node.marks) {
-                    strong = node.marks.find(mark => mark.type === "strong")
-                    em = node.marks.find(mark => mark.type === "em")
-                    underline = node.marks.find(
-                        mark => mark.type === "underline"
+                    strong = node.marks.find(
+                        (mark: any) => mark.type === "strong"
                     )
-                    hyperlink = node.marks.find(mark => mark.type === "link")
-                    anchor = node.marks.find(mark => mark.type === "anchor")
-                    sup = node.marks.find(mark => mark.type === "sup")
-                    sub = node.marks.find(mark => mark.type === "sub")
-                    code = node.marks.find(mark => mark.type === "code")
+                    em = node.marks.find((mark: any) => mark.type === "em")
+                    underline = node.marks.find(
+                        (mark: any) => mark.type === "underline"
+                    )
+                    hyperlink = node.marks.find(
+                        (mark: any) => mark.type === "link"
+                    )
+                    anchor = node.marks.find(
+                        (mark: any) => mark.type === "anchor"
+                    )
+                    sup = node.marks.find((mark: any) => mark.type === "sup")
+                    sub = node.marks.find((mark: any) => mark.type === "sub")
+                    code = node.marks.find((mark: any) => mark.type === "code")
                 }
                 if (em) {
                     start += "\\emph{"
@@ -453,14 +479,14 @@ export class LatexExporterConvert {
 
                 if (
                     references.length > 1 &&
-                    references.every(ref => !ref.locator && !ref.prefix)
+                    references.every((ref: any) => !ref.locator && !ref.prefix)
                 ) {
                     // multi source citation without page numbers or text before.
-                    const citationEntryKeys = []
+                    const citationEntryKeys: string[] = []
 
                     const allCitationItemsPresent = references
-                        .map(ref => ref.id)
-                        .every(citationEntry => {
+                        .map((ref: any) => ref.id)
+                        .every((citationEntry: string) => {
                             const bibDBEntry = this.bibDB.db[citationEntry]
                             if (bibDBEntry) {
                                 if (!bibDBEntry) {
@@ -487,50 +513,52 @@ export class LatexExporterConvert {
                     if (allCitationItemsPresent) {
                         citationCommand += `{${citationEntryKeys.join(",")}}`
                     } else {
-                        citationCommand = false
+                        citationCommand = false as any
                     }
                 } else {
                     if (references.length > 1) {
                         citationCommand += "s" // Switching from \autocite to \autocites
                     }
 
-                    const allCitationItemsPresent = references.every(ref => {
-                        const bibDBEntry = this.bibDB.db[ref.id]
-                        if (!bibDBEntry) {
-                            // Not present in bibliography database, skip it.
-                            // TODO: Throw an error?
-                            return false
-                        }
-
-                        if (ref.prefix) {
-                            citationCommand += `[${ref.prefix}]`
-                            if (!ref.locator) {
-                                citationCommand += "[]"
+                    const allCitationItemsPresent = references.every(
+                        (ref: any) => {
+                            const bibDBEntry = this.bibDB.db[ref.id]
+                            if (!bibDBEntry) {
+                                // Not present in bibliography database, skip it.
+                                // TODO: Throw an error?
+                                return false
                             }
-                        }
-                        if (ref.locator) {
-                            citationCommand += `[${ref.locator}]`
-                        }
-                        citationCommand += "{"
 
-                        if (!this.usedBibDB[ref.id]) {
-                            const citationKey = this.createUniqueCitationKey(
-                                bibDBEntry.entry_key
-                            )
-                            this.usedBibDB[ref.id] = Object.assign(
-                                {},
-                                bibDBEntry
-                            )
-                            this.usedBibDB[ref.id].entry_key = citationKey
-                        }
-                        citationCommand += this.usedBibDB[ref.id].entry_key
-                        citationCommand += "}"
+                            if (ref.prefix) {
+                                citationCommand += `[${ref.prefix}]`
+                                if (!ref.locator) {
+                                    citationCommand += "[]"
+                                }
+                            }
+                            if (ref.locator) {
+                                citationCommand += `[${ref.locator}]`
+                            }
+                            citationCommand += "{"
 
-                        return true
-                    })
+                            if (!this.usedBibDB[ref.id]) {
+                                const citationKey = this.createUniqueCitationKey(
+                                    bibDBEntry.entry_key
+                                )
+                                this.usedBibDB[ref.id] = Object.assign(
+                                    {},
+                                    bibDBEntry
+                                )
+                                this.usedBibDB[ref.id].entry_key = citationKey
+                            }
+                            citationCommand += this.usedBibDB[ref.id].entry_key
+                            citationCommand += "}"
+
+                            return true
+                        }
+                    )
 
                     if (!allCitationItemsPresent) {
-                        citationCommand = false
+                        citationCommand = false as any
                     }
                 }
                 if (citationCommand) {
@@ -542,38 +570,38 @@ export class LatexExporterConvert {
             case "figure": {
                 const category = node.attrs.category
                 const captionContent = node.attrs.caption
-                    ? node.content.find(node => node.type === "figure_caption")
+                    ? node.content.find((node: any) => node.type === "figure_caption")
                           ?.content || []
                     : []
-                let caption
+                let caption: string
                 if (category !== "none") {
                     if (!this.categoryCounter[category]) {
                         this.categoryCounter[category] = 1
                     }
                     const catCount = this.categoryCounter[category]++
-                    const catLabel = `${CATS[category][this.settings.language]} ${catCount}`
+                    const catLabel = `${getCat(category, this.settings.language)} ${catCount}`
                     if (captionContent.length) {
-                        caption = `${catLabel}: ${captionContent.map(node => this.walkJson(node)).join("")}`
+                        caption = `${catLabel}: ${captionContent.map((node: any) => this.walkJson(node)).join("")}`
                     } else {
                         caption = catLabel
                     }
                 } else {
                     caption = captionContent
-                        .map(node => this.walkJson(node))
+                        .map((node: any) => this.walkJson(node))
                         .join("")
                 }
                 let innerFigure = ""
-                let copyright
+                let copyright: any
                 const image =
-                    node.content.find(node => node.type === "image")?.attrs
+                    node.content.find((node: any) => node.type === "image")?.attrs
                         .image || false
                 if (image) {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image],
                         filePathName = imageDBEntry.image,
-                        filename = filePathName.split("/").pop()
+                        filename = filePathName!.toString().split("/").pop()
                     copyright = imageDBEntry.copyright
-                    if (filename.split(".").pop() === "svg") {
+                    if (filename!.split(".").pop() === "svg") {
                         innerFigure += `\\includesvg[width=${Number.parseInt(node.attrs.width) / 100}\\textwidth]{${filename}}\n`
                         this.features.SVGs = true
                     } else {
@@ -583,7 +611,7 @@ export class LatexExporterConvert {
                 } else {
                     const equation =
                         node.content.find(
-                            node => node.type === "figure_equation"
+                            (node: any) => node.type === "figure_equation"
                         )?.attrs.equation || ""
                     innerFigure += `\\begin{displaymath}\n${equation}\n\\end{displaymath}\n`
                 }
@@ -621,7 +649,7 @@ export class LatexExporterConvert {
                     content += `% © ${copyright.year ? copyright.year : new Date().getFullYear()} ${copyright.holder}\n`
                 }
                 if (copyright?.licenses.length) {
-                    copyright.licenses.forEach(license => {
+                    copyright.licenses.forEach((license: any) => {
                         content += `% ${license.title}: ${license.url}${license.start ? ` (${license.start})\n` : ""}\n`
                     })
                 }
@@ -650,21 +678,21 @@ export class LatexExporterConvert {
                     const captionContent = node.attrs.caption
                         ? node.content[0].content || []
                         : []
-                    let caption
+                    let caption: string
                     if (category !== "none") {
                         if (!this.categoryCounter[category]) {
                             this.categoryCounter[category] = 1
                         }
                         const catCount = this.categoryCounter[category]++
-                        const catLabel = `${CATS[category][this.settings.language]} ${catCount}`
+                        const catLabel = `${getCat(category, this.settings.language)} ${catCount}`
                         if (captionContent.length) {
-                            caption = `${catLabel}: ${captionContent.map(node => this.walkJson(node)).join("")}`
+                            caption = `${catLabel}: ${captionContent.map((node: any) => this.walkJson(node)).join("")}`
                         } else {
                             caption = catLabel
                         }
                     } else {
                         caption = captionContent
-                            .map(node => this.walkJson(node))
+                            .map((node: any) => this.walkJson(node))
                             .join("")
                     }
                     let columns = 1
@@ -673,7 +701,8 @@ export class LatexExporterConvert {
                         node.content[1].content?.length
                     ) {
                         columns = node.content[1].content[0].content.reduce(
-                            (columns, node) => columns + node.attrs.colspan,
+                            (columns: number, node: any) =>
+                                columns + node.attrs.colspan,
                             0
                         )
                     }
@@ -738,7 +767,7 @@ export class LatexExporterConvert {
         }
 
         if (node.content) {
-            node.content.forEach(child => {
+            node.content.forEach((child: any) => {
                 content += this.walkJson(child, options)
             })
         }
@@ -746,11 +775,11 @@ export class LatexExporterConvert {
             // There are footnotes that needed to be placed behind the node.
             // This happens in the case of headlines and lists.
             end += `\\addtocounter{footnote}{-${options.unplacedFootnotes.length}}`
-            options.unplacedFootnotes.forEach(footnote => {
+            options.unplacedFootnotes.forEach((footnote: any) => {
                 end += "\\stepcounter{footnote}\n"
                 end += "\\footnotetext{"
                 let fnContent = ""
-                footnote.forEach(footPar => {
+                footnote.forEach((footPar: any) => {
                     fnContent += this.walkJson(footPar, options)
                 })
                 end += fnContent.replace(/^\s+|\s+$/g, "")
@@ -769,10 +798,15 @@ export class LatexExporterConvert {
         return start + content + end
     }
 
+    convertText(text: string): string {
+        return text
+    }
+
     // The database doesn't ensure that citation keys are unique.
     // So here we need to make sure that the same key is not used twice in one
     // document.
-    createUniqueCitationKey(suggestedKey) {
+    createUniqueCitationKey(suggestedKey: string | undefined): string {
+        suggestedKey = suggestedKey || "key"
         const usedKeys = Object.keys(this.usedBibDB).map(key => {
             return this.usedBibDB[key].entry_key
         })
@@ -784,12 +818,12 @@ export class LatexExporterConvert {
         }
     }
 
-    postProcess(latex) {
+    postProcess(latex: string): string {
         return (
             latex
                 // join blocks of the same type that follow oneanother.
-                .replace(/\\end{code}\n\n\\begin{code}\n\n/g, "")
-                .replace(/\\end{quote}\n\n\\begin{quote}\n\n/g, "")
+                .replace(/\\end\{code\}\n\n\\begin\{code\}\n\n/g, "")
+                .replace(/\\end\{quote\}\n\n\\begin\{quote\}\n\n/g, "")
                 // Remove the last divider in any any table row.
                 .replace(/& {2}\\\\/g, "\\\\")
                 // Remove new lines between table cells.
@@ -799,25 +833,26 @@ export class LatexExporterConvert {
         )
     }
 
-    assembleEpilogue() {
+    assembleEpilogue(): string {
         let epilogue = ""
         if (this.features.citations) {
+            const lang = this.settings.language as string
             const bibliographyHeader =
-                this.settings.bibliography_header[this.settings.language] ||
-                BIBLIOGRAPHY_HEADERS[this.settings.language]
+                (this.settings.bibliography_header as Record<string, string> | undefined)?.[lang] ||
+                (BIBLIOGRAPHY_HEADERS as Record<string, string>)[lang]
             epilogue += `\n\n\\printbibliography[title={${escapeLatexText(bibliographyHeader)}}]`
         }
         return epilogue
     }
 
-    assembleCopyright() {
+    assembleCopyright(): string {
         let note = ""
         if (this.settings.copyright) {
             if (this.settings.copyright.holder) {
                 note += `% © ${this.settings.copyright.year ? this.settings.copyright.year : new Date().getFullYear()} ${this.settings.copyright.holder}\n`
             }
             if (this.settings.copyright.licenses.length) {
-                this.settings.copyright.licenses.forEach(license => {
+                this.settings.copyright.licenses.forEach((license: any) => {
                     note += `% ${license.url}${license.start ? ` (${license.start})` : ""}\n`
                 })
             }
@@ -829,7 +864,7 @@ export class LatexExporterConvert {
         return note
     }
 
-    assemblePreamble() {
+    assemblePreamble(): string {
         let preamble = ""
 
         if (this.features.subtitle) {

@@ -1,8 +1,11 @@
 import {escapeText} from "fwtoolkit"
-import {CATS} from "../../schema/i18n.js"
+import {getCat} from "../../schema/i18n.js"
 import {createZoteroCitation} from "../tools/zotero_csl.js"
 
-const TEXT_TYPES = {
+const TEXT_TYPES: Record<
+    string,
+    {tag: string; attrs: (options: any) => string}
+> = {
     heading1: {tag: "text:h", attrs: _options => 'text:outline-level="1"'},
     heading2: {tag: "text:h", attrs: _options => 'text:outline-level="2"'},
     heading3: {tag: "text:h", attrs: _options => 'text:outline-level="3"'},
@@ -37,16 +40,16 @@ const INLINE_TYPES = [
 
 /**
  * Create Zotero reference mark name for ODT.
- * @param {Array} references - Array of {id, prefix?, locator?} from citation node
- * @param {Object} bibDB - Bibliography database
- * @param {string} formattedCitation - Pre-formatted citation text from citeproc
- * @param {string} citationId - Optional citation ID (generated if not provided)
- * @returns {string} Reference mark name with JSON encoded
+ * @param references - Array of {id, prefix?, locator?} from citation node
+ * @param bibDB - Bibliography database
+ * @param formattedCitation - Pre-formatted citation text from citeproc
+ * @param citationId - Optional citation ID (generated if not provided)
+ * @returns Reference mark name with JSON encoded
  */
 
 // Generate a random ID for Zotero bibliography section + Zotero citations
 // Format: RND + random alphanumeric string (10 characters)
-function generateZoteroId() {
+function generateZoteroId(): string {
     const chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     const length = 10
@@ -58,11 +61,11 @@ function generateZoteroId() {
 }
 
 function createZoteroCitationMark(
-    references,
-    bibDB,
-    formattedCitation,
-    citationId = null
-) {
+    references: any[],
+    bibDB: any,
+    formattedCitation: string,
+    citationId: string | null = null
+): string | null {
     const zoteroCitation = createZoteroCitation(
         references,
         bibDB,
@@ -81,15 +84,32 @@ function createZoteroCitationMark(
 }
 
 export class ODTExporterRichtext {
+    comments: Record<string, any>
+    settings: any
+    styles: any
+    tracks: any
+    footnotes: any
+    citations: any
+    math: any
+    images: any
+
+    imgCounter: number
+    fnCounter: number // real footnotes
+    fnAlikeCounter: number // real footnotes and citations as footnotes
+    categoryCounter: Record<string, number> // counters for each type of table/figure category (figure/table/photo)
+    fnCategoryCounter: Record<string, number> // counters for each type of table/figure category (figure/table/photo)
+    zIndex: number
+    citationCounter: number // Track which citation we're processing
+
     constructor(
-        comments,
-        settings,
-        styles,
-        tracks,
-        footnotes,
-        citations,
-        math,
-        images
+        comments: Record<string, any>,
+        settings: any,
+        styles: any,
+        tracks: any,
+        footnotes: any,
+        citations: any,
+        math: any,
+        images: any
     ) {
         this.comments = comments
         this.styles = styles
@@ -109,16 +129,21 @@ export class ODTExporterRichtext {
         this.citationCounter = 0 // Track which citation we're processing
     }
 
-    run(node, options = {}, parent = null, siblingIndex = 0) {
+    run(
+        node: any,
+        options: any = {},
+        parent: any = null,
+        siblingIndex: number = 0
+    ): string {
         options.comments = this.findComments(node) // Data related to comments. We need to mark the first and last occurence of comment
         return this.transformRichtext(node, options, parent, siblingIndex)
     }
 
-    findComments(node, comments = {}) {
+    findComments(node: any, comments: any = {}): any {
         if (node.marks) {
             node.marks
-                .filter(mark => mark.type === "comment")
-                .forEach(comment => {
+                .filter((mark: any) => mark.type === "comment")
+                .forEach((comment: any) => {
                     if (!comments[comment.attrs.id]) {
                         comments[comment.attrs.id] = {
                             start: node,
@@ -138,7 +163,12 @@ export class ODTExporterRichtext {
         return comments
     }
 
-    transformRichtext(node, options = {}, parent = null, siblingIndex = 0) {
+    transformRichtext(
+        node: any,
+        options: any = {},
+        parent: any = null,
+        siblingIndex: number = 0
+    ): string {
         let start = "",
             content = "",
             end = ""
@@ -148,18 +178,18 @@ export class ODTExporterRichtext {
 
         const inlineNode = INLINE_TYPES.includes(node.type)
 
-        let blockDelete, blockInsert
+        let blockDelete: any, blockInsert: any
 
         if (!inlineNode && node.attrs?.track) {
             blockDelete = node.attrs.track.find(
-                mark => mark.type === "deletion"
+                (mark: any) => mark.type === "deletion"
             )
             if (blockDelete) {
                 options = Object.assign({}, options)
                 options.blockDelete = blockDelete
             }
             blockInsert = node.attrs.track.find(
-                mark => mark.type === "insertion"
+                (mark: any) => mark.type === "insertion"
             )
             if (blockInsert) {
                 options = Object.assign({}, options)
@@ -169,8 +199,8 @@ export class ODTExporterRichtext {
 
         if (node.marks) {
             node.marks
-                .filter(mark => mark.type === "comment")
-                .forEach(comment => {
+                .filter((mark: any) => mark.type === "comment")
+                .forEach((comment: any) => {
                     const commentData = options.comments[comment.attrs.id]
                     if (!commentData || !commentData.content) {
                         return
@@ -179,7 +209,7 @@ export class ODTExporterRichtext {
                         start += `<office:annotation office:name="comment_${options.tag}_${comment.attrs.id}" loext:resolved="${commentData.content.resolved}">
                                      <dc:creator>${escapeText(commentData.content.username)}</dc:creator>
                                         <dc:date>${new Date(commentData.content.date).toISOString().slice(0, -1)}000000</dc:date>
-                                        ${commentData.content.comment.map(node => this.transformRichtext(node, options)).join("")}
+                                        ${commentData.content.comment.map((node: any) => this.transformRichtext(node, options)).join("")}
                                     </office:annotation>`
                     }
                     if (commentData.end === node) {
@@ -187,11 +217,11 @@ export class ODTExporterRichtext {
                             `<office:annotation-end office:name="comment_${options.tag}_${comment.attrs.id}"/>` +
                             (commentData.content.answers || [])
                                 .map(
-                                    answer =>
+                                    (answer: any) =>
                                         `<office:annotation loext:resolved="${commentData.content.resolved}">
                                     <dc:creator>${escapeText(answer.username)}</dc:creator>
                                     <dc:date>${new Date(answer.date).toISOString().slice(0, -1)}000000</dc:date>
-                                    ${answer.answer.map(node => this.transformRichtext(node, options)).join("")}
+                                    ${answer.answer.map((node: any) => this.transformRichtext(node, options)).join("")}
                                 </office:annotation>`
                                 )
                                 .join("") +
@@ -224,12 +254,12 @@ export class ODTExporterRichtext {
                     this.styles.checkParStyle(options.section)
                 }
                 const nextBlockDelete = nextSibling?.attrs?.track?.find(
-                    mark => mark.type === "deletion"
+                    (mark: any) => mark.type === "deletion"
                 )
                 const nextBlockInsert = nextSibling?.attrs?.track?.find(
-                    mark => mark.type === "insertion"
+                    (mark: any) => mark.type === "insertion"
                 )
-                let lastNonMergedBlock
+                let lastNonMergedBlock: any
                 if (blockDelete) {
                     // This block has been deleted, so we need to check which text block
                     // it is being merged in to. If it has, we need to merge the
@@ -244,7 +274,7 @@ export class ODTExporterRichtext {
                             lastNonMergedBlock = searchNode
                             if (
                                 searchNode?.attrs?.track?.find(
-                                    mark => mark.type === "deletion"
+                                    (mark: any) => mark.type === "deletion"
                                 )
                             ) {
                                 searchNode =
@@ -324,7 +354,7 @@ export class ODTExporterRichtext {
                         const title = node.attrs.title
                             ? `: ${escapeText(node.attrs.title)}`
                             : ""
-                        const categoryLabel = `<text:bookmark-start text:name="${node.attrs.id}"/>${CATS[category][this.settings.language]} ${catCountXml}${title}<text:bookmark-end text:name="${node.attrs.id}"/><text:line-break/>`
+                        const categoryLabel = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}${title}<text:bookmark-end text:name="${node.attrs.id}"/><text:line-break/>`
                         start += categoryLabel
                     }
                 }
@@ -386,30 +416,30 @@ export class ODTExporterRichtext {
                 break
             }
             case "text": {
-                let hyperlink,
-                    strong,
-                    em,
-                    underline,
-                    sup,
-                    sub,
-                    smallcaps,
-                    code,
-                    anchor
+                let hyperlink: any,
+                    strong: any,
+                    em: any,
+                    underline: any,
+                    sup: any,
+                    sub: any,
+                    smallcaps: any,
+                    code: any,
+                    anchor: any
                 // Check for hyperlink, bold/strong and italic/em
                 if (node.marks) {
-                    hyperlink = node.marks.find(mark => mark.type === "link")
-                    anchor = node.marks.find(mark => mark.type === "anchor")
-                    strong = node.marks.find(mark => mark.type === "strong")
-                    em = node.marks.find(mark => mark.type === "em")
+                    hyperlink = node.marks.find((mark: any) => mark.type === "link")
+                    anchor = node.marks.find((mark: any) => mark.type === "anchor")
+                    strong = node.marks.find((mark: any) => mark.type === "strong")
+                    em = node.marks.find((mark: any) => mark.type === "em")
                     underline = node.marks.find(
-                        mark => mark.type === "underline"
+                        (mark: any) => mark.type === "underline"
                     )
                     smallcaps = node.marks.find(
-                        mark => mark.type === "smallcaps"
+                        (mark: any) => mark.type === "smallcaps"
                     )
-                    sup = node.marks.find(mark => mark.type === "sup")
-                    sub = node.marks.find(mark => mark.type === "sub")
-                    code = node.marks.find(mark => mark.type === "code")
+                    sup = node.marks.find((mark: any) => mark.type === "sup")
+                    sub = node.marks.find((mark: any) => mark.type === "sub")
+                    code = node.marks.find((mark: any) => mark.type === "code")
                 }
 
                 if (hyperlink) {
@@ -463,7 +493,7 @@ export class ODTExporterRichtext {
                 break
             }
             case "citation": {
-                let cit
+                let cit: any
                 // We take the first citation from the stack and remove it.
                 if (options.inFootnote) {
                     cit = this.footnotes.citations.pmCits.shift()
@@ -531,7 +561,7 @@ export class ODTExporterRichtext {
                             end
                     } else {
                         // Fallback to formatted text only
-                        cit.content.forEach(citContent => {
+                        cit.content.forEach((citContent: any) => {
                             content += this.transformRichtext(
                                 citContent,
                                 options
@@ -558,11 +588,11 @@ export class ODTExporterRichtext {
                     end = end + '<text:p text:style-name="Standard"></text:p>'
                 }
                 const figureCaption = node.content.find(
-                    node => node.type === "figure_caption"
+                    (node: any) => node.type === "figure_caption"
                 )
                 let caption = node.attrs.caption
                     ? figureCaption?.content
-                          ?.map((node, index) =>
+                          ?.map((node: any, index: number) =>
                               this.transformRichtext(
                                   node,
                                   options,
@@ -585,16 +615,16 @@ export class ODTExporterRichtext {
                     const catCount = categoryCounter[category]++
                     const catCountXml = `<text:sequence text:ref-name="ref${category}${catCount - 1}${options.inFootnote ? "A" : ""}" text:name="${category}" text:formula="ooow:${category}+1" style:num-format="1">${catCount}${options.inFootnote ? "A" : ""}</text:sequence>`
                     if (caption.length) {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${CATS[category][this.settings.language]} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
+                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
                     } else {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${CATS[category][this.settings.language]} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
+                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
                     }
                 }
                 let relWidth = node.attrs.width
                 let aligned = node.attrs.aligned
-                let frame
+                let frame = false
                 const image =
-                    node.content.find(node => node.type === "image")?.attrs
+                    node.content.find((node: any) => node.type === "image")?.attrs
                         .image || false
                 if (caption.length || image === false) {
                     frame = true
@@ -638,7 +668,7 @@ export class ODTExporterRichtext {
                         </draw:frame>`
                 } else {
                     const latex = node.content.find(
-                        node => node.type === "figure_equation"
+                        (node: any) => node.type === "figure_equation"
                     )?.attrs.equation
                     const objectNumber = this.math.addMath(latex)
                     const graphicStyleId =
@@ -677,7 +707,7 @@ export class ODTExporterRichtext {
                 break
             case "table": {
                 if (options.listStyles) {
-                    options.listStyles.forEach(listStyle => {
+                    options.listStyles.forEach((listStyle: string) => {
                         end =
                             `<text:list text:continue-numbering="true" text:style-name="${listStyle}"><text:list-item>` +
                             end
@@ -687,7 +717,7 @@ export class ODTExporterRichtext {
                 const tableCaption = node.content[0]
                 let caption = node.attrs.caption
                     ? tableCaption?.content
-                          ?.map((node, index) =>
+                          ?.map((node: any, index: number) =>
                               this.transformRichtext(
                                   node,
                                   options,
@@ -710,9 +740,9 @@ export class ODTExporterRichtext {
                     const catCount = categoryCounter[category]++
                     const catCountXml = `<text:sequence text:ref-name="ref${category}${catCount - 1}${options.inFootnote ? "A" : ""}" text:name="${category}" text:formula="ooow:${category}+1" style:num-format="1">${catCount}${options.inFootnote ? "A" : ""}</text:sequence>`
                     if (caption.length) {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${CATS[category][this.settings.language]} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
+                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
                     } else {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${CATS[category][this.settings.language]} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
+                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
                     }
                 }
                 if (caption.length) {
@@ -830,12 +860,12 @@ export class ODTExporterRichtext {
         if (inlineNode) {
             const inlineInsert =
                 node.marks?.find(
-                    mark =>
+                    (mark: any) =>
                         mark.type === "insertion" &&
                         mark.attrs.approved === false
                 )?.attrs || blockInsert
             const inlineDelete =
-                node.marks?.find(mark => mark.type === "deletion")?.attrs ||
+                node.marks?.find((mark: any) => mark.type === "deletion")?.attrs ||
                 options.blockDelete
             if (inlineDelete) {
                 if (parent) {

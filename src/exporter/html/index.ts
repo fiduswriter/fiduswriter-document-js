@@ -1,27 +1,57 @@
 import download from "downloadjs"
 import pretty from "pretty"
 
-import {shortFileTitle} from "fwtoolkit"
+import {shortFileTitle, staticUrl} from "fwtoolkit"
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {removeHidden} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
-import {ZipFileCreator} from "../tools/zip.js"
-
+import {ZipFileCreator, type ZipTextFile} from "../tools/zip.js"
 import {HTMLExporterConvert} from "./convert.js"
 import {htmlExportTemplate} from "./templates.js"
+
 /*
  Exporter to HTML
 */
 
 export class HTMLExporter {
+    doc: ExportDoc
+    bibDB: BibDB
+    imageDB: ImageDB
+    csl: CSL
+    updated: any
+    documentStyles: Array<{
+        slug: string
+        contents: string
+        documentstylefile_set: Array<[string, string]>
+    }>
+    converterOptions: Record<string, unknown>
+
+    docTitle: string
+    docContent: any
+    zipFileName: string | false
+    textFiles: Array<{filename: string; contents?: string; url?: string}>
+    httpFiles: Array<{filename: string; url: string}>
+    includeZips: Array<{directory: string; url: string}>
+    metaData: any
+    htmlExportTemplate: typeof htmlExportTemplate
+    contentFileName: string
+    fileEnding: string
+    mimeType: string
+    styleSheets: Array<{url?: string; filename?: string; contents?: string}>
+
     constructor(
-        doc,
-        bibDB,
-        imageDB,
-        csl,
-        updated,
-        documentStyles,
-        converterOptions = {},
-        template = htmlExportTemplate
+        doc: ExportDoc,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL,
+        updated: any,
+        documentStyles: Array<{
+            slug: string
+            contents: string
+            documentstylefile_set: Array<[string, string]>
+        }>,
+        converterOptions: Record<string, unknown> = {},
+        template: typeof htmlExportTemplate = htmlExportTemplate
     ) {
         this.doc = doc
         this.bibDB = bibDB
@@ -31,7 +61,7 @@ export class HTMLExporter {
         this.documentStyles = documentStyles
         this.converterOptions = converterOptions
 
-        this.docTitle = shortFileTitle(this.doc.title, this.doc.path)
+        this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
 
         this.docContent = false
         this.zipFileName = false
@@ -53,15 +83,15 @@ export class HTMLExporter {
         this.styleSheets = [{url: staticUrl("css/document.css")}]
     }
 
-    async init() {
+    async init(): Promise<void> {
         await this.process()
         return await this.createZip()
     }
 
-    async process() {
+    async process(): Promise<void> {
         // Process the document and prepare files
         this.zipFileName = `${createSlug(this.docTitle)}.${this.fileEnding}`
-        this.docContent = removeHidden(this.doc.content)
+        this.docContent = removeHidden(this.doc.content) as FidusNode
 
         const docStyle = this.getDocStyle(this.doc)
 
@@ -95,11 +125,13 @@ export class HTMLExporter {
         this.addDoc(html)
         this.addImages(imageIds)
         await Promise.all(
-            extraStyleSheets.map(async sheet => await this.loadStyle(sheet))
+            extraStyleSheets.map(async (sheet: any) => await this.loadStyle(sheet))
         )
     }
 
-    getProcessedFiles() {
+    converter: any
+
+    getProcessedFiles(): any {
         // Return the processed files and metadata. Used when using the
         // exporter in a different context than creating a zip file.
         return {
@@ -111,24 +143,24 @@ export class HTMLExporter {
         }
     }
 
-    addDoc(html) {
+    addDoc(html: string): void {
         this.textFiles.push({
             filename: this.contentFileName,
             contents: pretty(html, {ocd: true})
         })
     }
 
-    addImages(imageIds) {
+    addImages(imageIds: string[]): void {
         imageIds.forEach(id => {
             const image = this.imageDB.db[id]
             this.httpFiles.push({
-                filename: `images/${image.image.split("/").pop()}`,
-                url: image.image
+                filename: `images/${image.image!.toString().split("/").pop()!}`,
+                url: image.image as string
             })
         })
     }
 
-    getDocStyle(doc) {
+    getDocStyle(doc: ExportDoc): {contents: string; filename: string} | false {
         const docStyle = this.documentStyles.find(
             docStyle => docStyle.slug === doc.settings.documentstyle
         )
@@ -155,7 +187,9 @@ export class HTMLExporter {
         return {contents, filename: `css/${docStyle.slug}.css`}
     }
 
-    async loadStyle(sheet) {
+    async loadStyle(
+        sheet: {url?: string; filename?: string; contents?: string}
+    ): Promise<any> {
         if (sheet.url) {
             // Use simple fetch without X-Requested-With header and credentials
             // to avoid CORS preflight redirect issues with CDNs
@@ -165,18 +199,18 @@ export class HTMLExporter {
             }
             const text = await response.text()
             sheet.contents = text
-            sheet.filename = `css/${sheet.url.split("/").pop().split("?")[0]}`
+            sheet.filename = `css/${sheet.url.split("/").pop()!.split("?")[0]}`
             delete sheet.url
         }
         if (sheet.filename) {
-            this.textFiles.push(sheet)
+            this.textFiles.push(sheet as {filename: string; contents?: string})
         }
         return Promise.resolve(sheet)
     }
 
-    async createZip() {
+    async createZip(): Promise<void> {
         const zipper = new ZipFileCreator(
-            this.textFiles,
+            this.textFiles as ZipTextFile[],
             this.httpFiles,
             this.includeZips,
             this.mimeType,
@@ -186,7 +220,7 @@ export class HTMLExporter {
         return this.download(blob)
     }
 
-    download(blob) {
-        return download(blob, this.zipFileName, this.mimeType)
+    download(blob: Blob): void {
+        return download(blob, this.zipFileName as string, this.mimeType)
     }
 }

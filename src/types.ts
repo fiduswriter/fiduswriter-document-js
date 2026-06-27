@@ -74,9 +74,10 @@ export interface FidusDoc {
 
 /** A fully populated document object passed to exporters. */
 export interface ExportDoc {
+    id: string | number
     title: string
     path?: string
-    content: FidusNode[]
+    content: FidusNode
     settings: DocSettings
     comments?: Record<string, CommentData>
     version?: string

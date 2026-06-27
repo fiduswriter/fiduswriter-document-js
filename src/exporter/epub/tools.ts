@@ -65,7 +65,11 @@ export function getImageMimeType(filename: string): string | null {
 }
 
 export interface HierarchyItem extends Record<string, unknown> {
+    id: string
+    title: string
     level: number
+    link?: string
+    docNum?: number
     children: HierarchyItem[]
 }
 

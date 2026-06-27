@@ -1,15 +1,37 @@
 import {convertLatexToMathMl} from "mathlive"
 
 import {escapeText} from "fwtoolkit"
-import {CATS} from "../../schema/i18n.js"
-
+import {getCat} from "../../schema/i18n.js"
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import {FormatCitations} from "../../citations/format.js"
 import {removeHidden} from "../tools/doc_content.js"
 
 import {JATSExporterCitations} from "./citations.js"
 import {convertText} from "./text.js"
 
 export class JATSExporterConverter {
-    constructor(type, doc, csl, imageDB, bibDB) {
+    type: string
+    doc: ExportDoc
+    csl: CSL
+    imageDB: ImageDB
+    bibDB: BibDB
+    imageIds: string[]
+    categoryCounter: Record<string, number>
+    affiliations: Record<string, number>
+    affCounter: number
+    parCounter: number
+    headingCounter: number
+    currentSectionLevel: number
+    listCounter: number
+    orderedListLengths: number[]
+    footnotes: string[]
+    fnCounter: number
+    frontMatter: any
+    citInfos: any[]
+    citationCount: number
+    citations: JATSExporterCitations
+
+    constructor(type: string, doc: ExportDoc, csl: CSL, imageDB: ImageDB, bibDB: BibDB) {
         this.type = type
         this.doc = doc
         this.csl = csl
@@ -46,8 +68,8 @@ export class JATSExporterConverter {
         )
     }
 
-    init() {
-        const docContent = removeHidden(this.doc.content)
+    init(): Promise<{front: string; body: string; back: string; imageIds: string[]}> {
+        const docContent = removeHidden(this.doc.content) as FidusNode
         this.preWalkJson(docContent)
         this.findAllCitations(docContent)
         return this.citations.init(this.citInfos).then(() => {
@@ -67,7 +89,7 @@ export class JATSExporterConverter {
     }
 
     // Remove items from the body that should be in the front.
-    preWalkJson(node, parentNode = false) {
+    preWalkJson(node: any, parentNode: any = false): void {
         switch (node.type) {
             case "doc":
                 this.frontMatter.copyright = node.attrs.copyright
@@ -75,7 +97,7 @@ export class JATSExporterConverter {
             case "title":
                 this.frontMatter.title["default"] = node
                 parentNode.content = parentNode.content.filter(
-                    child => child !== node
+                    (child: any) => child !== node
                 )
                 break
             case "heading_part":
@@ -101,7 +123,7 @@ export class JATSExporterConverter {
                         content: node.content[0].content
                     }
                     parentNode.content = parentNode.content.filter(
-                        child => child !== node
+                        (child: any) => child !== node
                     )
                 }
                 break
@@ -124,7 +146,7 @@ export class JATSExporterConverter {
                         content: node.content
                     }
                     parentNode.content = parentNode.content.filter(
-                        child => child !== node
+                        (child: any) => child !== node
                     )
                 }
                 break
@@ -141,24 +163,24 @@ export class JATSExporterConverter {
                     this.frontMatter.tags.push(node)
                 }
                 parentNode.content = parentNode.content.filter(
-                    child => child !== node
+                    (child: any) => child !== node
                 )
                 break
             case "contributors_part":
                 this.frontMatter.contributors.push(node)
                 parentNode.content = parentNode.content.filter(
-                    child => child !== node
+                    (child: any) => child !== node
                 )
                 break
             default:
                 break
         }
         if (node.content) {
-            node.content.forEach(child => this.preWalkJson(child, node))
+            node.content.forEach((child: any) => this.preWalkJson(child, node))
         }
     }
 
-    findAllCitations(docContent) {
+    findAllCitations(docContent: any): void {
         // We need to look for citations in the same order they will be found in front + body
         // to get the formatting right.
         if (this.frontMatter.subtitle.default) {
@@ -183,29 +205,29 @@ export class JATSExporterConverter {
         this.findCitations(docContent)
     }
 
-    findCitations(node) {
+    findCitations(node: any): void {
         switch (node.type) {
             case "citation":
                 this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
                 break
             case "footnote":
-                node.attrs.footnote.forEach(child => this.findCitations(child))
+                node.attrs.footnote.forEach((child: any) => this.findCitations(child))
                 break
             default:
                 break
         }
         if (node.content) {
-            node.content.forEach(child => this.findCitations(child))
+            node.content.forEach((child: any) => this.findCitations(child))
         }
     }
 
-    assembleArticleFront() {
+    assembleArticleFront(): string {
         let front = "<front>"
         front +=
             "<journal-meta><journal-id></journal-id><issn></issn></journal-meta>" // Required by DTD
         front += "<article-meta>"
         if (this.frontMatter.tags.length) {
-            front += `<article-categories>${this.frontMatter.tags.map(node => this.walkJson(node)).join("")}</article-categories>`
+            front += `<article-categories>${this.frontMatter.tags.map((node: any) => this.walkJson(node)).join("")}</article-categories>`
         }
         Object.keys(this.frontMatter.subtitle)
             .filter(language => language !== "default")
@@ -234,12 +256,12 @@ export class JATSExporterConverter {
                 front += "</trans-title-group>"
             })
         front += "</title-group>"
-        this.frontMatter.contributors.forEach(contributors => {
+        this.frontMatter.contributors.forEach((contributors: any) => {
             front += this.walkJson(contributors)
         })
         Object.entries(this.affiliations).forEach(
             ([institution, index]) =>
-                (front += `<aff id="aff${index}"><institution>${escapeText(institution)}</institution></aff>`)
+                (front += `<aff id="aff${index}"><institution>${escapeText(institution as string)}</institution></aff>`)
         )
         // https://validator.jats4r.org/ requires a <permissions> element here, but is OK with it being empty.
         if (this.frontMatter.copyright.holder) {
@@ -254,7 +276,7 @@ export class JATSExporterConverter {
             }
             front += this.frontMatter.copyright.licenses
                 .map(
-                    license =>
+                    (license: any) =>
                         `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
                 )
                 .join("")
@@ -272,17 +294,17 @@ export class JATSExporterConverter {
                 front += this.walkJson(this.frontMatter.abstract[language])
                 front += this.closeSections(0)
             })
-        this.frontMatter.keywords.forEach(keywords => {
+        this.frontMatter.keywords.forEach((keywords: any) => {
             front += this.walkJson(keywords)
         })
         front += "</article-meta></front>"
         return front
     }
 
-    assembleBookPartFront() {
+    assembleBookPartFront(): string {
         let front = "<front-matter><book-part-meta>"
         if (this.frontMatter.tags.length) {
-            front += `<subj-group>${this.frontMatter.tags.map(node => this.walkJson(node)).join("")}</subj-group>`
+            front += `<subj-group>${this.frontMatter.tags.map((node: any) => this.walkJson(node)).join("")}</subj-group>`
         }
         Object.keys(this.frontMatter.subtitle)
             .filter(language => language !== "default")
@@ -311,12 +333,12 @@ export class JATSExporterConverter {
                 front += "</trans-title-group>"
             })
         front += "</title-group>"
-        this.frontMatter.contributors.forEach(contributors => {
+        this.frontMatter.contributors.forEach((contributors: any) => {
             front += this.walkJson(contributors)
         })
         Object.entries(this.affiliations).forEach(
             ([institution, index]) =>
-                (front += `<aff id="aff${index}"><institution>${escapeText(institution)}</institution></aff>`)
+                (front += `<aff id="aff${index}"><institution>${escapeText(institution as string)}</institution></aff>`)
         )
         // https://validator.jats4r.org/ requires a <permissions> element here, but is OK with it being empty.
         if (this.frontMatter.copyright.holder) {
@@ -331,7 +353,7 @@ export class JATSExporterConverter {
             }
             front += this.frontMatter.copyright.licenses
                 .map(
-                    license =>
+                    (license: any) =>
                         `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
                 )
                 .join("")
@@ -349,14 +371,14 @@ export class JATSExporterConverter {
                 front += this.walkJson(this.frontMatter.abstract[language])
                 front += this.closeSections(0)
             })
-        this.frontMatter.keywords.forEach(keywords => {
+        this.frontMatter.keywords.forEach((keywords: any) => {
             front += this.walkJson(keywords)
         })
         front += "</book-part-meta></front-matter>"
         return front
     }
 
-    walkJson(node, options = {}) {
+    walkJson(node: any, options: any = {}): string {
         let start = "",
             content = "",
             end = ""
@@ -404,7 +426,7 @@ export class JATSExporterConverter {
                 break
             case "contributors_part":
                 if (node.content) {
-                    const contributorTypes = {
+                    const contributorTypes: Record<string, string> = {
                         authors: "author",
                         editors: "editor",
                         translators: "translator",
@@ -417,7 +439,7 @@ export class JATSExporterConverter {
                     end = "</contrib-group>" + end
                     const contributorTypeId = node.attrs.id
                     let counter = 1
-                    node.content.forEach(childNode => {
+                    node.content.forEach((childNode: any) => {
                         const contributor = childNode.attrs
                         if (contributor.firstname || contributor.lastname) {
                             content += `<contrib id="${contributorTypeId}-${counter++}" contrib-type="person">`
@@ -582,12 +604,8 @@ export class JATSExporterConverter {
                     lastListIndex = this.orderedListLengths.lastIndexOf(
                         continuedListEndNumber
                     )
-                    // const lastListReverseIndex = this.orderedListLengths.slice().reverse().findIndex(length => length === continuedListEndNumber)
-                    // if (lastListReverseIndex !== undefined) {
-                    //     lastListIndex = this.orderedListLengths.length-lastListReverseIndex
-                    // }
                 }
-                if (lastListIndex > -1) {
+                if (lastListIndex !== undefined && lastListIndex > -1) {
                     start += `<list list-type="order" id="list-${++this.listCounter}" continued-from="list-${lastListIndex}">`
                 } else {
                     start += `<list list-type="order" id="list-${++this.listCounter}">`
@@ -657,7 +675,8 @@ export class JATSExporterConverter {
                     this.citations.citationTexts[this.citationCount++]
                 if (
                     options.inFootnote ||
-                    this.citations.citFm.citationType !== "note"
+                    (this.citations.citFm as FormatCitations).citationType !==
+                        "note"
                 ) {
                     content += citationText
                 } else {
@@ -674,19 +693,19 @@ export class JATSExporterConverter {
                     // only allows <p> block level elements https://jats.nlm.nih.gov/archiving/tag-library/1.2/element/fn.html
                     break
                 }
-                let imageFilename, copyright
+                let imageFilename: string | undefined, copyright: any
                 const image =
-                    node.content.find(node => node.type === "image")?.attrs
+                    node.content.find((node: any) => node.type === "image")?.attrs
                         .image || false
                 if (image !== false) {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image],
                         filePathName = imageDBEntry.image
                     copyright = imageDBEntry.copyright
-                    imageFilename = filePathName.split("/").pop()
+                    imageFilename = filePathName!.toString().split("/").pop()
                 }
                 const caption = node.attrs.caption
-                    ? node.content.find(node => node.type === "figure_caption")
+                    ? node.content.find((node: any) => node.type === "figure_caption")
                           ?.content || []
                     : []
                 if (
@@ -696,7 +715,7 @@ export class JATSExporterConverter {
                     (!copyright || !copyright.holder)
                 ) {
                     content += `<graphic id="${node.attrs.id}" position="anchor" xlink:href="${imageFilename}">`
-                    content += `<alt-text>${escapeText(caption.map(node => node.text || "").join("") || imageFilename)}</alt-text>`
+                    content += `<alt-text>${escapeText(caption.map((node: any) => node.text || "").join("") || imageFilename)}</alt-text>`
                     content += "</graphic>"
                 } else {
                     start += `<fig id="${node.attrs.id}">`
@@ -708,14 +727,14 @@ export class JATSExporterConverter {
                             this.categoryCounter[category] = 0
                         }
                         const catCount = ++this.categoryCounter[category]
-                        const catLabel = `${CATS[category][this.doc.settings.language]} ${catCount}`
+                        const catLabel = `${getCat(category, this.doc.settings.language || "en-US")} ${catCount}`
                         start += `<label>${escapeText(catLabel)}</label>`
                     }
                     if (caption.length) {
-                        start += `<caption><p>${caption.map(node => this.walkJson(node)).join("")}</p></caption>`
+                        start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
                     }
                     const equation = node.content.find(
-                        node => node.type === "figure_equation"
+                        (node: any) => node.type === "figure_equation"
                     )?.attrs.equation
                     if (equation) {
                         start += "<disp-formula>"
@@ -740,7 +759,7 @@ export class JATSExporterConverter {
                             }
                             start += copyright.licenses
                                 .map(
-                                    license =>
+                                    (license: any) =>
                                         `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
                                 )
                                 .join("")
@@ -748,7 +767,7 @@ export class JATSExporterConverter {
                         }
                         if (imageFilename) {
                             content += `<graphic position="anchor" xlink:href="${imageFilename}">`
-                            content += `<alt-text>${escapeText(caption.map(node => node.text || "").join("") || imageFilename)}</alt-text>`
+                            content += `<alt-text>${escapeText(caption.map((node: any) => node.text || "").join("") || imageFilename)}</alt-text>`
                             content += "</graphic>"
                         }
                     }
@@ -778,14 +797,14 @@ export class JATSExporterConverter {
                         this.categoryCounter[category] = 0
                     }
                     const catCount = ++this.categoryCounter[category]
-                    const catLabel = `${CATS[category][this.doc.settings.language]} ${catCount}`
+                    const catLabel = `${getCat(category, this.doc.settings.language || "en-US")} ${catCount}`
                     start += `<label>${escapeText(catLabel)}</label>`
                 }
                 const caption = node.attrs.caption
                     ? node.content[0].content || []
                     : []
                 if (caption.length) {
-                    start += `<caption><p>${caption.map(node => this.walkJson(node)).join("")}</p></caption>`
+                    start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
                 }
                 start += `<table width="${node.attrs.width}%"><tbody>`
                 end = "</tbody></table>" + end
@@ -835,7 +854,7 @@ export class JATSExporterConverter {
         }
 
         if (!content.length && node.content) {
-            node.content.forEach(child => {
+            node.content.forEach((child: any) => {
                 content += this.walkJson(child, options)
             })
         }
@@ -843,7 +862,7 @@ export class JATSExporterConverter {
         return start + content + end
     }
 
-    closeSections(targetLevel) {
+    closeSections(targetLevel: number): string {
         let returnValue = ""
         while (this.currentSectionLevel > targetLevel) {
             returnValue += "</sec>"
@@ -853,11 +872,11 @@ export class JATSExporterConverter {
         return returnValue
     }
 
-    assembleBody(docContent) {
+    assembleBody(docContent: any): string {
         return `<body id="body">${this.walkJson(docContent) + this.closeSections(0)}</body>`
     }
 
-    assembleBack() {
+    assembleBack(): string {
         let back = "<back>"
         if (this.footnotes.length) {
             back += `<fn-group>${this.footnotes.join("")}</fn-group>`

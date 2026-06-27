@@ -2,19 +2,34 @@ import {BibLatexExporter} from "biblatex-csl-converter"
 import download from "downloadjs"
 
 import {shortFileTitle} from "fwtoolkit"
+import type {BibDB, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
 import {LatexExporterConvert} from "./convert.js"
 import {readMe} from "./readme.js"
+
 /*
  Exporter to LaTeX
 */
 
 export class LatexExporter {
-    constructor(doc, bibDB, imageDB, updated) {
+    doc: ExportDoc
+    docTitle: string
+    bibDB: BibDB
+    imageDB: ImageDB
+    updated: any
+
+    docContent: any
+    zipFileName: string | false
+    textFiles: Array<{filename: string; contents: string}>
+    httpFiles: Array<{filename: string; url: string}>
+
+    conversion: any
+
+    constructor(doc: ExportDoc, bibDB: BibDB, imageDB: ImageDB, updated: any) {
         this.doc = doc
-        this.docTitle = shortFileTitle(this.doc.title, this.doc.path)
+        this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.updated = updated
@@ -25,16 +40,16 @@ export class LatexExporter {
         this.httpFiles = []
     }
 
-    init() {
+    init(): Promise<void> {
         this.zipFileName = `${createSlug(this.docTitle)}.latex.zip`
-        this.docContent = fixTables(removeHidden(this.doc.content))
-        this.converter = new LatexExporterConvert(
+        this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
+        const converter = new LatexExporterConvert(
             this,
             this.imageDB,
             this.bibDB,
             this.doc.settings
         )
-        this.conversion = this.converter.init(this.docContent)
+        this.conversion = converter.init(this.docContent)
         if (Object.keys(this.conversion.usedBibDB).length > 0) {
             const bibExport = new BibLatexExporter(this.conversion.usedBibDB)
             this.textFiles.push({
@@ -47,16 +62,16 @@ export class LatexExporter {
             contents: this.conversion.latex
         })
         this.textFiles.push({filename: "README.txt", contents: readMe})
-        this.conversion.imageIds.forEach(id => {
+        this.conversion.imageIds.forEach((id: string) => {
             this.httpFiles.push({
-                filename: this.imageDB.db[id].image.split("/").pop(),
-                url: this.imageDB.db[id].image
+                filename: this.imageDB.db[id].image!.toString().split("/").pop()!,
+                url: this.imageDB.db[id].image as string
             })
         })
         return this.createZip()
     }
 
-    createZip() {
+    createZip(): Promise<void> {
         const zipper = new ZipFileCreator(
             this.textFiles,
             this.httpFiles,
@@ -68,7 +83,7 @@ export class LatexExporter {
         return zipper.init().then(blob => this.download(blob))
     }
 
-    download(blob) {
-        return download(blob, this.zipFileName, "application/zip")
+    download(blob: Blob): void {
+        return download(blob, this.zipFileName as string, "application/zip")
     }
 }

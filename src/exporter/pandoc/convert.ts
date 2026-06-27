@@ -1,7 +1,19 @@
 import {convertContributor, convertText} from "./tools.js"
 
 export class PandocExporterConvert {
-    constructor(exporter, imageDB, bibDB, settings) {
+    exporter: any
+    settings: any
+    imageDB: any
+    bibDB: any
+    imageIds: string[]
+    usedBibDB: any
+
+    internalLinks: string[]
+    categoryCounter: Record<string, number>
+
+    metaData: {toc: any[]}
+
+    constructor(exporter: any, imageDB: any, bibDB: any, settings: any) {
         this.exporter = exporter
         this.settings = settings
         this.imageDB = imageDB
@@ -17,15 +29,15 @@ export class PandocExporterConvert {
         }
     }
 
-    init(doc) {
+    init(doc: any): any {
         this.preWalkJson(doc)
-        const meta = {
+        const meta: any = {
             lang: {
                 t: "MetaInlines",
                 c: [{t: "Str", c: this.settings.language.split("-")[0]}]
             }
         }
-        const json = {
+        const json: any = {
             "pandoc-api-version": [1, 23, 1],
             meta,
             blocks: this.convertContent(doc.content, meta)
@@ -39,7 +51,7 @@ export class PandocExporterConvert {
     }
 
     // Find information for meta tags in header
-    preWalkJson(node) {
+    preWalkJson(node: any): void {
         switch (node.type) {
             case "heading1":
             case "heading2":
@@ -53,7 +65,7 @@ export class PandocExporterConvert {
                     c: [
                         level,
                         [node.attrs.id || "", [], []],
-                        this.convertContent(node.content || [])
+                        this.convertContent(node.content || [], {})
                     ]
                 })
                 break
@@ -62,17 +74,17 @@ export class PandocExporterConvert {
                 break
         }
         if (node.content) {
-            node.content.forEach(child => this.preWalkJson(child))
+            node.content.forEach((child: any) => this.preWalkJson(child))
         }
     }
 
     // Function to convert Fidus Writer content to Pandoc format
     convertContent(
-        docContent,
-        meta,
-        options = {inFootnote: false, inCode: false}
-    ) {
-        const pandocContent = []
+        docContent: any[],
+        meta: any,
+        options: any = {inFootnote: false, inCode: false}
+    ): any[] {
+        const pandocContent: any[] = []
         for (const node of docContent) {
             switch (node.type) {
                 case "doc":
@@ -86,13 +98,13 @@ export class PandocExporterConvert {
                     break
                 }
                 case "bullet_list": {
-                    const c = []
+                    const c: any[] = []
                     pandocContent.push({
                         t: "BulletList",
                         c
                     })
                     if (node.content) {
-                        node.content.forEach(listItem =>
+                        node.content.forEach((listItem: any) =>
                             c.push(
                                 this.convertContent(
                                     listItem.content || [],
@@ -112,7 +124,7 @@ export class PandocExporterConvert {
                     const cit = this.exporter.citations.pmCits.shift()
 
                     const pandocReferences = node.attrs.references
-                        .map(reference => {
+                        .map((reference: any) => {
                             const bibDBEntry = this.bibDB.db[reference.id]
                             if (!bibDBEntry) {
                                 // Not present in bibliography database, skip it.
@@ -150,7 +162,7 @@ export class PandocExporterConvert {
                                 citationHash: 0
                             }
                         })
-                        .filter(reference => reference)
+                        .filter((reference: any) => reference)
                     if (!pandocReferences.length) {
                         break
                     }
@@ -159,7 +171,7 @@ export class PandocExporterConvert {
                         meta,
                         options
                     )
-                    const pandocElement = {
+                    const pandocElement: any = {
                         t: "Cite",
                         c: [pandocReferences, pandocRendering]
                     }
@@ -168,7 +180,7 @@ export class PandocExporterConvert {
                             node.content,
                             meta,
                             options
-                        ).forEach(el => pandocElement.c.push(el))
+                        ).forEach((el: any) => pandocElement.c.push(el))
                     }
                     pandocContent.push(pandocElement)
                     break
@@ -179,7 +191,7 @@ export class PandocExporterConvert {
                     const classes = node.attrs.language
                         ? [node.attrs.language]
                         : []
-                    const keyValuePairs = []
+                    const keyValuePairs: [string, string][] = []
 
                     // Add caption if title is present
                     if (node.attrs.title) {
@@ -200,7 +212,7 @@ export class PandocExporterConvert {
                         c: [
                             attrs,
                             this.convertContent(node.content, meta, options)
-                                .map(item => {
+                                .map((item: any) => {
                                     if (item.t === "Str") {
                                         return item.c
                                     } else if (item.t === "Space") {
@@ -230,13 +242,14 @@ export class PandocExporterConvert {
                             meta.author = {t: "MetaList", c: []}
                         }
                         const convertedContributors = node.content
-                            .map(contributor =>
+                            .map((contributor: any) =>
                                 convertContributor(contributor.attrs)
                             )
                             .filter(
-                                convertedContributor => convertedContributor
+                                (convertedContributor: any) =>
+                                    convertedContributor
                             )
-                        convertedContributors.forEach(contributor =>
+                        convertedContributors.forEach((contributor: any) =>
                             meta.author.c.push(contributor)
                         )
                     } else {
@@ -261,7 +274,7 @@ export class PandocExporterConvert {
                                         c: convertText(
                                             node.content
                                                 .map(
-                                                    contributor =>
+                                                    (contributor: any) =>
                                                         `${contributor.attrs.firstname} ${contributor.attrs.lastname}, ${contributor.attrs.institution}, ${contributor.attrs.email}`
                                                 )
                                                 .join("; ")
@@ -301,7 +314,7 @@ export class PandocExporterConvert {
                             }
                         }
                     } else {
-                        const pandocElement = {
+                        const pandocElement: any = {
                             t: "Header",
                             c: [2, [node.attrs?.metadata || "", [], []]]
                         }
@@ -310,7 +323,7 @@ export class PandocExporterConvert {
                                 node.content,
                                 meta,
                                 options
-                            ).forEach(el => pandocElement.c.push(el))
+                            ).forEach((el: any) => pandocElement.c.push(el))
                         }
                         pandocContent.push({
                             t: "Div",
@@ -350,22 +363,22 @@ export class PandocExporterConvert {
                 }
                 case "figure": {
                     const image =
-                        node.content.find(node => node.type === "image")?.attrs
-                            .image || false
+                        node.content.find((node: any) => node.type === "image")
+                            ?.attrs.image || false
                     const caption = node.attrs.caption
                         ? node.content.find(
-                              node => node.type === "figure_caption"
+                              (node: any) => node.type === "figure_caption"
                           )?.content || []
                         : []
                     const equation = node.content.find(
-                        node => node.type === "figure_equation"
+                        (node: any) => node.type === "figure_equation"
                     )?.attrs.equation
                     if (image !== false) {
                         this.imageIds.push(image)
                         const imageDBEntry = this.imageDB.db[image],
                             filePathName = imageDBEntry.image
                         const copyright = imageDBEntry.copyright
-                        const imageFilename = filePathName.split("/").pop()
+                        const imageFilename = filePathName!.toString().split("/").pop()
                         if (
                             node.attrs.category === "none" &&
                             imageFilename &&
@@ -561,7 +574,7 @@ export class PandocExporterConvert {
                     // handled by ordered_list and bullet_list
                     break
                 case "ordered_list": {
-                    const c = []
+                    const c: any[] = []
                     pandocContent.push({
                         t: "OrderedList",
                         c: [
@@ -575,7 +588,7 @@ export class PandocExporterConvert {
                     })
 
                     if (node.content) {
-                        node.content.forEach(listItem =>
+                        node.content.forEach((listItem: any) =>
                             c.push(
                                 this.convertContent(
                                     listItem.content || [],
@@ -603,7 +616,11 @@ export class PandocExporterConvert {
                     if (node.attrs?.metadata === "abstract" && !meta.abstract) {
                         meta.abstract = {
                             t: "MetaBlocks",
-                            c: this.convertContent(node.content, meta, options)
+                            c: this.convertContent(
+                                node.content,
+                                meta,
+                                options
+                            )
                         }
                     } else {
                         pandocContent.push({
@@ -621,7 +638,11 @@ export class PandocExporterConvert {
                                     ],
                                     []
                                 ],
-                                this.convertContent(node.content, meta, options)
+                                this.convertContent(
+                                    node.content,
+                                    meta,
+                                    options
+                                )
                             ]
                         })
                     }
@@ -674,7 +695,7 @@ export class PandocExporterConvert {
                                     t: "Para",
                                     c: convertText(
                                         node.content
-                                            .map(tag => tag.attrs.tag)
+                                            .map((tag: any) => tag.attrs.tag)
                                             .join("; ")
                                     )
                                 }
@@ -687,14 +708,14 @@ export class PandocExporterConvert {
                     // Tables seem to have this structure in pandoc json:
                     // If table has no rows with content, skip.
                     const tableBodyNode = node.content.find(
-                        childNode =>
+                        (childNode: any) =>
                             childNode.type === "table_body" &&
                             childNode.content &&
                             childNode.content.length
                     )
                     const tableFirstRow = tableBodyNode
                         ? tableBodyNode.content.find(
-                              childNode =>
+                              (childNode: any) =>
                                   childNode.type === "table_row" &&
                                   childNode.content &&
                                   childNode.content.length
@@ -704,7 +725,7 @@ export class PandocExporterConvert {
                         break
                     }
 
-                    const c = []
+                    const c: any[] = []
                     pandocContent.push({
                         t: "Table",
                         c
@@ -727,7 +748,7 @@ export class PandocExporterConvert {
                     ])
                     // child 1: table caption
                     const tableCaptionNode = node.content.find(
-                        childNode =>
+                        (childNode: any) =>
                             childNode.type === "table_caption" &&
                             childNode.content &&
                             childNode.content.length
@@ -751,7 +772,7 @@ export class PandocExporterConvert {
                     }
                     // child 2: settings for each column
                     c.push(
-                        tableFirstRow.content.map(_column => [
+                        tableFirstRow.content.map((_column: any) => [
                             {t: "AlignDefault"},
                             {t: "ColWidthDefault"}
                         ])
@@ -759,20 +780,20 @@ export class PandocExporterConvert {
                     // child 3: ?
                     c.push([["", [], []], []])
                     // child 4: Each child represents one table row
-                    const tableHead = []
-                    const tableBody = []
-                    c.push([[["", [], []], 0, tableHead, tableBody]])
+                    const tableHead: any[] = []
+                    const tableBody: any[] = []
+                    c.push([["", [], []], 0, tableHead, tableBody])
                     let currentTablePart = tableHead
 
                     this.convertContent(
                         tableBodyNode.content,
                         meta,
                         options
-                    ).forEach((row, index) => {
+                    ).forEach((row: any, index: number) => {
                         if (
                             currentTablePart === tableHead &&
                             tableBodyNode.content[index].content?.find(
-                                node => node.type === "table_cell"
+                                (node: any) => node.type === "table_cell"
                             )
                         ) {
                             // If at least one regular table cell is found in the row, we assume the table header hs finished.
@@ -862,35 +883,35 @@ export class PandocExporterConvert {
                 }
                 case "text": {
                     if (node.text) {
-                        let containerContent = pandocContent
-                        let strong,
-                            em,
-                            underline,
-                            hyperlink,
-                            anchor,
-                            sup,
-                            sub,
-                            code
+                        let containerContent: any[] = pandocContent
+                        let strong: any,
+                            em: any,
+                            underline: any,
+                            hyperlink: any,
+                            anchor: any,
+                            sup: any,
+                            sub: any,
+                            code: any
                         if (node.marks) {
                             strong = node.marks.find(
-                                mark => mark.type === "strong"
+                                (mark: any) => mark.type === "strong"
                             )
-                            em = node.marks.find(mark => mark.type === "em")
+                            em = node.marks.find((mark: any) => mark.type === "em")
                             underline = node.marks.find(
-                                mark => mark.type === "underline"
+                                (mark: any) => mark.type === "underline"
                             )
                             hyperlink = node.marks.find(
-                                mark => mark.type === "link"
+                                (mark: any) => mark.type === "link"
                             )
                             anchor = node.marks.find(
-                                mark => mark.type === "anchor"
+                                (mark: any) => mark.type === "anchor"
                             )
-                            sup = node.marks.find(mark => mark.type === "sup")
-                            sub = node.marks.find(mark => mark.type === "sub")
-                            code = node.marks.find(mark => mark.type === "code")
+                            sup = node.marks.find((mark: any) => mark.type === "sup")
+                            sub = node.marks.find((mark: any) => mark.type === "sub")
+                            code = node.marks.find((mark: any) => mark.type === "code")
                         }
                         if (em) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Emph",
                                 c
@@ -898,7 +919,7 @@ export class PandocExporterConvert {
                             containerContent = c
                         }
                         if (strong) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Strong",
                                 c
@@ -906,7 +927,7 @@ export class PandocExporterConvert {
                             containerContent = c
                         }
                         if (underline) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Underline",
                                 c
@@ -914,7 +935,7 @@ export class PandocExporterConvert {
                             containerContent = c
                         }
                         if (sup) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Superscript",
                                 c
@@ -922,7 +943,7 @@ export class PandocExporterConvert {
                             containerContent = c
                         }
                         if (sub) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Subscript",
                                 c
@@ -937,7 +958,7 @@ export class PandocExporterConvert {
                             break
                         }
                         if (hyperlink) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Link",
                                 c: [["", [], []], c, [hyperlink.attrs.href, ""]]
@@ -945,7 +966,7 @@ export class PandocExporterConvert {
                             containerContent = c
                         }
                         if (anchor) {
-                            const c = []
+                            const c: any[] = []
                             containerContent.push({
                                 t: "Span",
                                 c: [[anchor.attrs.id, [], []], c]
@@ -976,7 +997,7 @@ export class PandocExporterConvert {
                             c: this.convertContent(node.content, meta, options)
                         }
                     } else {
-                        const pandocElement = {
+                        const pandocElement: any = {
                             t: "Header",
                             c: [1, ["title", [], []]]
                         }
@@ -985,7 +1006,7 @@ export class PandocExporterConvert {
                                 node.content,
                                 meta,
                                 options
-                            ).forEach(el => pandocElement.c.push(el))
+                            ).forEach((el: any) => pandocElement.c.push(el))
                         }
                         pandocContent.push(pandocElement)
                     }
@@ -1000,13 +1021,11 @@ export class PandocExporterConvert {
         return pandocContent
     }
 
-    // The database doesn't ensure that citation keys are unique.
-    // So here we need to make sure that the same key is not used twice in one
-    // document.
-    createUniqueCitationKey(suggestedKey) {
-        const usedKeys = Object.keys(this.usedBibDB).map(key => {
-            return this.usedBibDB[key].entry_key
-        })
+    createUniqueCitationKey(suggestedKey: string | undefined): string {
+        suggestedKey = suggestedKey || "key"
+        const usedKeys = Object.keys(this.usedBibDB).map(
+            key => this.usedBibDB[key].entry_key
+        )
         if (usedKeys.includes(suggestedKey)) {
             suggestedKey += "X"
             return this.createUniqueCitationKey(suggestedKey)

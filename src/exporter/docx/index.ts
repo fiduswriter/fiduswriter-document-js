@@ -1,9 +1,11 @@
 import download from "downloadjs"
 
 import {shortFileTitle} from "fwtoolkit"
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {fixTables, removeHidden, textContent} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
-import {XmlZip} from "../tools/xml_zip.js"
+import type {XmlZip} from "../tools/xml_zip.js"
+import {XmlZip as XmlZipImpl} from "../tools/xml_zip.js"
 import {DOCXExporterCitations} from "./citations.js"
 import {DOCXExporterComments} from "./comments.js"
 import {DOCXExporterFootnotes} from "./footnotes.js"
@@ -29,23 +31,39 @@ TODO:
 */
 
 export class DOCXExporter {
-    constructor(doc, templateUrl, bibDB, imageDB, csl) {
+    doc: ExportDoc
+    templateUrl: string
+    bibDB: BibDB
+    imageDB: ImageDB
+    csl: CSL
+
+    docTitle: string
+    mimeType: string
+    docContent: any
+
+    constructor(
+        doc: ExportDoc,
+        templateUrl: string,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL
+    ) {
         this.doc = doc
         this.templateUrl = templateUrl
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.csl = csl
 
-        this.docTitle = shortFileTitle(this.doc.title, this.doc.path)
+        this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.mimeType =
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         this.docContent = moveFootnoteComments(
-            fixTables(removeHidden(this.doc.content))
+            fixTables(removeHidden(this.doc.content) as FidusNode)
         )
     }
 
-    init() {
-        const xml = new XmlZip(this.templateUrl, this.mimeType)
+    init(): Promise<void> {
+        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType)
 
         const tables = new DOCXExporterTables(xml)
         const math = new DOCXExporterMath(xml)
@@ -101,7 +119,7 @@ export class DOCXExporter {
 
         const comments = new DOCXExporterComments(
             this.docContent,
-            this.doc.comments,
+            this.doc.comments || {},
             xml,
             rels,
             richtext
@@ -133,7 +151,7 @@ export class DOCXExporter {
             .then(blob => this.download(blob))
     }
 
-    download(blob) {
+    download(blob: Blob): void {
         return download(
             blob,
             createSlug(this.docTitle) + ".docx",
@@ -141,16 +159,16 @@ export class DOCXExporter {
         )
     }
 
-    getBaseMetadata() {
+    getBaseMetadata(): any {
         const contributors = this.docContent.content.reduce(
-            (contributors, part) => {
+            (contributors: any[], part: any) => {
                 if (
                     part.type === "contributors_part" &&
                     part.attrs.metadata &&
                     part.content
                 ) {
                     return contributors.concat(
-                        part.content.map(node => ({
+                        part.content.map((node: any) => ({
                             ...node.attrs,
                             role: part.attrs.metadata
                         }))
@@ -162,21 +180,26 @@ export class DOCXExporter {
             []
         )
         return {
-            authors: contributors.filter(c => c.role === "authors"),
+            authors: contributors.filter((c: any) => c.role === "authors"),
             contributors,
-            keywords: this.docContent.content.reduce((keywords, part) => {
-                if (
-                    part.type === "tags_part" &&
-                    part.attrs.metadata === "keywords" &&
-                    part.content
-                ) {
-                    return keywords.concat(
-                        part.content.map(keywordNode => keywordNode.attrs.tag)
-                    )
-                } else {
-                    return keywords
-                }
-            }, []),
+            keywords: this.docContent.content.reduce(
+                (keywords: string[], part: any) => {
+                    if (
+                        part.type === "tags_part" &&
+                        part.attrs.metadata === "keywords" &&
+                        part.content
+                    ) {
+                        return keywords.concat(
+                            part.content.map(
+                                (keywordNode: any) => keywordNode.attrs.tag
+                            )
+                        )
+                    } else {
+                        return keywords
+                    }
+                },
+                []
+            ),
             title: textContent(this.docContent.content[0]),
             language: this.doc.settings.language,
             citationStyle: this.doc.settings.citationstyle

@@ -1,11 +1,11 @@
 import download from "downloadjs"
 
 import {shortFileTitle} from "fwtoolkit"
-
+import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {fixTables, removeHidden, textContent} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
-import {XmlZip} from "../tools/xml_zip.js"
-
+import type {XmlZip} from "../tools/xml_zip.js"
+import {XmlZip as XmlZipImpl} from "../tools/xml_zip.js"
 import {ODTExporterCitations} from "./citations.js"
 import {ODTExporterFootnotes} from "./footnotes.js"
 import {ODTExporterImages} from "./images.js"
@@ -27,7 +27,24 @@ TODO:
 */
 
 export class ODTExporter {
-    constructor(doc, templateUrl, bibDB, imageDB, csl) {
+    doc: ExportDoc
+    templateUrl: string
+    bibDB: BibDB
+    imageDB: ImageDB
+    csl: CSL
+
+    pmCits: any
+    docContent: any
+    docTitle: string
+    mimeType: string
+
+    constructor(
+        doc: ExportDoc,
+        templateUrl: string,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL
+    ) {
         this.doc = doc
         this.templateUrl = templateUrl
         this.bibDB = bibDB
@@ -35,13 +52,13 @@ export class ODTExporter {
         this.csl = csl
 
         this.pmCits = false
-        this.docContent = fixTables(removeHidden(this.doc.content))
-        this.docTitle = shortFileTitle(this.doc.title, this.doc.path)
+        this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
+        this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.mimeType = "application/vnd.oasis.opendocument.text"
     }
 
-    init() {
-        const xml = new XmlZip(this.templateUrl, this.mimeType)
+    init(): Promise<void> {
+        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType)
         const styles = new ODTExporterStyles(xml)
         const math = new ODTExporterMath(xml)
         const tracks = new ODTExporterTracks(xml)
@@ -73,7 +90,7 @@ export class ODTExporter {
         const images = new ODTExporterImages(this.docContent, xml, this.imageDB)
 
         const richtext = new ODTExporterRichtext(
-            this.doc.comments,
+            this.doc.comments || {},
             this.doc.settings,
             styles,
             tracks,
@@ -108,16 +125,16 @@ export class ODTExporter {
             .then(blob => this.download(blob))
     }
 
-    getBaseMetadata() {
+    getBaseMetadata(): any {
         const contributors = this.docContent.content.reduce(
-            (contributors, part) => {
+            (contributors: any[], part: any) => {
                 if (
                     part.type === "contributors_part" &&
                     part.attrs.metadata &&
                     part.content
                 ) {
                     return contributors.concat(
-                        part.content.map(node => ({
+                        part.content.map((node: any) => ({
                             ...node.attrs,
                             role: part.attrs.metadata
                         }))
@@ -129,28 +146,33 @@ export class ODTExporter {
             []
         )
         return {
-            authors: contributors.filter(c => c.role === "authors"),
+            authors: contributors.filter((c: any) => c.role === "authors"),
             contributors,
-            keywords: this.docContent.content.reduce((keywords, part) => {
-                if (
-                    part.type === "tags_part" &&
-                    part.attrs.metadata === "keywords" &&
-                    part.content
-                ) {
-                    return keywords.concat(
-                        part.content.map(keywordNode => keywordNode.attrs.tag)
-                    )
-                } else {
-                    return keywords
-                }
-            }, []),
+            keywords: this.docContent.content.reduce(
+                (keywords: string[], part: any) => {
+                    if (
+                        part.type === "tags_part" &&
+                        part.attrs.metadata === "keywords" &&
+                        part.content
+                    ) {
+                        return keywords.concat(
+                            part.content.map(
+                                (keywordNode: any) => keywordNode.attrs.tag
+                            )
+                        )
+                    } else {
+                        return keywords
+                    }
+                },
+                []
+            ),
             title: textContent(this.docContent.content[0]),
             language: this.doc.settings.language,
             citationStyle: this.doc.settings.citationstyle
         }
     }
 
-    download(blob) {
+    download(blob: Blob): void {
         return download(blob, createSlug(this.docTitle) + ".odt", this.mimeType)
     }
 }

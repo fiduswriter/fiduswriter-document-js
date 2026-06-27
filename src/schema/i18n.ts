@@ -581,7 +581,10 @@ const EXERCISE_SOLUTION = {
     uk: "Розв'язок"
 }
 
-export const CATS = {
+export const CATS: Record<
+    string,
+    Record<string, string>
+> = {
     figure: FIGURE,
     equation: EQUATION,
     table: TABLE,
@@ -593,3 +596,6 @@ export const CATS = {
     exercise: EXERCISE,
     exercise_solution: EXERCISE_SOLUTION
 }
+
+export const getCat = (category: string, language: string): string =>
+    CATS[category]?.[language] || CATS[category]?.["en-US"] || category

@@ -1,21 +1,57 @@
 import {convertLatexToMathMl} from "mathlive"
 import pretty from "pretty"
 
-import {escapeText} from "fwtoolkit"
-import {CATS} from "../../schema/i18n.js"
+import {escapeText, staticUrl} from "fwtoolkit"
+import {getCat} from "../../schema/i18n.js"
+import type {BibDB, CSL, DocSettings, FidusNode} from "../../types.js"
+import {descendantNodes} from "../tools/doc_content.js"
 import {HTMLExporterCitations} from "./citations.js"
 import {displayNumber} from "./tools.js"
 
 export class HTMLExporterConvert {
+    docTitle: string
+    docSettings: DocSettings
+    docContent: FidusNode
+    htmlExportTemplate: any
+    imageDB: any
+    bibDB: BibDB
+    csl: CSL
+    styleSheets: any[]
+    xhtml: boolean
+    epub: boolean
+    relativeUrls: boolean
+    footnoteNumbering: string
+    affiliationNumbering: string
+
+    endSlash: string
+    imageIds: string[]
+    categoryCounter: Record<string, number>
+    affiliations: Record<string, number>
+    parCounter: number
+    headingCounter: number
+    currentSectionLevel: number
+    listCounter: number
+    orderedListLengths: number[]
+    footnotes: string[]
+    fnCounter: number
+    affCounter: number
+    metaData: any
+    features: {math: boolean; bibliography: boolean}
+    citations: any
+    citInfos: any[]
+    citationCount: number
+    extraStyleSheets: any[]
+    idPrefix: string
+
     constructor(
-        docTitle,
-        docSettings,
-        docContent,
-        htmlExportTemplate,
-        imageDB,
-        bibDB,
-        csl,
-        styleSheets,
+        docTitle: string,
+        docSettings: DocSettings,
+        docContent: FidusNode,
+        htmlExportTemplate: any,
+        imageDB: any,
+        bibDB: BibDB,
+        csl: CSL,
+        styleSheets: any[],
         {
             xhtml = false,
             epub = false,
@@ -26,7 +62,7 @@ export class HTMLExporterConvert {
             footnoteOffset = 0,
             affiliationOffset = 0,
             figureOffset = {}
-        } = {}
+        }: any = {}
     ) {
         this.docTitle = docTitle
         this.docSettings = docSettings
@@ -81,12 +117,12 @@ export class HTMLExporterConvert {
         this.categoryCounter = Object.assign({}, figureOffset)
     }
 
-    init() {
+    init(): Promise<any> {
         this.analyze(this.docContent)
         return this.process()
     }
 
-    async processCitInfos() {
+    async processCitInfos(): Promise<void> {
         const citationProcessor = new HTMLExporterCitations(
             this.docSettings,
             this.bibDB,
@@ -96,7 +132,7 @@ export class HTMLExporterConvert {
         this.citations = citations
     }
 
-    async process() {
+    async process(): Promise<any> {
         if (this.citInfos.length) {
             await this.processCitInfos()
         }
@@ -124,7 +160,7 @@ export class HTMLExporterConvert {
             body,
             back,
             settings: this.docSettings,
-            lang: this.docSettings.language.split("-")[0],
+            lang: this.docSettings.language!.split("-")[0],
             xhtml: this.xhtml,
             epub: this.epub
         })
@@ -137,14 +173,14 @@ export class HTMLExporterConvert {
     }
 
     // Find information for meta tags in header
-    analyze(node) {
+    analyze(node: any): void {
         switch (node.type) {
             case "citation":
                 this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
                 break
             case "contributors_part":
                 if (node.attrs.metadata === "authors" && node.content) {
-                    node.content.forEach(author => {
+                    node.content.forEach((author: any) => {
                         this.metaData.authors.push(author)
                     })
                 }
@@ -163,7 +199,7 @@ export class HTMLExporterConvert {
                     level,
                     id: node.attrs.id,
                     title: (node.content || [])
-                        .map(subNode => this.walkJson(subNode))
+                        .map((subNode: any) => this.walkJson(subNode))
                         .join("")
                 })
                 break
@@ -173,7 +209,7 @@ export class HTMLExporterConvert {
                 this.features.math = true
                 break
             case "footnote":
-                node.attrs.footnote.forEach(child => this.analyze(child))
+                node.attrs.footnote.forEach((child: any) => this.analyze(child))
                 break
             case "richtext_part":
                 if (
@@ -186,7 +222,7 @@ export class HTMLExporterConvert {
                 break
             case "tags_part":
                 if (node.attrs.metadata === "keywords" && node.content) {
-                    node.content.forEach(tag => {
+                    node.content.forEach((tag: any) => {
                         this.metaData.keywords.push(tag.attrs.tag)
                     })
                 }
@@ -209,17 +245,17 @@ export class HTMLExporterConvert {
                 break
         }
         if (node.content) {
-            node.content.forEach(child => this.analyze(child))
+            node.content.forEach((child: any) => this.analyze(child))
         }
     }
 
-    assembleHead() {
+    assembleHead(): string {
         let head = `<title>${escapeText(this.metaData.title)}</title>`
         if (this.metaData.authors.length) {
             const authorString = this.metaData.authors
-                .map(author => {
+                .map((author: any) => {
                     if (author.firstname || author.lastname) {
-                        const nameParts = []
+                        const nameParts: string[] = []
                         if (author.firstname) {
                             nameParts.push(author.firstname)
                         }
@@ -247,7 +283,7 @@ export class HTMLExporterConvert {
 
             head += this.metaData.copyright.licenses
                 .map(
-                    license =>
+                    (license: any) =>
                         `<link rel="license" href="${escapeText(license.url)}"${this.endSlash}>` // TODO: Add this.metaData.copyright.license.start info if present
                 )
                 .join("")
@@ -265,7 +301,7 @@ export class HTMLExporterConvert {
         }
         head += this.styleSheets
             .concat(this.extraStyleSheets)
-            .map(sheet => {
+            .map((sheet: any) => {
                 if (!sheet.filename && !sheet.contents) {
                     console.warn(
                         "No filename or contents for stylesheet.",
@@ -282,19 +318,19 @@ export class HTMLExporterConvert {
     }
 
     // Only allow for text output
-    textWalkJson(node) {
+    textWalkJson(node: any): string {
         let content = ""
         if (node.type === "text") {
             content += escapeText(node.text).normalize("NFC")
         } else if (node.content) {
-            node.content.forEach(child => {
+            node.content.forEach((child: any) => {
                 content += this.textWalkJson(child)
             })
         }
         return content
     }
 
-    walkJson(node, options = {}) {
+    walkJson(node: any, options: any = {}): string {
         let start = "",
             content = "",
             end = ""
@@ -317,13 +353,13 @@ export class HTMLExporterConvert {
                     start += `<div class="doc-part doc-contributors doc-${node.attrs.id} ${node.attrs.metadata || "other"}" id="${this.idPrefix}${node.attrs.id}"${node.attrs.language ? ` lang="${node.attrs.language}"` : ""}>`
                     end = "</div>" + end
                     let counter = 0
-                    const contributorOutputs = []
-                    node.content.forEach(childNode => {
+                    const contributorOutputs: string[] = []
+                    node.content.forEach((childNode: any) => {
                         const contributor = childNode.attrs
                         let output = ""
                         if (contributor.firstname || contributor.lastname) {
                             output += `<span id="${this.idPrefix}${node.attrs.id}-${counter++}" class="person">`
-                            const nameParts = []
+                            const nameParts: string[] = []
                             if (contributor.firstname) {
                                 nameParts.push(
                                     `<span class="firstname">${escapeText(contributor.firstname)}</span>`
@@ -392,7 +428,7 @@ export class HTMLExporterConvert {
                 start += `<div class="doc-part table-of-contents"><h1>${escapeText(node.attrs.title)}</h1>`
                 content += this.metaData.toc
                     .map(
-                        item =>
+                        (item: any) =>
                             `<h${item.level}><a href="#${item.id}">${item.title}</a></h${item.level}>`
                     )
                     .join("")
@@ -423,7 +459,7 @@ export class HTMLExporterConvert {
                 break
             }
             case "code_block": {
-                const attrs = []
+                const attrs: string[] = []
                 if (node.attrs.language) {
                     attrs.push(
                         `data-language="${escapeText(node.attrs.language)}"`
@@ -442,29 +478,27 @@ export class HTMLExporterConvert {
 
                 // If there's a category, wrap in figure for proper numbering
                 if (node.attrs.category && node.attrs.id) {
-                    const language = this.doc.attrs.language || "en-US"
-                    const {CATS} = require("../../schema/i18n")
-                    const categoryLabel =
-                        CATS[node.attrs.category]?.[language] ||
-                        node.attrs.category
+                    const language = this.docSettings.language || "en-US"
+                    const categoryLabel = getCat(node.attrs.category, language)
 
                     // Count code blocks to get the number
-                    const categories = {}
-                    this.doc.descendants(n => {
+                    const categories: Record<string, number> = {}
+                    for (const n of descendantNodes(this.docContent)) {
                         if (
                             n.type === "code_block" &&
-                            n.attrs.category &&
+                            n.attrs?.category &&
                             n.attrs.id
                         ) {
-                            if (!categories[n.attrs.category]) {
-                                categories[n.attrs.category] = 0
+                            const category = n.attrs.category as string
+                            if (!categories[category]) {
+                                categories[category] = 0
                             }
-                            categories[n.attrs.category]++
+                            categories[category]++
                             if (n.attrs.id === node.attrs.id) {
-                                return false
+                                break
                             }
                         }
-                    })
+                    }
                     const number = categories[node.attrs.category] || 1
                     const label = node.attrs.title
                         ? `${categoryLabel} ${number}: ${escapeText(node.attrs.title)}`
@@ -528,19 +562,32 @@ export class HTMLExporterConvert {
                 end = "</aside>" + end
                 break
             case "text": {
-                let strong, em, underline, hyperlink, anchor, sup, sub, code
+                let strong: any,
+                    em: any,
+                    underline: any,
+                    hyperlink: any,
+                    anchor: any,
+                    sup: any,
+                    sub: any,
+                    code: any
                 // Check for hyperlink, bold/strong, italic/em and underline
                 if (node.marks) {
-                    strong = node.marks.find(mark => mark.type === "strong")
-                    em = node.marks.find(mark => mark.type === "em")
-                    underline = node.marks.find(
-                        mark => mark.type === "underline"
+                    strong = node.marks.find(
+                        (mark: any) => mark.type === "strong"
                     )
-                    hyperlink = node.marks.find(mark => mark.type === "link")
-                    anchor = node.marks.find(mark => mark.type === "anchor")
-                    sup = node.marks.find(mark => mark.type === "sup")
-                    sub = node.marks.find(mark => mark.type === "sub")
-                    code = node.marks.find(mark => mark.type === "code")
+                    em = node.marks.find((mark: any) => mark.type === "em")
+                    underline = node.marks.find(
+                        (mark: any) => mark.type === "underline"
+                    )
+                    hyperlink = node.marks.find(
+                        (mark: any) => mark.type === "link"
+                    )
+                    anchor = node.marks.find(
+                        (mark: any) => mark.type === "anchor"
+                    )
+                    sup = node.marks.find((mark: any) => mark.type === "sup")
+                    sub = node.marks.find((mark: any) => mark.type === "sub")
+                    code = node.marks.find((mark: any) => mark.type === "code")
                 }
                 if (em) {
                     start += "<em>"
@@ -609,9 +656,9 @@ export class HTMLExporterConvert {
                 break
             }
             case "figure": {
-                let imageUrl, copyright
+                let imageUrl: string | undefined, copyright: any
                 const image =
-                    node.content.find(node => node.type === "image")?.attrs
+                    node.content.find((node: any) => node.type === "image")?.attrs
                         .image || false
                 if (image !== false) {
                     this.imageIds.push(image)
@@ -619,11 +666,11 @@ export class HTMLExporterConvert {
                         filePathName = imageDBEntry.image
                     copyright = imageDBEntry.copyright
                     imageUrl = this.relativeUrls
-                        ? `images/${filePathName.split("/").pop()}`
-                        : filePathName
+                        ? `images/${filePathName!.toString().split("/").pop()!}`
+                        : (filePathName as string)
                 }
                 const caption = node.attrs.caption
-                    ? node.content.find(node => node.type === "figure_caption")
+                    ? node.content.find((node: any) => node.type === "figure_caption")
                           ?.content || []
                     : []
                 if (
@@ -644,7 +691,7 @@ export class HTMLExporterConvert {
                     end = "</figure>" + end
 
                     const equation = node.content.find(
-                        node => node.type === "figure_equation"
+                        (node: any) => node.type === "figure_equation"
                     )?.attrs.equation
 
                     if (image && copyright?.holder) {
@@ -657,7 +704,7 @@ export class HTMLExporterConvert {
                         figureFooter += `<span class="copyright-holder">${escapeText(copyright.holder)}</span> `
                         figureFooter += copyright.licenses
                             .map(
-                                license =>
+                                (license: any) =>
                                     `<span class="license"><a rel="license"${license.start ? ` data-start="${license.start}"` : ""}>${escapeText(license.url)}</a></span>`
                             )
                             .join("")
@@ -673,11 +720,11 @@ export class HTMLExporterConvert {
                                 this.categoryCounter[category] = 0
                             }
                             const catCount = ++this.categoryCounter[category]
-                            const catLabel = `${CATS[category][this.docSettings.language]} ${catCount}`
+                            const catLabel = `${getCat(category, this.docSettings.language || "en-US")} ${catCount}`
                             figcaption += `<label>${escapeText(catLabel)}</label>`
                         }
                         if (caption.length) {
-                            figcaption += `<p>${caption.map(node => this.walkJson(node)).join("")}</p>`
+                            figcaption += `<p>${caption.map((node: any) => this.walkJson(node)).join("")}</p>`
                         }
                         figcaption += "</figcaption>"
                         if (category === "table") {
@@ -726,14 +773,14 @@ export class HTMLExporterConvert {
                         this.categoryCounter[category] = 0
                     }
                     const catCount = ++this.categoryCounter[category]
-                    const catLabel = `${CATS[category][this.docSettings.language]} ${catCount}`
+                    const catLabel = `${getCat(category, this.docSettings.language || "en-US")} ${catCount}`
                     start += `<label>${escapeText(catLabel)}</label>`
                 }
                 const caption = node.attrs.caption
                     ? node.content[0].content || []
                     : []
                 if (caption.length) {
-                    start += `<caption><p>${caption.map(node => this.walkJson(node)).join("")}</p></caption>`
+                    start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
                 }
                 start += "<tbody>"
                 end = "</tbody>" + end
@@ -770,7 +817,7 @@ export class HTMLExporterConvert {
         }
 
         if (!content.length && node.content) {
-            node.content.forEach(child => {
+            node.content.forEach((child: any) => {
                 content += this.walkJson(child, options)
             })
         }
@@ -778,11 +825,11 @@ export class HTMLExporterConvert {
         return start + content + end
     }
 
-    assembleBody() {
+    assembleBody(): string {
         return `<div id="${this.idPrefix}body">${this.walkJson(this.docContent)}</div>`
     }
 
-    assembleBack() {
+    assembleBack(): string {
         let back = ""
         if (
             this.footnotes.length ||
@@ -796,7 +843,7 @@ export class HTMLExporterConvert {
                 )
                     .map(
                         ([name, id]) =>
-                            `<aside class="affiliation" id="aff-${id}"${this.epub ? 'epub:type="footnote"' : ""}><label>${displayNumber(id, this.affiliationNumbering)}</label> <div>${escapeText(name)}</div></aside>`
+                            `<aside class="affiliation" id="aff-${id}"${this.epub ? 'epub:type="footnote"' : ""}><label>${displayNumber(id as number, this.affiliationNumbering)}</label> <div>${escapeText(name)}</div></aside>`
                     )
                     .join("")}</section>`
             }

@@ -1,5 +1,7 @@
 import pretty from "pretty"
+
 import {HTMLExporter} from "../html/index.js"
+import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
 
 import {
     containerTemplate,
@@ -15,7 +17,22 @@ import {
 } from "./tools.js"
 
 export class EpubExporter extends HTMLExporter {
-    constructor(doc, bibDB, imageDB, csl, updated, documentStyles) {
+    documentFileName: string
+    lang: string
+    shortLang: string
+
+    constructor(
+        doc: ExportDoc,
+        bibDB: BibDB,
+        imageDB: ImageDB,
+        csl: CSL,
+        updated: any,
+        documentStyles: Array<{
+            slug: string
+            contents: string
+            documentstylefile_set: Array<[string, string]>
+        }>
+    ) {
         super(doc, bibDB, imageDB, csl, updated, documentStyles, {
             xhtml: true,
             epub: true
@@ -24,15 +41,17 @@ export class EpubExporter extends HTMLExporter {
         this.documentFileName = "document.xhtml"
         this.fileEnding = "epub"
         this.mimeType = "application/epub+zip"
+        this.lang = doc.settings.language || "en-US"
+        this.shortLang = this.lang.split("-")[0]
     }
 
-    createZip() {
+    createZip(): Promise<void> {
         this.prefixFiles()
         this.createEPUBFiles()
         return super.createZip()
     }
 
-    prefixFiles() {
+    prefixFiles(): void {
         // prefix all files with "EPUB/"
         this.textFiles = this.textFiles.map(file =>
             Object.assign({}, file, {filename: `EPUB/${file.filename}`})
@@ -45,7 +64,7 @@ export class EpubExporter extends HTMLExporter {
         )
     }
 
-    createEPUBFiles() {
+    createEPUBFiles(): void {
         // Generate the required EPUB-specific files using the converted content
         this.textFiles.push(
             {
@@ -67,29 +86,33 @@ export class EpubExporter extends HTMLExporter {
         )
     }
 
-    createOPF() {
+    createOPF(): string {
         const timestamp = getTimestamp(this.updated)
         const images = this.httpFiles
             .map(file =>
                 Object.assign({mimeType: getImageMimeType(file.filename)}, file)
             )
-            .filter(image => image.mimeType)
+            .filter(image => image.mimeType) as Array<
+            {filename: string; url: string; mimeType: string}
+        >
 
         const fontFiles = this.httpFiles
             .map(file =>
                 Object.assign({mimeType: getFontMimeType(file.filename)}, file)
             )
-            .filter(file => file.mimeType)
+            .filter(file => file.mimeType) as Array<
+            {filename: string; url: string; mimeType: string}
+        >
 
         const styleSheets = this.textFiles.filter(file =>
             file.filename.endsWith(".css")
         )
 
         // Extract authors and keywords from metaData
-        const authors = this.converter.metaData.authors.map(
-            ({attrs: author}) => {
+        const rawAuthors = this.converter.metaData.authors.map(
+            ({attrs: author}: any) => {
                 if (author.firstname || author.lastname) {
-                    const nameParts = []
+                    const nameParts: string[] = []
                     if (author.firstname) {
                         nameParts.push(author.firstname)
                     }
@@ -102,34 +125,39 @@ export class EpubExporter extends HTMLExporter {
                 }
             }
         )
+        const authors = rawAuthors.filter(
+            (author: any): author is string => typeof author === "string"
+        )
         return opfTemplate({
             language: this.lang,
             title: this.docTitle,
             authors,
             keywords: this.converter.metaData.keywords,
             idType: "fidus",
-            id: this.doc.id,
+            id: String(this.doc.id),
             date: timestamp.slice(0, 10),
             modified: timestamp,
             styleSheets,
             math: this.converter.features.math,
             images,
             fontFiles,
-            copyright: this.doc.settings.copyright
+            copyright: this.doc.settings.copyright as
+                | {holder?: string; year?: number}
+                | undefined
         })
     }
 
-    createNCX() {
+    createNCX(): string {
         return ncxTemplate({
             shortLang: this.shortLang,
             title: this.docTitle,
             idType: "fidus",
-            id: this.doc.id,
+            id: String(this.doc.id),
             toc: buildHierarchy(this.converter.metaData.toc)
         })
     }
 
-    createNav() {
+    createNav(): string {
         const styleSheets = this.textFiles.filter(file =>
             file.filename.endsWith(".css")
         )
