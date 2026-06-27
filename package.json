@@ -78,7 +78,8 @@
     "prepare": "npm run build && npm run build-schema",
     "prepublishOnly": "npm run build && npm run build-schema",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js",
+    "deploy-pages": "./scripts/deploy-pages.sh"
   },
   "dependencies": {
     "@vivliostyle/print": "^2.42.0",

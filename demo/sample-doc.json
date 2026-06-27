@@ -1,0 +1,70 @@
+{
+  "type": "doc",
+  "attrs": {
+    "documentstyle": "",
+    "tracked": false,
+    "citationstyle": "apa",
+    "language": "en-US",
+    "papersize": "A4",
+    "template": "",
+    "import_id": "",
+    "copyright": {
+      "holder": false,
+      "year": false,
+      "freeToRead": true,
+      "licenses": []
+    }
+  },
+  "content": [
+    {
+      "type": "title",
+      "attrs": {
+        "id": "title"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello world"
+        }
+      ]
+    },
+    {
+      "type": "heading1",
+      "attrs": {
+        "id": false,
+        "track": []
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Introduction"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "attrs": {
+        "track": []
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "This is a sample paragraph with "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "strong"
+            }
+          ],
+          "text": "bold"
+        },
+        {
+          "type": "text",
+          "text": " text."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>@fiduswriter/document — Equation demo</title>
+        <link rel="stylesheet" href="../css/fwtoolkit.css" />
+        <link rel="stylesheet" href="../demo.css" />
+        <link rel="icon" type="image/png" href="../favicon.png" />
+    </head>
+    <body>
+        <main class="demo-container">
+            <h1>Equation demo</h1>
+            <p>
+                Convert LaTeX equations to MathML with the same helper used by
+                the exporters.
+            </p>
+
+            <div class="demo-field">
+                <label for="latex">LaTeX</label>
+                <textarea id="latex">x = {-b \pm \sqrt{b^2-4ac} \over 2a}</textarea>
+            </div>
+
+            <div class="demo-actions">
+                <button id="convert" class="fw-button fw-dark">
+                    Convert to MathML
+                </button>
+            </div>
+
+            <h2>Rendered</h2>
+            <div id="rendered" class="demo-output"></div>
+
+            <h2>MathML source</h2>
+            <pre id="output" class="demo-output"></pre>
+
+            <p><a href="../index.html">← Back to demos</a></p>
+        </main>
+
+        <script type="module" src="./index.js"></script>
+    </body>
+</html>

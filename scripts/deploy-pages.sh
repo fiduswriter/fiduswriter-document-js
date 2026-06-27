@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Build the demo site and push it to the Codeberg Pages branch.
+set -e
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+cd "$ROOT"
+
+echo "Building @fiduswriter/document..."
+npm run build
+
+echo "Preparing pages build..."
+BUILD_DIR="$ROOT/.pages-build"
+rm -rf "$BUILD_DIR"
+mkdir "$BUILD_DIR"
+
+cp -r "$ROOT/demo/"* "$BUILD_DIR/"
+cp -r "$ROOT/dist" "$BUILD_DIR/"
+
+# Bundle demo entry points into the pages build.
+echo "Bundling demos..."
+PAGES_BUILD_DIR="$BUILD_DIR" node "$ROOT/scripts/build-demo.js"
+
+# Copy fwtoolkit CSS so the demo has consistent styling without a CDN.
+mkdir -p "$BUILD_DIR/css"
+cp "$ROOT/node_modules/fwtoolkit/css/fwtoolkit.css" "$BUILD_DIR/css/"
+
+# Remove TypeScript sources and declaration/source-map files from the pages build.
+find "$BUILD_DIR" -name "*.ts" -delete
+find "$BUILD_DIR/dist" \( -name "*.d.ts" -o -name "*.map" \) -delete
+
+cd "$BUILD_DIR"
+git init
+git checkout -b pages
+git add .
+git commit -m "Deploy @fiduswriter/document demo to Codeberg Pages"
+
+REMOTE=$(cd "$ROOT" && git remote get-url origin)
+echo "Pushing to $REMOTE pages branch..."
+git remote add origin "$REMOTE"
+git push -f origin pages
+
+cd "$ROOT"
+rm -rf "$BUILD_DIR"
+echo "Done. The demo should be available at https://fiduswriter.codeberg.page/fiduswriter-document/"
