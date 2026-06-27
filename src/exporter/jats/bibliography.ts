@@ -1,7 +1,35 @@
 import {escapeText} from "fwtoolkit"
 
-import type {BibDBEntry, FidusNode} from "../../types.js"
-import {convertTexts} from "./text.js"
+// CSL-JSON item as produced by biblatex-csl-converter's CSLExporter.
+interface CSLName {
+    family?: string
+    given?: string
+    literal?: string
+    prefix?: string
+    suffix?: string
+}
+
+interface CSLDate {
+    "date-parts"?: number[][]
+    literal?: string
+}
+
+interface CSLItem {
+    type?: string
+    title?: string
+    "container-title"?: string
+    author?: CSLName[]
+    editor?: CSLName[]
+    publisher?: string | string[]
+    "publisher-place"?: string | string[]
+    issued?: CSLDate | string
+    volume?: string
+    issue?: string
+    page?: string
+    DOI?: string
+    URL?: string
+    accessed?: CSLDate | string
+}
 
 // This list is based on values listed at https://jats.nlm.nih.gov/archiving/tag-library/1.2/attribute/publication-type.html
 // And the advice given here: https://jats4r.org/citations/#recommendation
@@ -44,192 +72,178 @@ const PUBLICATION_TYPES: Record<string, string> = {
     unpublished: "standard"
 }
 
-interface NameLike {
-    literal?: string | FidusNode[]
-    family?: string | FidusNode[]
-    given?: string | FidusNode[]
-    prefix?: string | FidusNode[]
-    suffix?: string | FidusNode[]
-}
-
-/**
- * Serialize a bibliographic field value. CSL fields may be plain strings
- * or rich-text node arrays, so we handle both.
- */
-function serializeField(value: unknown): string {
+function text(value: unknown): string {
+    if (value === undefined || value === null) {
+        return ""
+    }
     if (Array.isArray(value)) {
-        // Array of Fidus nodes (rich text)
-        return convertTexts(value as FidusNode[])
+        return value.map(text).join("")
     }
-    if (typeof value === "string") {
-        return escapeText(value)
-    }
-    return escapeText(String(value || ""))
+    return escapeText(String(value))
 }
 
-export function jatsBib(bib: BibDBEntry, id: number): string {
-    let start = "",
-        end = ""
-    start += `<ref id="ref-${id}">`
-    end = "</ref>" + end
-    // Type
-    const publicationType = PUBLICATION_TYPES[bib.bib_type || ""] ?? "standard"
+function renderName(name: CSLName): string {
+    if (name.literal) {
+        return `<collab>${text(name.literal)}</collab>`
+    }
+    let nameStart = "<name>"
+    if (name.family) {
+        nameStart += `<surname>${text(name.family)}</surname>`
+    }
+    if (name.given) {
+        nameStart += ` <given-names>${text(name.given)}</given-names>`
+    }
+    if (name.prefix) {
+        nameStart += ` <prefix>${text(name.prefix)}</prefix>`
+    }
+    if (name.suffix) {
+        nameStart += ` <suffix>${text(name.suffix)}</suffix>`
+    }
+    return nameStart + "</name>"
+}
+
+function renderNameList(
+    names: CSLName[] | undefined,
+    personGroupType: string
+): string {
+    if (!names || !names.length) {
+        return ""
+    }
+    return `<person-group person-group-type="${personGroupType}">${names
+        .map(renderName)
+        .join(", ")}</person-group>`
+}
+
+function parseDateParts(dateParts?: number[]): {
+    year: string
+    month: string
+    day: string
+} {
+    return {
+        year: dateParts && dateParts[0] ? String(dateParts[0]) : "",
+        month: dateParts && dateParts[1] ? String(dateParts[1]) : "",
+        day: dateParts && dateParts[2] ? String(dateParts[2]) : ""
+    }
+}
+
+function renderDate(
+    issued: CSLDate | string | undefined,
+    dateType: string
+): string {
+    if (!issued) {
+        return ""
+    }
+    let isoDate: string
+    let year = ""
+    let month = ""
+    let day = ""
+    if (typeof issued === "string") {
+        isoDate = issued
+        const parts = issued.split("-")
+        year = parts[0] || ""
+        month = parts[1] || ""
+        day = parts[2] || ""
+    } else if (issued["date-parts"] && issued["date-parts"][0]) {
+        const parts = parseDateParts(issued["date-parts"][0])
+        year = parts.year
+        month = parts.month
+        day = parts.day
+        isoDate = `${year}${month ? "-" + month.padStart(2, "0") : ""}${
+            day ? "-" + day.padStart(2, "0") : ""
+        }`
+    } else if (issued.literal) {
+        isoDate = issued.literal
+        year = isoDate.split("-")[0] || ""
+    } else {
+        return ""
+    }
+    return `<date iso-8601-date="${escapeText(isoDate)}" date-type="${dateType}">${
+        day ? `<day>${text(day)}</day>` : ""
+    }${month ? `<month>${text(month)}</month>` : ""}<year>${text(
+        year
+    )}</year></date>`
+}
+
+export function jatsBib(bib: CSLItem, id: number): string {
+    let start = `<ref id="ref-${id}">`
+    let end = "</ref>"
+
+    const publicationType = PUBLICATION_TYPES[bib.type || ""] ?? "standard"
     start += `<element-citation publication-type="${publicationType}">`
     end = "</element-citation>" + end
 
-    const fields = (bib.fields || {}) as Record<string, unknown>
+    start += renderNameList(bib.author, "author")
 
-    // authors
-    if (fields.author && Array.isArray(fields.author) && fields.author.length) {
-        start += `<person-group person-group-type="author">${fields.author
-            .map((author: unknown) => {
-                const a = author as NameLike
-                if (a.literal) {
-                    return `<collab>${serializeField(a.literal)}</collab>`
-                }
-                let nameStart = `<name><surname>${serializeField(
-                    a.family || ""
-                )}</surname> <given-names>${serializeField(
-                    a.given || ""
-                )}</given-names>`
-                if (a.prefix && a.prefix.length) {
-                    nameStart += ` <prefix>${serializeField(a.prefix)}</prefix>`
-                }
-                if (a.suffix && a.suffix.length) {
-                    nameStart += ` <suffix>${serializeField(a.suffix)}</suffix>`
-                }
-                const nameEnd = "</name>"
-                return nameStart + nameEnd
-            })
-            .join(", ")}</person-group>`
+    const containerTitle = bib["container-title"]
+    if (containerTitle) {
+        start += `<source>${text(containerTitle)}</source>`
+        if (bib.title) {
+            const titleTag =
+                bib.type === "chapter" ? "chapter-title" : "article-title"
+            start += `<${titleTag}>${text(bib.title)}</${titleTag}>`
+        }
+    } else if (bib.title) {
+        start += `<source>${text(bib.title)}</source>`
     }
 
-    // title && container title
-    if (fields.title) {
-        if (
-            fields.shortjournal ||
-            fields.booktitle ||
-            fields.journaltitle
-        ) {
-            start += `<source>${serializeField(
-                fields.shortjournal || fields.booktitle || fields.journaltitle
-            )}</source>`
-            start += `<article-title>${serializeField(fields.title)}</article-title>`
-        } else {
-            start += `<source>${serializeField(fields.title)}</source>`
+    start += renderNameList(bib.editor, "editor")
+
+    if (bib.publisher) {
+        const publishers = Array.isArray(bib.publisher)
+            ? bib.publisher
+            : [bib.publisher]
+        publishers.forEach(
+            publisher =>
+                (start += `<publisher-name>${text(publisher)}</publisher-name>`)
+        )
+    }
+
+    if (bib["publisher-place"]) {
+        const places = Array.isArray(bib["publisher-place"])
+            ? bib["publisher-place"]
+            : [bib["publisher-place"]]
+        places.forEach(
+            place => (start += `<publisher-loc>${text(place)}</publisher-loc>`)
+        )
+    }
+
+    start += renderDate(bib.issued, "published")
+
+    if (bib.volume) {
+        start += `<volume>${text(bib.volume)}</volume>`
+    }
+
+    if (bib.issue) {
+        start += `<issue>${text(bib.issue)}</issue>`
+    }
+
+    if (bib.page) {
+        const pageStr = String(bib.page)
+        const pageParts = pageStr.split("-")
+        start += `<fpage>${text(pageParts[0])}</fpage>`
+        if (pageParts.length > 1) {
+            start += `<lpage>${text(pageParts[pageParts.length - 1])}</lpage>`
+        }
+        if (pageParts.length > 2) {
+            start += `<page-range>${text(pageStr)}</page-range>`
         }
     }
 
-    // editors
-    if (fields.editor && Array.isArray(fields.editor) && fields.editor.length) {
-        start += `<person-group person-group-type="editor">${fields.editor
-            .map((editor: unknown) => {
-                const e = editor as NameLike
-                if (e.literal) {
-                    return `<collab>${serializeField(e.literal)}</collab>`
-                }
-                let nameStart = `<name><surname>${serializeField(
-                    e.family || ""
-                )}</surname> <given-names>${serializeField(
-                    e.given || ""
-                )}</given-names>`
-                const nameEnd = "</name>"
-                if (e.prefix && e.prefix.length) {
-                    nameStart += ` <prefix>${serializeField(e.prefix)}</prefix>`
-                }
-                if (e.suffix && e.suffix.length) {
-                    nameStart += ` <suffix>${serializeField(e.suffix)}</suffix>`
-                }
-                return nameStart + nameEnd
-            })
-            .join(", ")}</person-group>`
+    if (bib.DOI) {
+        start += `<pub-id pub-id-type="doi">${text(bib.DOI)}</pub-id>`
     }
 
-    // publisher
-    if (
-        fields.publisher &&
-        Array.isArray(fields.publisher) &&
-        fields.publisher.length
-    ) {
-        start += fields.publisher
-            .map(
-                publisher =>
-                    `<publisher-name>${serializeField(publisher)}</publisher-name>`
-            )
-            .join("")
+    if (bib.URL) {
+        start += `<ext-link ext-link-type="web" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="${escapeText(
+            bib.URL
+        )}"/>`
     }
 
-    // location
-    if (
-        fields.location &&
-        Array.isArray(fields.location) &&
-        fields.location.length
-    ) {
-        start += fields.location
-            .map(
-                location =>
-                    `<publisher-loc>${serializeField(location)}</publisher-loc>`
-            )
-            .join("")
-    }
-
-    // date
-    if (fields.date && String(fields.date).length) {
-        const date = String(fields.date)
-        const dateParts = date.split("-")
-        start += `<date iso-8601-date="${date}" date-type="published">${
-            dateParts.length > 2 ? `<day>${dateParts[2]}</day>` : ""
-        }${
-            dateParts.length > 1 ? `<month>${dateParts[1]}</month>` : ""
-        }<year>${dateParts[0]}</year></date>`
-    }
-
-    // volume
-    if (fields.volume && String(fields.volume).length) {
-        start += `<volume>${serializeField(fields.volume)}</volume>`
-    }
-
-    // issue
-    if (fields.issue && String(fields.issue).length) {
-        start += `<issue>${serializeField(fields.issue)}</issue>`
-    }
-
-    // pages
-    if (fields.pages && Array.isArray(fields.pages) && fields.pages.length) {
-        const pages = fields.pages as Array<string[]>
-        start += `<fpage>${serializeField(pages[0][0])}</fpage>`
-        const lastPageGroup = pages.slice(-1)[0]
-        start += `<lpage>${serializeField(
-            lastPageGroup.slice(-1)[0]
-        )}</lpage>`
-        if (pages.length > 1) {
-            start += `<page-range>${pages
-                .map(pageGroup =>
-                    pageGroup.map(page => serializeField(page)).join("-")
-                )
-                .join(", ")}</page-range>`
-        }
-    }
-
-    // doi
-    if (fields.doi && String(fields.doi).length) {
-        start += `<pub-id pub-id-type="doi">${escapeText(String(fields.doi))}</pub-id>`
-    }
-
-    // url
-    if (fields.url && String(fields.url).length) {
-        start += `<ext-link ext-link-type="web" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="${escapeText(String(fields.url))}"/>`
-    }
-
-    // url date
-    if (fields.urldate && String(fields.urldate).length) {
-        const date = String(fields.urldate)
-        const dateParts = date.split("-")
-        start += `<date-in-citation content-type="access-date" iso-8601-date="${date}">${
-            dateParts.length > 2 ? `<day>${dateParts[2]}</day>` : ""
-        }${
-            dateParts.length > 1 ? `<month>${dateParts[1]}</month>` : ""
-        }<year>${dateParts[0]}</year></date-in-citation>`
+    if (bib.accessed) {
+        start += renderDate(bib.accessed, "access-date").replace(
+            'date-type="access-date"',
+            'content-type="access-date"'
+        )
     }
 
     return start + end

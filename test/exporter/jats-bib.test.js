@@ -1,4 +1,4 @@
-import {beforeAll, describe, expect, it, jest} from "@jest/globals"
+import {describe, expect, it, jest} from "@jest/globals"
 
 jest.unstable_mockModule("fwtoolkit", () => ({
     escapeText: str =>
@@ -14,19 +14,17 @@ const {jatsBib} = await import("../../src/exporter/jats/bibliography.js")
 describe("jatsBib", () => {
     it("renders a journal article with CSL-string authors and title", () => {
         const bib = {
-            bib_type: "article-journal",
-            fields: {
-                title: "My title",
-                journaltitle: "My journal",
-                author: [
-                    {family: "Doe", given: "John"},
-                    {family: "Smith", given: "Jane"}
-                ],
-                date: "2012",
-                volume: "7",
-                issue: "3",
-                pages: [["1", "10"]]
-            }
+            type: "article-journal",
+            title: "My title",
+            "container-title": "My journal",
+            author: [
+                {family: "Doe", given: "John"},
+                {family: "Smith", given: "Jane"}
+            ],
+            issued: {"date-parts": [[2012]]},
+            volume: "7",
+            issue: "3",
+            page: "1-10"
         }
         const xml = jatsBib(bib, 1)
         expect(xml).toContain("My title")
@@ -36,73 +34,62 @@ describe("jatsBib", () => {
         expect(xml).toContain("Smith")
         expect(xml).toContain("Jane")
         expect(xml).toContain('<ref id="ref-1">')
+        expect(xml).toContain("<volume>7</volume>")
+        expect(xml).toContain("<issue>3</issue>")
+        expect(xml).toContain("<fpage>1</fpage>")
+        expect(xml).toContain("<lpage>10</lpage>")
     })
 
-    it("renders a journal article with rich-text authors and title", () => {
+    it("renders a book with a string literal author", () => {
         const bib = {
-            bib_type: "article-journal",
-            fields: {
-                title: [{type: "text", text: "My "}, {type: "text", text: "title"}],
-                journaltitle: [{type: "text", text: "My journal"}],
-                author: [
-                    {
-                        family: [{type: "text", text: "Doe"}],
-                        given: [{type: "text", text: "John"}]
-                    }
-                ],
-                date: "2012",
-                volume: "7",
-                issue: "3",
-                pages: [["1", "10"]]
-            }
+            type: "book",
+            title: "A book",
+            author: [{literal: "Acme Corporation"}],
+            issued: {"date-parts": [[2020]]},
+            publisher: "Penguin",
+            "publisher-place": "New York"
         }
         const xml = jatsBib(bib, 2)
-        expect(xml).toContain("My title")
-        expect(xml).toContain("My journal")
-        expect(xml).toContain("Doe")
-        expect(xml).toContain("John")
+        expect(xml).toContain("A book")
+        expect(xml).toContain("Acme Corporation")
+        expect(xml).toContain("<publisher-name>Penguin</publisher-name>")
+        expect(xml).toContain("<publisher-loc>New York</publisher-loc>")
         expect(xml).toContain('<ref id="ref-2">')
     })
 
-    it("renders a string literal author", () => {
+    it("renders a chapter with editor and page range", () => {
         const bib = {
-            bib_type: "book",
-            fields: {
-                title: "A book",
-                author: [{literal: "Acme Corporation"}]
-            }
+            type: "chapter",
+            title: "My chapter",
+            "container-title": "Edited volume",
+            author: [{family: "Doe", given: "John"}],
+            editor: [{family: "Smith", given: "Jane"}],
+            issued: {literal: "2021"},
+            page: "15-25"
         }
         const xml = jatsBib(bib, 3)
-        expect(xml).toContain("A book")
-        expect(xml).toContain("Acme Corporation")
+        expect(xml).toContain("<chapter-title>My chapter</chapter-title>")
+        expect(xml).toContain("<source>Edited volume</source>")
+        expect(xml).toContain("Doe")
+        expect(xml).toContain("Smith")
+        expect(xml).toContain("<fpage>15</fpage>")
+        expect(xml).toContain("<lpage>25</lpage>")
     })
 
-    it("renders a rich-text literal author", () => {
+    it("escapes special characters in titles and names", () => {
         const bib = {
-            bib_type: "book",
-            fields: {
-                title: "A book",
-                author: [
-                    {
-                        literal: [
-                            {type: "text", text: "Acme ", marks: [{type: "strong"}]},
-                            {type: "text", text: "Corporation"}
-                        ]
-                    }
-                ]
-            }
+            type: "article-journal",
+            title: "A <b>title</b>",
+            author: [{family: "O'Brien", given: "Anne & Bob"}]
         }
         const xml = jatsBib(bib, 4)
-        expect(xml).toContain("Acme")
-        expect(xml).toContain("Corporation")
-        expect(xml).toContain("<bold>")
+        expect(xml).toContain("A &lt;b&gt;title&lt;/b&gt;")
+        expect(xml).toContain("O'Brien")
+        expect(xml).toContain("Anne &amp; Bob")
     })
 
     it("handles missing fields gracefully", () => {
-        const bib = {
-            bib_type: "misc",
-            fields: {}
-        }
+        const bib = {type: "misc"}
         const xml = jatsBib(bib, 5)
         expect(xml).toContain('<ref id="ref-5">')
     })

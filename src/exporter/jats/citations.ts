@@ -1,3 +1,5 @@
+import {CSLExporter} from "biblatex-csl-converter"
+
 import {FormatCitations} from "../../citations/format.js"
 
 import type {BibDB, CSL, ExportDoc} from "../../types.js"
@@ -96,9 +98,17 @@ export class JATSExporterCitations {
                 if (!bibliography) {
                     return Promise.resolve()
                 }
+                const entryIds = bibliography[0].entry_ids.map(id => String(id))
+                const cslItems = new CSLExporter(
+                    this.bibDB.db as Record<string, any>,
+                    entryIds
+                ).parse() as Record<string, Record<string, unknown>>
                 bibliography[0].entry_ids.forEach((id, index) => {
                     this.jatsIdConvert[id] = index + 1
-                    this.jatsBib += jatsBib(this.bibDB.db[id], index + 1)
+                    this.jatsBib += jatsBib(
+                        (cslItems[String(id)] || {}) as any,
+                        index + 1
+                    )
                 })
                 this.citationTexts = citFm.citationTexts.map(
                     (ref, index) => {
