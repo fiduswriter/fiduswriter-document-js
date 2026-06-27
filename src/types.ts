@@ -105,6 +105,14 @@ export interface ExportMetadata {
     citationStyle?: string
 }
 
+/** A user reference passed to importers. */
+export interface User {
+    id: number
+    name?: string
+    avatar?: string
+    username?: string
+}
+
 /** A single comment thread. */
 export interface CommentData {
     id?: number
@@ -231,3 +239,76 @@ export interface NativeDomNode {
     a?: Array<[string, string]>
     c?: NativeDomNode[]
 }
+
+/** A document template extracted from document content. */
+export interface Template {
+    content: FidusNode
+    exportTemplates: Array<Record<string, JSONValue>>
+    documentStyles: Array<Record<string, JSONValue>>
+    files?: Array<{filename: string; content: Blob | ArrayBuffer | string}>
+}
+
+/** Files bundled with a document template. */
+export interface TemplateFiles {
+    textFiles: Array<{filename: string; contents: string}>
+    httpFiles: Array<{url: string; filename: string}>
+}
+
+/** Backend callbacks used by the generic NativeImporter. */
+export interface NativeImporterBackend {
+    createDoc: (
+        template: Template,
+        importId: string | number | null,
+        requestedPath: string,
+        e2eeOptions: E2EEOptions | null,
+        files: Record<string, File[]>
+    ) => Promise<{id: number; path: string; e2ee?: boolean}>
+    saveImages: (
+        images: ImageDB,
+        docId: number,
+        e2eeOptions: E2EEOptions | null
+    ) => Promise<Record<number | string, number>>
+    saveDocument: (
+        saveData: Record<string, unknown>,
+        e2eeOptions: E2EEOptions | null
+    ) => Promise<{added: number; updated: number}>
+    extractTemplate?: (doc: FidusNode) => Template
+    decryptBufferToBase64?: (base64: string, key: CryptoKey) => Promise<string>
+    encryptImage?: (file: Blob, key: CryptoKey) => Promise<Blob>
+    encryptObject?: (obj: unknown, key: CryptoKey) => Promise<unknown>
+    encrypt?: (text: string, key: CryptoKey) => Promise<unknown>
+    storeKeyInSession?: (docId: number, key: CryptoKey) => void
+}
+
+/** E2EE options used during import/export/copy. */
+export interface E2EEOptions {
+    enabled?: boolean
+    key?: CryptoKey
+    sourceKey?: CryptoKey
+    targetE2EE?: boolean
+    targetPassword?: string
+    salt?: string
+    iterations?: number
+}
+
+/** Callback that uploads a native revision blob. */
+export type UploadRevision = (blob: Blob, doc: Record<string, unknown>) => unknown
+
+/** E2EE helper object used by SaveCopy. */
+export interface SaveCopyE2EE {
+    decryptObject: (encrypted: unknown, key: CryptoKey) => Promise<unknown>
+    encryptObject: (obj: unknown, key: CryptoKey) => Promise<unknown>
+    encrypt: (text: string, key: CryptoKey) => Promise<unknown>
+    encryptImage: (file: Blob, key: CryptoKey) => Promise<Blob>
+    generateSalt: () => Uint8Array
+    deriveKey: (password: string, salt: Uint8Array, iterations: number) => Promise<CryptoKey>
+}
+
+/** Callback used by SaveCopy to import a copied document. */
+export type ImportDocument = (
+    doc: Record<string, unknown>,
+    bibDB: BibDB,
+    imageDB: ImageDB,
+    httpIncludes: Array<{url: string; filename: string}>,
+    options: Record<string, unknown>
+) => Promise<{doc: Record<string, unknown>; docInfo: Record<string, unknown>}>
