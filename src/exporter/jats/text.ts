@@ -2,11 +2,22 @@ import {escapeText} from "fwtoolkit"
 
 import type {FidusNode} from "../../types.js"
 
-export function convertTexts(nodeList: FidusNode[]): string {
+export function convertTexts(
+    nodeList: FidusNode[] | string | undefined
+): string {
+    if (!nodeList) {
+        return ""
+    }
+    if (typeof nodeList === "string") {
+        return escapeText(nodeList)
+    }
     return nodeList.map(node => convertText(node)).join("")
 }
 
-export function convertText(node: FidusNode): string {
+export function convertText(node: FidusNode | string): string {
+    if (typeof node === "string") {
+        return escapeText(node)
+    }
     let start = ""
     let end = ""
     let strong, em, underline, hyperlink, anchor, sup, sub, code
