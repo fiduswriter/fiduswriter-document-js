@@ -4,6 +4,18 @@
 
 This package contains the Fidus Writer document schema, importers and exporters.
 
+## Demo
+
+Interactive examples running entirely in the browser are available at
+**https://fiduswriter.codeberg.page/fiduswriter-document/**
+
+The demo site includes:
+
+- **File converter** — export a sample document (with editable JSON and bibliography) to JATS, HTML, LaTeX, Pandoc JSON, EPUB, DOCX, and ODT. DOCX and ODT exports support custom upload templates; built-in "Classic" (DOCX) and "Free" (ODT) templates are provided as defaults.
+- **Schema viewer** — browse all document nodes, marks, and their allowed content.
+- **JATS bibliography generator** — fill in a reference and preview the rendered JATS XML.
+- **Import preview** — drop a native `.fidus` file and inspect its JSON.
+
 ## Usage
 
 ```javascript
@@ -14,9 +26,9 @@ import {DOCXExporter} from "@fiduswriter/document/exporter/docx/index.js"
 
 ## TypeScript
 
-The package is being migrated to TypeScript. New source files are written in
-`.ts`, compiled to `dist/` on build, and published with matching `.d.ts`
-declarations. The public import paths remain unchanged.
+The package is fully written in TypeScript. Source files are compiled to
+`dist/` on build and published with matching `.d.ts` declarations. The public
+import paths remain unchanged.
 
 ## Development
 
@@ -25,6 +37,7 @@ npm install
 npm run build      # compile TypeScript to dist/
 npm run typecheck  # run tsc --noEmit
 npm test           # run the Jest test suite
+npm run deploy-pages  # build and push the demo site to Codeberg Pages
 ```
 
 ## Dependencies
