@@ -36,6 +36,7 @@ export class DOCXExporter {
     bibDB: BibDB
     imageDB: ImageDB
     csl: CSL
+    templateBlob?: Blob
 
     docTitle: string
     mimeType: string
@@ -46,13 +47,15 @@ export class DOCXExporter {
         templateUrl: string,
         bibDB: BibDB,
         imageDB: ImageDB,
-        csl: CSL
+        csl: CSL,
+        templateBlob?: Blob
     ) {
         this.doc = doc
         this.templateUrl = templateUrl
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.csl = csl
+        this.templateBlob = templateBlob
 
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.mimeType =
@@ -63,7 +66,7 @@ export class DOCXExporter {
     }
 
     init(): Promise<void> {
-        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType)
+        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType, this.templateBlob)
 
         const tables = new DOCXExporterTables(xml)
         const math = new DOCXExporterMath(xml)
@@ -151,7 +154,7 @@ export class DOCXExporter {
             .then(blob => this.download(blob))
     }
 
-    download(blob: Blob): void {
+    download(blob: Blob): void | Promise<void> {
         return download(
             blob,
             createSlug(this.docTitle) + ".docx",

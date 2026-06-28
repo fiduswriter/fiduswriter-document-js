@@ -186,7 +186,9 @@ export class HTMLExporterConvert {
                 }
                 break
             case "doc":
-                this.metaData.copyright = node.attrs.copyright
+                if (node.attrs.copyright) {
+                    this.metaData.copyright = node.attrs.copyright
+                }
                 break
             case "heading1":
             case "heading2":

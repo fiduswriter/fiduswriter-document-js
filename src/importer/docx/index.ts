@@ -69,7 +69,7 @@ export class DocxImporter {
     importDocx(): Promise<typeof this.output> {
         const bibliography: Record<string, unknown> = {}
         return import("jszip")
-            .then(({default: JSZip}) => JSZip.loadAsync(this.file))
+            .then(({default: JSZip}) => this.file.arrayBuffer().then(ab => JSZip.loadAsync(ab)))
             .then(zip => {
                 const docx = new DocxConvert(
                     zip,
@@ -90,7 +90,7 @@ export class DocxImporter {
                             settings: convertedDoc.settings
                         },
                         bibliography,
-                        docx.images as any,
+                        {db: docx.images || {}},
                         [],
                         this.user,
                         this.nativeBackend,

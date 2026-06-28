@@ -89,43 +89,45 @@ export class ODTExporterImages {
                 if (!imgDBEntry || !imgDBEntry.image) {
                     return
                 }
+                const imageValue = imgDBEntry.image
+                const imagePromise: Promise<Blob> =
+                    imageValue instanceof Blob
+                        ? Promise.resolve(imageValue)
+                        : get(imageValue as string)
+                              .then(response => response.blob())
+                const imageFilename =
+                    imageValue instanceof Blob
+                        ? `image-${String(image)}.${(imgDBEntry.file_type as string | undefined) || (imageValue.type.split("/")[1] ?? "bin")}`
+                        : (imageValue as string).split("/").pop()!
                 p.push(
-                    get(imgDBEntry.image as string)
-                        .then(response => response.blob())
-                        .then(async blob => {
-                            const wImgId = this.addImage(
-                                (imgDBEntry.image as string).split("/").pop()!,
-                                blob
+                    imagePromise.then(async blob => {
+                        const wImgId = this.addImage(imageFilename, blob)
+                        if (blob.type === "image/svg+xml") {
+                            // Add PNG version in addition to SVG
+                            const {blob: pngBlob, width, height} = await svg2png(blob)
+                            const pngWImgId = this.addImage(
+                                imageFilename.replace(/.svg$/g, ".png"),
+                                pngBlob
                             )
-                            if (blob.type === "image/svg+xml") {
-                                // Add PNG version in addition to SVG
-                                const {blob: pngBlob, width, height} = await svg2png(blob)
-                                const pngWImgId = this.addImage(
-                                    (imgDBEntry.image as string)
-                                        .split("/")
-                                        .pop()!
-                                        .replace(/.svg$/g, ".png"),
-                                    pngBlob
-                                )
-                                this.images[String(image)] = {
-                                    id: pngWImgId,
-                                    width,
-                                    height,
-                                    title: imgDBEntry.title as string | undefined,
-                                    type: blob.type,
-                                    svg: wImgId
-                                }
-                            } else {
-                                this.images[String(image)] = {
-                                    id: wImgId,
-                                    width: imgDBEntry.width as number,
-                                    height: imgDBEntry.height as number,
-                                    title: imgDBEntry.title as string | undefined,
-                                    type: blob.type,
-                                    svg: null
-                                }
+                            this.images[String(image)] = {
+                                id: pngWImgId,
+                                width,
+                                height,
+                                title: imgDBEntry.title as string | undefined,
+                                type: blob.type,
+                                svg: wImgId
                             }
-                        })
+                        } else {
+                            this.images[String(image)] = {
+                                id: wImgId,
+                                width: imgDBEntry.width as number,
+                                height: imgDBEntry.height as number,
+                                title: imgDBEntry.title as string | undefined,
+                                type: blob.type,
+                                svg: null
+                            }
+                        }
+                    })
                 )
             })
 

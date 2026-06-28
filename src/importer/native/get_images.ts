@@ -54,7 +54,7 @@ export class GetImages {
             await this.getImageZipEntry()
             return
         }
-        this.imageEntries[this.counter]["file"] = new window.Blob([f.content], {
+        this.imageEntries[this.counter]["file"] = new Blob([f.content], {
             type: imageEntry.file_type
         })
         this.counter++

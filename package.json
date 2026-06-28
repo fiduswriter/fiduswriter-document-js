@@ -48,6 +48,34 @@
       "types": "./dist/exporter/native/index.d.ts",
       "default": "./dist/exporter/native/index.js"
     },
+    "./exporter/docx": {
+      "types": "./dist/exporter/docx/index.d.ts",
+      "default": "./dist/exporter/docx/index.js"
+    },
+    "./exporter/odt": {
+      "types": "./dist/exporter/odt/index.d.ts",
+      "default": "./dist/exporter/odt/index.js"
+    },
+    "./exporter/latex": {
+      "types": "./dist/exporter/latex/index.d.ts",
+      "default": "./dist/exporter/latex/index.js"
+    },
+    "./exporter/html": {
+      "types": "./dist/exporter/html/index.d.ts",
+      "default": "./dist/exporter/html/index.js"
+    },
+    "./exporter/epub": {
+      "types": "./dist/exporter/epub/index.d.ts",
+      "default": "./dist/exporter/epub/index.js"
+    },
+    "./exporter/jats": {
+      "types": "./dist/exporter/jats/index.d.ts",
+      "default": "./dist/exporter/jats/index.js"
+    },
+    "./exporter/pandoc": {
+      "types": "./dist/exporter/pandoc/index.d.ts",
+      "default": "./dist/exporter/pandoc/index.js"
+    },
     "./exporter/*": {
       "types": "./dist/exporter/*.d.ts",
       "default": "./dist/exporter/*.js"

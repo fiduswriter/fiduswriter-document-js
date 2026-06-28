@@ -32,6 +32,7 @@ export class ODTExporter {
     bibDB: BibDB
     imageDB: ImageDB
     csl: CSL
+    templateBlob?: Blob
 
     pmCits: any
     docContent: any
@@ -43,13 +44,15 @@ export class ODTExporter {
         templateUrl: string,
         bibDB: BibDB,
         imageDB: ImageDB,
-        csl: CSL
+        csl: CSL,
+        templateBlob?: Blob
     ) {
         this.doc = doc
         this.templateUrl = templateUrl
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.csl = csl
+        this.templateBlob = templateBlob
 
         this.pmCits = false
         this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
@@ -58,7 +61,7 @@ export class ODTExporter {
     }
 
     init(): Promise<void> {
-        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType)
+        const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType, this.templateBlob)
         const styles = new ODTExporterStyles(xml)
         const math = new ODTExporterMath(xml)
         const tracks = new ODTExporterTracks(xml)
@@ -172,7 +175,7 @@ export class ODTExporter {
         }
     }
 
-    download(blob: Blob): void {
+    download(blob: Blob): void | Promise<void> {
         return download(blob, createSlug(this.docTitle) + ".odt", this.mimeType)
     }
 }

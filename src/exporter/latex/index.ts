@@ -23,7 +23,7 @@ export class LatexExporter {
     docContent: any
     zipFileName: string | false
     textFiles: Array<{filename: string; contents: string}>
-    httpFiles: Array<{filename: string; url: string}>
+    httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
     conversion: any
 
@@ -63,10 +63,23 @@ export class LatexExporter {
         })
         this.textFiles.push({filename: "README.txt", contents: readMe})
         this.conversion.imageIds.forEach((id: string) => {
-            this.httpFiles.push({
-                filename: this.imageDB.db[id].image!.toString().split("/").pop()!,
-                url: this.imageDB.db[id].image as string
-            })
+            const imageValue = this.imageDB.db[id].image
+            if (imageValue instanceof Blob) {
+                const ext =
+                    (this.imageDB.db[id].file_type as string | undefined) ||
+                    imageValue.type.split("/")[1] ||
+                    "bin"
+                this.httpFiles.push({
+                    filename: `image-${id}.${ext}`,
+                    url: `blob:${id}`,
+                    blob: imageValue
+                })
+            } else {
+                this.httpFiles.push({
+                    filename: (imageValue as string).split("/").pop()!,
+                    url: imageValue as string
+                })
+            }
         })
         return this.createZip()
     }
@@ -83,7 +96,7 @@ export class LatexExporter {
         return zipper.init().then(blob => this.download(blob))
     }
 
-    download(blob: Blob): void {
+    download(blob: Blob): void | Promise<void> {
         return download(blob, this.zipFileName as string, "application/zip")
     }
 }

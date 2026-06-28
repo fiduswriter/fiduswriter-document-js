@@ -130,7 +130,7 @@ export class PandocImporter {
                         settings: convertedDoc.settings
                     },
                     bibliography,
-                    converter.images as any,
+                        {db: converter.images || {}},
                     Object.entries(images).map(([filename, blob]) => ({
                         filename,
                         content: blob

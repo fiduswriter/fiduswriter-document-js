@@ -30,7 +30,7 @@ export class HTMLExporter {
     docContent: any
     zipFileName: string | false
     textFiles: Array<{filename: string; contents?: string; url?: string}>
-    httpFiles: Array<{filename: string; url: string}>
+    httpFiles: Array<{filename: string; url: string; blob?: Blob}>
     includeZips: Array<{directory: string; url: string}>
     metaData: any
     htmlExportTemplate: typeof htmlExportTemplate
@@ -153,10 +153,23 @@ export class HTMLExporter {
     addImages(imageIds: string[]): void {
         imageIds.forEach(id => {
             const image = this.imageDB.db[id]
-            this.httpFiles.push({
-                filename: `images/${image.image!.toString().split("/").pop()!}`,
-                url: image.image as string
-            })
+            const imageValue = image.image
+            if (imageValue instanceof Blob) {
+                const ext =
+                    (image.file_type as string | undefined) ||
+                    imageValue.type.split("/")[1] ||
+                    "bin"
+                this.httpFiles.push({
+                    filename: `images/image-${id}.${ext}`,
+                    url: `blob:${id}`,
+                    blob: imageValue
+                })
+            } else {
+                this.httpFiles.push({
+                    filename: `images/${(imageValue as string).split("/").pop()!}`,
+                    url: imageValue as string
+                })
+            }
         })
     }
 
@@ -220,7 +233,7 @@ export class HTMLExporter {
         return this.download(blob)
     }
 
-    download(blob: Blob): void {
+    download(blob: Blob): void | Promise<void> {
         return download(blob, this.zipFileName as string, this.mimeType)
     }
 }

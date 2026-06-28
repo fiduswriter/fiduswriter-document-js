@@ -92,7 +92,9 @@ export class JATSExporterConverter {
     preWalkJson(node: any, parentNode: any = false): void {
         switch (node.type) {
             case "doc":
-                this.frontMatter.copyright = node.attrs.copyright
+                if (node.attrs.copyright) {
+                    this.frontMatter.copyright = node.attrs.copyright
+                }
                 break
             case "title":
                 this.frontMatter.title["default"] = node

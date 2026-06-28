@@ -12,22 +12,39 @@ export class XmlZip {
     extraFiles: Record<string, unknown>
     rawFile: Blob | false
     zip: any
+    loadedBlob: Blob | undefined
 
-    constructor(url: string, mimeType: string) {
+    constructor(url: string, mimeType: string, loadedBlob?: Blob) {
         this.url = url
         this.mimeType = mimeType
         this.docs = {}
         this.extraFiles = {}
         this.rawFile = false
+        this.loadedBlob = loadedBlob
     }
 
     init() {
         return import("jszip")
             .then(({default: JSZip}) => {
                 this.zip = new JSZip()
-                return this.downloadZip()
+                if (this.loadedBlob) {
+                    return this.blobToArrayBuffer(this.loadedBlob).then(ab => {
+                        this.rawFile = new Blob([ab])
+                        return this.loadZip(ab)
+                    })
+                }
+                return this.downloadZip().then(() => this.loadZip())
             })
-            .then(() => this.loadZip())
+    }
+
+    blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+        if (blob instanceof Blob && typeof blob.arrayBuffer === "function") {
+            return blob.arrayBuffer()
+        }
+        if (blob instanceof ArrayBuffer) {
+            return Promise.resolve(blob)
+        }
+        return Promise.reject(new Error("Cannot convert to ArrayBuffer"))
     }
 
     downloadZip() {
@@ -36,8 +53,8 @@ export class XmlZip {
             .then(blob => (this.rawFile = blob))
     }
 
-    loadZip() {
-        return this.zip.loadAsync(this.rawFile)
+    loadZip(data?: ArrayBuffer | Blob) {
+        return this.zip.loadAsync(data || this.rawFile)
     }
 
     // Open file at filePath from zip file and parse it as XML.

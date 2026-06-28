@@ -25,7 +25,7 @@ export class PandocExporter {
     docContent: any
     zipFileName: string
     textFiles: Array<{filename: string; contents: string}>
-    httpFiles: Array<{filename: string; url: string}>
+    httpFiles: Array<{filename: string; url: string; blob?: Blob}>
     citations!: PandocExporterCitations
 
     constructor(
@@ -77,11 +77,24 @@ export class PandocExporter {
             }
 
             this.conversion.imageIds.forEach((id: string) => {
-                const imageUrl = this.imageDB.db[id].image as string
-                this.httpFiles.push({
-                    filename: imageUrl.split("/").pop()!,
-                    url: imageUrl
-                })
+                const imageValue = this.imageDB.db[id].image
+                if (imageValue instanceof Blob) {
+                    const ext =
+                        (this.imageDB.db[id].file_type as string | undefined) ||
+                        imageValue.type.split("/")[1] ||
+                        "bin"
+                    this.httpFiles.push({
+                        filename: `image-${id}.${ext}`,
+                        url: `blob:${id}`,
+                        blob: imageValue
+                    })
+                } else {
+                    const imageUrl = imageValue as string
+                    this.httpFiles.push({
+                        filename: imageUrl.split("/").pop()!,
+                        url: imageUrl
+                    })
+                }
             })
             return this.createExport()
         })
@@ -101,7 +114,6 @@ export class PandocExporter {
     }
 
     createDownload(): Promise<void> {
-        // This creates a ZIP file with JSON sources included and then returns a promise for the download of the file.
         const zipper = new ZipFileCreator(
             this.textFiles,
             this.httpFiles,
@@ -112,6 +124,10 @@ export class PandocExporter {
 
         return zipper
             .init()
-            .then(blob => download(blob, this.zipFileName, "application/zip"))
+            .then(blob => this.download(blob))
+    }
+
+    download(blob: Blob): void | Promise<void> {
+        return download(blob, this.zipFileName, "application/zip")
     }
 }

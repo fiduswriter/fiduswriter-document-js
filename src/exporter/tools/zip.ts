@@ -1,5 +1,12 @@
 import {convertDataURIToBlob as convertDataURIToBlobFn, get} from "fwtoolkit"
 
+function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+    if (typeof blob.arrayBuffer === "function") {
+        return blob.arrayBuffer()
+    }
+    return Promise.reject(new Error("Cannot convert blob to ArrayBuffer"))
+}
+
 export interface ZipTextFile {
     filename: string
     contents: string
@@ -63,6 +70,9 @@ export class ZipFileCreator {
 
     includeZips() {
         const getZipBlobs = this.zipFiles.map(zipFile => {
+            if (zipFile.blob) {
+                return blobToArrayBuffer(zipFile.blob).then(ab => (zipFile.blob = new Blob([ab])))
+            }
             return get(zipFile.url)
                 .then(response => response.blob())
                 .then(blob => (zipFile.blob = blob))
@@ -74,6 +84,9 @@ export class ZipFileCreator {
                         zipFile.directory === ""
                             ? this.zipFs
                             : this.zipFs.folder(zipFile.directory)
+                    if (zipFile.blob && typeof zipFile.blob.arrayBuffer === "function") {
+                        return zipFile.blob.arrayBuffer().then(ab => zipDir.loadAsync(ab))
+                    }
                     return zipDir.loadAsync(zipFile.blob)
                 })
             })
@@ -86,20 +99,26 @@ export class ZipFileCreator {
                 compression: "DEFLATE"
             })
         })
-        const blobPromises = this.binaryFiles.map(binaryFile =>
-            get(binaryFile.url)
+        const blobPromises = this.binaryFiles.map(binaryFile => {
+            if (binaryFile.blob) {
+                return blobToArrayBuffer(binaryFile.blob).then(ab =>
+                    Promise.resolve({data: ab, filename: binaryFile.filename})
+                )
+            }
+            return get(binaryFile.url)
                 .then(response => response.blob())
                 .then(blob =>
                     Promise.resolve({blob, filename: binaryFile.filename})
                 )
-        )
+        })
         return Promise.all(blobPromises).then(promises => {
-            promises.forEach(promise =>
-                this.zipFs.file(promise.filename, promise.blob, {
+            promises.forEach(promise => {
+                const data = "data" in promise ? promise.data : promise.blob
+                this.zipFs.file(promise.filename, data, {
                     binary: true,
                     compression: "DEFLATE"
                 })
-            )
+            })
             return this.zipFs.generateAsync({
                 type: "blob",
                 mimeType: this.mimeType

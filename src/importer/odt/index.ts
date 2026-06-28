@@ -72,7 +72,7 @@ export class OdtImporter {
 
     importOdt(): Promise<typeof this.output> {
         return import("jszip")
-            .then(({default: JSZip}) => JSZip.loadAsync(this.file))
+            .then(({default: JSZip}) => this.file.arrayBuffer().then(ab => JSZip.loadAsync(ab)))
             .then(zip => {
                 const contentPromise = zip.file("content.xml")?.async("string")
                 const stylePromise = zip.file("styles.xml")?.async("string")
@@ -167,7 +167,7 @@ export class OdtImporter {
                 settings: convertedDoc.settings
             },
             bibliography,
-            converter.images as any,
+            {db: converter.images || {}},
             Object.entries(images).map(([filename, blob]) => ({
                 filename,
                 content: blob

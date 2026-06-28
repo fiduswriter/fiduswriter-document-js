@@ -17,14 +17,12 @@ export class DOCXExporterMath {
     xml: XmlZip
     fontTablesXML: import("../tools/xml.js").XMLElement | false
     addedCambriaMath: boolean
-    domParser: DOMParser
     mathLive: typeof import("mathlive") | null
 
     constructor(xml: XmlZip) {
         this.xml = xml
         this.fontTablesXML = false
         this.addedCambriaMath = false
-        this.domParser = new DOMParser()
         this.mathLive = null
     }
 

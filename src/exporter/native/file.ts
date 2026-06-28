@@ -17,6 +17,7 @@ export class ExportFidusFile {
         docId: string | number,
         token: string | boolean
     ) => Promise<TemplateFiles>
+    silent: boolean
 
     constructor(
         doc: ExportDoc,
@@ -27,7 +28,8 @@ export class ExportFidusFile {
         getTemplateFiles?: (
             docId: string | number,
             token: string | boolean
-        ) => Promise<TemplateFiles>
+        ) => Promise<TemplateFiles>,
+        silent = false
     ) {
         this.doc = doc
         this.bibDB = bibDB
@@ -35,11 +37,12 @@ export class ExportFidusFile {
         this.includeTemplate = includeTemplate
         this.token = token
         this.getTemplateFiles = getTemplateFiles
+        this.silent = silent
         return this.init() as unknown as ExportFidusFile
     }
 
     init(): Promise<Blob> {
-        const shrinker = new ShrinkFidus(this.doc as any, this.imageDB, this.bibDB)
+        const shrinker = new ShrinkFidus(this.doc as any, this.imageDB, this.bibDB, this.silent)
         return shrinker
             .init()
             .then(({doc, shrunkImageDB, shrunkBibDB, httpIncludes}) => {
@@ -56,10 +59,14 @@ export class ExportFidusFile {
                 return zipper.init()
             })
             .then(blob => {
-                const title: string = shortFileTitle(this.doc.title, this.doc.path || "") || "untitled"
-                const filename = `${createSlug(title)}.fidus`
-                download(blob, filename, "application/fidus+zip")
+                this.download(blob)
                 return blob
             })
+    }
+
+    download(blob: Blob): void | Promise<void> {
+        const title: string = shortFileTitle(this.doc.title, this.doc.path || "") || "untitled"
+        const filename = `${createSlug(title)}.fidus`
+        return download(blob, filename, "application/fidus+zip")
     }
 }

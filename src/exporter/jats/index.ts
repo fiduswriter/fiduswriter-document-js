@@ -27,7 +27,7 @@ export class JATSExporter {
 
     zipFileName: string | false
     textFiles: Array<{filename: string; contents: string}>
-    httpFiles: Array<{filename: string; url: string}>
+    httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
     converter: any
 
@@ -86,10 +86,27 @@ export class JATSExporter {
                     })
                     const images = imageIds.map(id => {
                         const imageEntry = this.imageDB.db[id]
+                        const imageValue = imageEntry.image
+                        let filename: string
+                        let url: string
+                        let blob: Blob | undefined
+                        if (imageValue instanceof Blob) {
+                            const ext =
+                                (imageEntry.file_type as string | undefined) ||
+                                imageValue.type.split("/")[1] ||
+                                "bin"
+                            filename = `image-${id}.${ext}`
+                            url = `blob:${id}`
+                            blob = imageValue
+                        } else {
+                            filename = (imageValue as string).split("/").pop()!
+                            url = imageValue as string
+                        }
                         return {
                             title: imageEntry.title || "",
-                            filename: imageEntry.image!.toString().split("/").pop()!,
-                            url: imageEntry.image as string
+                            filename,
+                            url,
+                            blob
                         }
                     })
                     this.textFiles.push({
@@ -106,7 +123,8 @@ export class JATSExporter {
                     images.forEach(image => {
                         this.httpFiles.push({
                             filename: image.filename,
-                            url: image.url
+                            url: image.url,
+                            blob: image.blob
                         })
                     })
 
@@ -126,7 +144,7 @@ export class JATSExporter {
         return zipper.init().then(blob => this.download(blob))
     }
 
-    download(blob: Blob): void {
+    download(blob: Blob): void | Promise<void> {
         return download(blob, this.zipFileName as string, "application/zip")
     }
 }

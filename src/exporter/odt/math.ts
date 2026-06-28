@@ -5,14 +5,12 @@ export class ODTExporterMath {
     xml: XmlZip
     objectCounter: number
     manifestXml: XMLElement | false
-    domParser: DOMParser
     mathLive: typeof import("mathlive") | null
 
     constructor(xml: XmlZip) {
         this.xml = xml
         this.objectCounter = 1
         this.manifestXml = false
-        this.domParser = new DOMParser()
         this.mathLive = null
     }
 

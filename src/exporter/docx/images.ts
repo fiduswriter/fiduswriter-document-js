@@ -84,39 +84,41 @@ export class DOCXExporterImages {
                 if (!imgDBEntry || !imgDBEntry.image) {
                     return
                 }
+                const imageValue = imgDBEntry.image
+                const imagePromise: Promise<Blob> =
+                    imageValue instanceof Blob
+                        ? Promise.resolve(imageValue)
+                        : get(imageValue as string)
+                              .then(response => response.blob())
+                const imageFilename =
+                    imageValue instanceof Blob
+                        ? `image-${String(image)}.${(imgDBEntry.file_type as string | undefined) || (imageValue.type.split("/")[1] ?? "bin")}`
+                        : (imageValue as string).split("/").pop()!
                 p.push(
-                    get(imgDBEntry.image as string)
-                        .then(response => response.blob())
-                        .then(async blob => {
-                            if (blob.type === "image/svg+xml") {
-                                // DOCX doesn't support SVG. Convert to PNG.
-                                const {blob: pngBlob, width, height} = await svg2png(blob)
-                                const wImgId = this.addImage(
-                                    (imgDBEntry.image as string)
-                                        .split("/")
-                                        .pop()!
-                                        .replace(/.svg$/g, ".png"),
-                                    pngBlob
-                                )
-                                this.images[String(image)] = {
-                                    id: wImgId,
-                                    width,
-                                    height,
-                                    title: imgDBEntry.title as string | undefined
-                                }
-                            } else {
-                                const wImgId = this.addImage(
-                                    (imgDBEntry.image as string).split("/").pop()!,
-                                    blob
-                                )
-                                this.images[String(image)] = {
-                                    id: wImgId,
-                                    width: imgDBEntry.width as number,
-                                    height: imgDBEntry.height as number,
-                                    title: imgDBEntry.title as string | undefined
-                                }
+                    imagePromise.then(async blob => {
+                        if (blob.type === "image/svg+xml") {
+                            // DOCX doesn't support SVG. Convert to PNG.
+                            const {blob: pngBlob, width, height} = await svg2png(blob)
+                            const wImgId = this.addImage(
+                                imageFilename.replace(/.svg$/g, ".png"),
+                                pngBlob
+                            )
+                            this.images[String(image)] = {
+                                id: wImgId,
+                                width,
+                                height,
+                                title: imgDBEntry.title as string | undefined
                             }
-                        })
+                        } else {
+                            const wImgId = this.addImage(imageFilename, blob)
+                            this.images[String(image)] = {
+                                id: wImgId,
+                                width: imgDBEntry.width as number,
+                                height: imgDBEntry.height as number,
+                                title: imgDBEntry.title as string | undefined
+                            }
+                        }
+                    })
                 )
             })
 
