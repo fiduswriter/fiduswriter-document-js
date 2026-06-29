@@ -53,14 +53,15 @@ export function convertText(node: FidusNode): string {
         attrs = ""
     }
     if (hyperlink) {
-        const href = hyperlink.attrs?.href as string
+        const href = (hyperlink.attrs?.href as string) || ""
+        const title = (hyperlink.attrs?.title as string) || ""
         if (href[0] === "#") {
             // Internal link
             start += `<xref rid="${href.substring(1)}"${attrs}>`
             end = "</xref>" + end
         } else {
             // External link
-            start += `<ext-link xlink:href="${escapeText(href)}" ext-link-type="uri" xlink:title="${escapeText(hyperlink.attrs?.title as string)}"${attrs}>`
+            start += `<ext-link xlink:href="${escapeText(href)}" ext-link-type="uri" xlink:title="${escapeText(title)}"${attrs}>`
             end = "</ext-link>" + end
         }
         attrs = ""
