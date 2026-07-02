@@ -1,3 +1,4 @@
+import { gettext } from "fwtoolkit"
 export const LANGUAGES: Array<[string, string, string]> = [
     ["af-ZA", gettext("Afrikaans"), "ltr"],
     ["sq-AL", gettext("Albanian"), "ltr"],

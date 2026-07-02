@@ -8,7 +8,6 @@ import {NativeImporter} from "./importer.js"
 import type {
     E2EEOptions,
     FidusDoc,
-    FidusNode,
     ImageDBEntries,
     NativeImporterBackend,
     Template,

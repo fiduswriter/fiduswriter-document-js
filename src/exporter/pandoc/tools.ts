@@ -17,7 +17,7 @@ interface PandocMetaInlines {
     c: Array<PandocText | PandocSpace | PandocNote>
 }
 
-type PandocInline = PandocText | PandocSpace | PandocNote | PandocMetaInlines
+type _PandocInline = PandocText | PandocSpace | PandocNote | PandocMetaInlines
 
 export const convertText = (text: string): Array<PandocText | PandocSpace> => {
     const textContent: Array<PandocText | PandocSpace> = []

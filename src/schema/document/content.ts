@@ -1,5 +1,5 @@
 import {escapeText} from "fwtoolkit"
-import type {MarkSpec, NodeSpec} from "prosemirror-model"
+import type {NodeSpec} from "prosemirror-model"
 
 import {parseTracks} from "../common/index.js"
 import {fnNodeToHtml, htmlToFnNode} from "../footnotes_convert.js"

@@ -1,8 +1,6 @@
 import {MathMLToLaTeX} from "mathml-to-latex"
-import {xmlDOM} from "../../exporter/tools/xml.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 import {
-    randomCommentId,
     randomFigureId,
     randomHeadingId
 } from "../../schema/common/index.js"
@@ -18,7 +16,7 @@ import {normalizeText} from "./helpers.js"
 import {omml2mathml} from "./omml2mathml.js"
 import {DocxParser} from "./parse.js"
 import {gettext} from "fwtoolkit"
-import type {BibDB, FidusDoc, FidusNode, ImageDBEntry} from "../../types.js"
+import type {FidusDoc, ImageDBEntry} from "../../types.js"
 
 function attr(node: unknown, name: string): string {
     if (node && typeof node === "object" && "getAttribute" in node) {

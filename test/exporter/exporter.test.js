@@ -1,4 +1,4 @@
-import {existsSync, readFileSync} from "fs"
+import {readFileSync} from "fs"
 import {dirname, join} from "path"
 import {fileURLToPath} from "url"
 import {beforeAll, describe, expect, it} from "@jest/globals"

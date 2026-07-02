@@ -1,5 +1,5 @@
 // @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 import type {BibDB, FidusDoc} from "../types.js"
 
 /* To convert to and from how the document is stored in the database to how ProseMirror expects it.

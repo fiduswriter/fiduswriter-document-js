@@ -1,4 +1,4 @@
-import type {MarkSpec, NodeSpec} from "prosemirror-model"
+import type {MarkSpec} from "prosemirror-model"
 
 export interface Track {
     type: "insertion" | "deletion" | "block_change"

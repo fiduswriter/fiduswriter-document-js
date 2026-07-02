@@ -2,7 +2,6 @@ import {xmlDOM} from "../../exporter/tools/xml.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 import {randomCommentId} from "../../schema/common/index.js"
 import {gettext} from "fwtoolkit"
-import type {FidusMark, FidusNode} from "../../types.js"
 
 function attr(node: unknown, name: string): string {
     if (node && typeof node === "object" && "getAttribute" in node) {

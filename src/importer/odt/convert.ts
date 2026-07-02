@@ -18,7 +18,7 @@ import {
     parseOdtReferenceMark
 } from "./citations.js"
 import {gettext} from "fwtoolkit"
-import type {BibDB, FidusDoc, FidusNode, ImageDBEntry} from "../../types.js"
+import type {BibDB, FidusDoc, ImageDBEntry} from "../../types.js"
 
 function attr(node: unknown, name: string): string {
     if (node && typeof node === "object" && "getAttribute" in node) {

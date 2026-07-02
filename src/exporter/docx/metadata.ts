@@ -1,6 +1,6 @@
 import {escapeText} from "fwtoolkit"
 
-import type {CSL, CSLStyle, ExportMetadata} from "../../types.js"
+import type {CSL, ExportMetadata} from "../../types.js"
 import type {XMLElement} from "../tools/xml.js"
 import type {XmlZip} from "../tools/xml_zip.js"
 

@@ -2,7 +2,6 @@ import {GetImages} from "./get_images.js"
 import {extractTemplate} from "./extract_template.js"
 
 import type {
-    BibDB,
     E2EEOptions,
     FidusNode,
     ImageDB,

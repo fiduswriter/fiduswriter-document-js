@@ -1,7 +1,7 @@
 import {DocxCitationsParser} from "biblatex-csl-converter"
 
 import {citationResultToNode} from "../citations.js"
-import type {BibDB, FidusNode} from "../../types.js"
+import type {FidusNode} from "../../types.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 
 /**
