@@ -5,6 +5,7 @@ import {getCat} from "../../schema/i18n.js"
 import type {BibDB, CSL, DocSettings, FidusNode} from "../../types.js"
 import {descendantNodes} from "../tools/doc_content.js"
 import {formatCss} from "../tools/format.js"
+import {getImageDBEntryFilename} from "../tools/file.js"
 import {HTMLExporterCitations} from "./citations.js"
 import {displayNumber} from "./tools.js"
 
@@ -662,12 +663,14 @@ export class HTMLExporterConvert {
                         .image || false
                 if (image !== false) {
                     this.imageIds.push(image)
-                    const imageDBEntry = this.imageDB.db[image],
-                        filePathName = imageDBEntry.image
+                    const imageDBEntry = this.imageDB.db[image]
                     copyright = imageDBEntry.copyright
+                    const filename = getImageDBEntryFilename(imageDBEntry, image)
                     imageUrl = this.relativeUrls
-                        ? `images/${filePathName!.toString().split("/").pop()!}`
-                        : (filePathName as string)
+                        ? `images/${filename}`
+                        : typeof imageDBEntry.image === "string"
+                          ? imageDBEntry.image
+                          : undefined
                 }
                 const caption = node.attrs.caption
                     ? node.content.find((node: any) => node.type === "figure_caption")

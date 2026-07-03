@@ -3,6 +3,7 @@ import {addAlert, gettext} from "fwtoolkit"
 import {docSchema} from "../../schema/document/index.js"
 import {toMiniJSON} from "../../schema/mini_json.js"
 import type {BibDB, FidusNode, ImageDB} from "../../types.js"
+import {getImageExtension} from "../tools/file.js"
 
 interface ShrinkDoc {
     content: FidusNode
@@ -13,7 +14,7 @@ interface ShrinkResult {
     doc: Record<string, unknown>
     shrunkImageDB: Record<string, Record<string, unknown>>
     shrunkBibDB: Record<string, Record<string, unknown>>
-    httpIncludes: Array<{url: string; filename: string}>
+    httpIncludes: Array<{url: string; filename: string; blob?: Blob}>
 }
 
 // Generate a copy of the fidus doc, imageDB and bibDB with all clutter removed.
@@ -45,7 +46,7 @@ export class ShrinkFidus {
 
     init(): Promise<ShrinkResult> {
         const shrunkImageDB: Record<string, Record<string, unknown>> = {},
-            httpIncludes: Array<{url: string; filename: string}> = []
+            httpIncludes: Array<{url: string; filename: string; blob?: Blob}> = []
 
         if (!this.silent) {
             addAlert("info", gettext("File export has been initiated."))
@@ -66,9 +67,31 @@ export class ShrinkFidus {
             delete shrunkImageDB[key].thumbnail
             delete shrunkImageDB[key].pk
             delete shrunkImageDB[key].added
-            const imageUrl = shrunkImageDB[key].image as string
+            const imageValue = shrunkImageDB[key].image as string | Blob | ArrayBuffer
             let filename: string
-            if (imageUrl.startsWith("blob:")) {
+            let url: string
+            let blob: Blob | undefined
+            if (imageValue instanceof Blob) {
+                const ext = getImageExtension(
+                    shrunkImageDB[key].file_type as string | undefined,
+                    imageValue.type
+                )
+                filename = `images/${key}.${ext}`
+                url = `blob:${key}`
+                blob = imageValue
+            } else if (imageValue instanceof ArrayBuffer) {
+                const ext = getImageExtension(
+                    shrunkImageDB[key].file_type as string | undefined,
+                    ""
+                )
+                filename = `images/${key}.${ext}`
+                url = `blob:${key}`
+                blob = new Blob([imageValue], {
+                    type:
+                        (shrunkImageDB[key].file_type as string) ||
+                        "application/octet-stream"
+                })
+            } else if (imageValue.startsWith("blob:")) {
                 // Blob URL produced by decrypting an E2EE image client-side.
                 // The URL itself carries no useful file extension, so derive
                 // one from the image entry's MIME type instead.  Without this
@@ -87,13 +110,16 @@ export class ShrinkFidus {
                 }
                 const ext = mimeExtMap[mime] || "png"
                 filename = `images/${key}.${ext}`
+                url = imageValue
             } else {
-                filename = `images/${imageUrl.split("/").pop()}`
+                filename = `images/${imageValue.split("/").pop()}`
+                url = imageValue
             }
             shrunkImageDB[key].image = filename
             httpIncludes.push({
-                url: imageUrl,
-                filename
+                url,
+                filename,
+                blob
             })
         })
 

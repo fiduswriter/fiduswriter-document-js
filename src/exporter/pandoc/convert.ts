@@ -1,3 +1,4 @@
+import {getImageDBEntryFilename} from "../tools/file.js"
 import {convertContributor, convertText} from "./tools.js"
 
 export class PandocExporterConvert {
@@ -375,10 +376,12 @@ export class PandocExporterConvert {
                     )?.attrs.equation
                     if (image !== false) {
                         this.imageIds.push(image)
-                        const imageDBEntry = this.imageDB.db[image],
-                            filePathName = imageDBEntry.image
+                        const imageDBEntry = this.imageDB.db[image]
                         const copyright = imageDBEntry.copyright
-                        const imageFilename = filePathName!.toString().split("/").pop()
+                        const imageFilename = getImageDBEntryFilename(
+                            imageDBEntry,
+                            image
+                        )
                         if (
                             node.attrs.category === "none" &&
                             imageFilename &&

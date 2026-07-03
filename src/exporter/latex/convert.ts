@@ -1,6 +1,7 @@
 import {gettext} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS, getCat} from "../../schema/i18n.js"
 import {descendantNodes} from "../tools/doc_content.js"
+import {getImageDBEntryFilename} from "../tools/file.js"
 import {escapeLatexText} from "./escape_latex.js"
 
 export class LatexExporterConvert {
@@ -598,10 +599,9 @@ export class LatexExporterConvert {
                 if (image) {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image],
-                        filePathName = imageDBEntry.image,
-                        filename = filePathName!.toString().split("/").pop()
+                        filename = getImageDBEntryFilename(imageDBEntry, image)
                     copyright = imageDBEntry.copyright
-                    if (filename!.split(".").pop() === "svg") {
+                    if (filename.split(".").pop() === "svg") {
                         innerFigure += `\\includesvg[width=${Number.parseInt(node.attrs.width) / 100}\\textwidth]{${filename}}\n`
                         this.features.SVGs = true
                     } else {

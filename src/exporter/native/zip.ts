@@ -8,7 +8,7 @@ export class ZipFidus {
     doc: Record<string, unknown>
     shrunkImageDB: Record<string, Record<string, unknown>>
     shrunkBibDB: Record<string, Record<string, unknown>>
-    httpFiles: Array<{url: string; filename: string}>
+    httpFiles: Array<{url: string; filename: string; blob?: Blob}>
     includeTemplate: boolean
     token: string | boolean
     getTemplateFiles?: (
@@ -23,7 +23,7 @@ export class ZipFidus {
         doc: Record<string, unknown>,
         shrunkImageDB: Record<string, Record<string, unknown>>,
         shrunkBibDB: Record<string, Record<string, unknown>>,
-        httpFiles: Array<{url: string; filename: string}>,
+        httpFiles: Array<{url: string; filename: string; blob?: Blob}>,
         includeTemplate = true,
         token: string | boolean = false,
         getTemplateFiles?: (

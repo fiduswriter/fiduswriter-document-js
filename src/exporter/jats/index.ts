@@ -3,7 +3,7 @@ import download from "downloadjs"
 import {shortFileTitle} from "fwtoolkit"
 import {formatXml} from "../tools/format.js"
 import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
-import {createSlug} from "../tools/file.js"
+import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
 import {JATSExporterConverter} from "./convert.js"
 import {
@@ -88,10 +88,10 @@ export class JATSExporter {
             let url: string
             let blob: Blob | undefined
             if (imageValue instanceof Blob) {
-                const ext =
-                    (imageEntry.file_type as string | undefined) ||
-                    imageValue.type.split("/")[1] ||
-                    "bin"
+                const ext = getImageExtension(
+                    imageEntry.file_type as string | undefined,
+                    imageValue.type
+                )
                 filename = `image-${id}.${ext}`
                 url = `blob:${id}`
                 blob = imageValue

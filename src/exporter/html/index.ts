@@ -4,7 +4,7 @@ import {shortFileTitle, staticUrl} from "fwtoolkit"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {formatHtml} from "../tools/format.js"
 import {removeHidden} from "../tools/doc_content.js"
-import {createSlug} from "../tools/file.js"
+import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator, type ZipTextFile} from "../tools/zip.js"
 import {HTMLExporterConvert} from "./convert.js"
 import {htmlExportTemplate} from "./templates.js"
@@ -155,10 +155,10 @@ export class HTMLExporter {
             const image = this.imageDB.db[id]
             const imageValue = image.image
             if (imageValue instanceof Blob) {
-                const ext =
-                    (image.file_type as string | undefined) ||
-                    imageValue.type.split("/")[1] ||
-                    "bin"
+                const ext = getImageExtension(
+                    image.file_type as string | undefined,
+                    imageValue.type
+                )
                 this.httpFiles.push({
                     filename: `images/image-${id}.${ext}`,
                     url: `blob:${id}`,

@@ -5,6 +5,7 @@ import {getCat} from "../../schema/i18n.js"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {FormatCitations} from "../../citations/format.js"
 import {removeHidden} from "../tools/doc_content.js"
+import {getImageDBEntryFilename} from "../tools/file.js"
 
 import {JATSExporterCitations} from "./citations.js"
 import {convertText} from "./text.js"
@@ -701,10 +702,9 @@ export class JATSExporterConverter {
                         .image || false
                 if (image !== false) {
                     this.imageIds.push(image)
-                    const imageDBEntry = this.imageDB.db[image],
-                        filePathName = imageDBEntry.image
+                    const imageDBEntry = this.imageDB.db[image]
                     copyright = imageDBEntry.copyright
-                    imageFilename = filePathName!.toString().split("/").pop()
+                    imageFilename = getImageDBEntryFilename(imageDBEntry, image)
                 }
                 const caption = node.attrs.caption
                     ? node.content.find((node: any) => node.type === "figure_caption")

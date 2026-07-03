@@ -4,7 +4,7 @@ import download from "downloadjs"
 import {shortFileTitle} from "fwtoolkit"
 import type {BibDB, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
-import {createSlug} from "../tools/file.js"
+import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
 import {LatexExporterConvert} from "./convert.js"
 import {readMe} from "./readme.js"
@@ -63,12 +63,13 @@ export class LatexExporter {
         })
         this.textFiles.push({filename: "README.txt", contents: readMe})
         this.conversion.imageIds.forEach((id: string) => {
-            const imageValue = this.imageDB.db[id].image
+            const imageEntry = this.imageDB.db[id]
+            const imageValue = imageEntry.image
             if (imageValue instanceof Blob) {
-                const ext =
-                    (this.imageDB.db[id].file_type as string | undefined) ||
-                    imageValue.type.split("/")[1] ||
-                    "bin"
+                const ext = getImageExtension(
+                    imageEntry.file_type as string | undefined,
+                    imageValue.type
+                )
                 this.httpFiles.push({
                     filename: `image-${id}.${ext}`,
                     url: `blob:${id}`,
