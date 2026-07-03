@@ -99,9 +99,16 @@ export class XmlZip {
     }
 
     // Put all extra files into zip.
-    allExtraToZip(): void {
+    async allExtraToZip(): Promise<void> {
         for (const fileName in this.extraFiles) {
-            this.zip.file(fileName, this.extraFiles[fileName])
+            let contents = this.extraFiles[fileName]
+            // JSZip 3.x cannot consume a Node.js Blob, so convert Blobs to
+            // ArrayBuffers before adding them. Browser Blobs work with
+            // ArrayBuffer as well, so this is safe everywhere.
+            if (contents instanceof Blob) {
+                contents = await contents.arrayBuffer()
+            }
+            this.zip.file(fileName, contents)
         }
     }
 
@@ -111,9 +118,9 @@ export class XmlZip {
         this.zip.file(filePath, string)
     }
 
-    prepareBlob(): Promise<Blob> {
+    async prepareBlob(): Promise<Blob> {
         this.allXMLToZip()
-        this.allExtraToZip()
+        await this.allExtraToZip()
 
         return this.zip.generateAsync({type: "blob", mimeType: this.mimeType})
     }

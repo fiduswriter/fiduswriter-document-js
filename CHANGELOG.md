@@ -7,6 +7,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.2.5] — 2026-07-03
+
+### Fixed
+
+- **DOCX/ODT image export in Node.js** — `XmlZip` now converts `Blob` extras to
+  `ArrayBuffer` before handing them to JSZip, because JSZip 3.x cannot consume
+  Node.js `Blob` objects.
+- **Image filename generation** — `file_type` values stored as full MIME types
+  (e.g. `image/png`) are now normalized to file extensions, preventing filenames
+  such as `image-91.image/png` in exported DOCX/ODT archives.
+
+---
+
 ## [0.1.0] — 2026-06-28
 
 First stable release. Consolidates the document schema, all importers, and all

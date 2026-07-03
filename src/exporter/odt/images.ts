@@ -15,6 +15,13 @@ interface ImageInfo {
     svg: string | null
 }
 
+function getImageExtension(fileType: string | undefined, blobType: string): string {
+    if (fileType) {
+        return fileType.includes("/") ? fileType.split("/").pop() || "bin" : fileType
+    }
+    return blobType.split("/")[1] || "bin"
+}
+
 export class ODTExporterImages {
     docContent: FidusNode
     xml: XmlZip
@@ -97,7 +104,7 @@ export class ODTExporterImages {
                               .then(response => response.blob())
                 const imageFilename =
                     imageValue instanceof Blob
-                        ? `image-${String(image)}.${(imgDBEntry.file_type as string | undefined) || (imageValue.type.split("/")[1] ?? "bin")}`
+                        ? `image-${String(image)}.${getImageExtension(imgDBEntry.file_type as string | undefined, imageValue.type)}`
                         : (imageValue as string).split("/").pop()!
                 p.push(
                     imagePromise.then(async blob => {
