@@ -146,5 +146,8 @@ describe("DOCX round-trip", () => {
         expect(documentXml).toBeDefined()
         expect(documentXml).toContain("<w:document")
         expect(documentXml).toContain("</w:document>")
+        expect(documentXml).toContain(
+            'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+        )
     })
 })

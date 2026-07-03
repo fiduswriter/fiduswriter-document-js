@@ -39,6 +39,12 @@ export class DOCXExporterRender {
                 // Ensure we support the three latest docx feature sets:
                 // wp14 (drawing 2010), w14 (word 2010), w15 (word 2012)
                 const documentEl = this.text.query("w:document")
+                if (!documentEl!.getAttribute("xmlns:wp")) {
+                    documentEl!.setAttribute(
+                        "xmlns:wp",
+                        "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                    )
+                }
                 if (!documentEl!.getAttribute("xmlns:wp14")) {
                     documentEl!.setAttribute(
                         "xmlns:wp14",

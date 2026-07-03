@@ -7,6 +7,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.2.6] — 2026-07-03
+
+### Fixed
+
+- **Missing `xmlns:wp` namespace in exported DOCX** — `DOCXExporterRender` now
+  adds the `wp` (Wordprocessing Drawing) namespace declaration to the root
+  `<w:document>` element when it is absent. This prevents LibreOffice and other
+  consumers from rejecting DOCX files that contain images or other drawing
+  elements.
+
+---
+
 ## [0.2.5] — 2026-07-03
 
 ### Fixed
