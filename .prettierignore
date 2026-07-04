@@ -8,3 +8,5 @@ jest.config.js
 scripts/
 package-lock.json
 package.json
+.mathlive_bundle_cache.json
+static-libs/
