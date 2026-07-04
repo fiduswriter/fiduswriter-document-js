@@ -794,7 +794,7 @@ export class ODTExporterRichtext {
                 const objectNumber = this.math.addMath(latex)
                 const styleId = this.styles.getGraphicStyleId("Formula")
                 content += `<draw:frame draw:style-name="${styleId}" draw:name="Object${objectNumber}" text:anchor-type="as-char" draw:z-index="${this.zIndex++}">
-                        <draw:object xlink:href="./Object ${objectNumber}.js" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>
+                        <draw:object xlink:href="./Object ${objectNumber}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>
                         <svg:desc>formula</svg:desc>
                     </draw:frame>`
                 break
