@@ -1,5 +1,15 @@
-import {createHash} from "node:crypto"
-import {mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from "node:fs"
+import {
+    createHash
+} from "node:crypto"
+import {
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    statSync,
+    utimesSync,
+    writeFileSync
+} from "node:fs"
 import {dirname, join, relative} from "node:path"
 import {fileURLToPath} from "node:url"
 import JSZip from "jszip"
@@ -87,6 +97,12 @@ function cleanDirectory(dir: string): void {
     mkdirSync(dir, {recursive: true})
 }
 
+function copyFileWithTimestamp(src: string, dest: string): void {
+    writeFileSync(dest, readFileSync(src))
+    const stats = statSync(src)
+    utimesSync(dest, stats.atime, stats.mtime)
+}
+
 function generateOpfEntries(filePaths: FilePathEntry[]): string {
     let opfText =
         "// This file is auto-generated. CHANGES WILL BE OVERWRITTEN! " +
@@ -109,25 +125,32 @@ async function createBundle(): Promise<void> {
     // Copy and rewrite CSS font paths
     const css = readFileSync(CSS_SRC, "utf-8")
     writeFileSync(CSS_OUT_FILE, css.replace(/url\(fonts\//g, "url(media/"))
+    const cssStats = statSync(CSS_SRC)
+    utimesSync(CSS_OUT_FILE, cssStats.atime, cssStats.mtime)
 
     // Copy font files
-    for (const filename of readdirSync(FONTS_SRC_DIR)) {
+    for (const filename of readdirSync(FONTS_SRC_DIR).sort()) {
         if (filename.startsWith(".")) {
             continue
         }
         const src = join(FONTS_SRC_DIR, filename)
-        writeFileSync(join(FONTS_OUT_DIR, filename), readFileSync(src))
+        copyFileWithTimestamp(src, join(FONTS_OUT_DIR, filename))
     }
 
     // Create zip
     const zip = new JSZip()
     const filePaths: FilePathEntry[] = []
+    const cssMtime = cssStats.mtime
+    // Explicitly create the media directory with a stable timestamp so JSZip
+    // does not fall back to the current time for the implicit folder entry.
+    zip.file("media/", null, {dir: true, date: cssMtime})
     const addToZip = (fullPath: string, zipPath: string) => {
-        zip.file(zipPath, readFileSync(fullPath))
+        const stats = statSync(fullPath)
+        zip.file(zipPath, readFileSync(fullPath), {date: stats.mtime})
         filePaths.push({path: zipPath, mimetype: getMimeType(zipPath)})
     }
     addToZip(CSS_OUT_FILE, "mathlive.css")
-    for (const filename of readdirSync(FONTS_OUT_DIR)) {
+    for (const filename of readdirSync(FONTS_OUT_DIR).sort()) {
         if (filename.startsWith(".")) {
             continue
         }
