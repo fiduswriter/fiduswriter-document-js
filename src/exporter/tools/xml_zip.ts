@@ -1,6 +1,6 @@
 import {get} from "fwtoolkit"
 
-import {xmlDOM, XMLElement} from "./xml.js"
+import {validateXml, xmlDOM, XMLElement} from "./xml.js"
 
 // Handle a zip file containing XML files. Make sure files are only opened once,
 // and provide a mechanism to save the file.
@@ -115,6 +115,7 @@ export class XmlZip {
     // Put the xml identified by filePath into zip.
     xmlToZip(filePath: string): void {
         const string = this.docs[filePath].toString()
+        validateXml(string)
         this.zip.file(filePath, string)
     }
 

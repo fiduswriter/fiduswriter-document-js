@@ -1,4 +1,4 @@
-import {XMLBuilder, XMLParser} from "fast-xml-parser"
+import {XMLBuilder, XMLParser, XMLValidator} from "fast-xml-parser"
 
 const fastXMLParserOptions = {
     attributeNamePrefix: "",
@@ -577,4 +577,74 @@ export const xmlDOM = (xmlString: string): XMLElement => {
             : ({"#document": xmlStructure} as XMLNode)
     // Recursively wrap each node in XMLElement
     return new XMLElement(node)
+}
+
+function validateXmlNamespaces(
+    nodes: unknown[],
+    parentNamespaceMap: Map<string, string>
+): void {
+    for (const node of nodes) {
+        if (typeof node !== "object" || node === null) {
+            continue
+        }
+        const nodeRecord = node as Record<string, unknown>
+        const tagNames = Object.keys(nodeRecord).filter(key => key !== ":@")
+        const attributes = (nodeRecord[":@"] as Record<string, unknown>) || {}
+        const namespaceMap = new Map(parentNamespaceMap)
+        for (const attrName of Object.keys(attributes)) {
+            if (attrName.startsWith("xmlns:")) {
+                namespaceMap.set(attrName.slice(6), String(attributes[attrName]))
+            } else if (attrName === "xmlns") {
+                namespaceMap.set("", String(attributes[attrName]))
+            }
+        }
+        for (const tagName of tagNames) {
+            if (["#text", "__cdata", "#comment"].includes(tagName)) {
+                continue
+            }
+            checkXmlNamespacePrefix(tagName, namespaceMap)
+        }
+        for (const attrName of Object.keys(attributes)) {
+            if (!attrName.startsWith("xmlns") && attrName !== "xmlns") {
+                checkXmlNamespacePrefix(attrName, namespaceMap)
+            }
+        }
+        for (const tagName of tagNames) {
+            if (["#text", "__cdata", "#comment"].includes(tagName)) {
+                continue
+            }
+            const children = nodeRecord[tagName]
+            if (Array.isArray(children)) {
+                validateXmlNamespaces(children, namespaceMap)
+            }
+        }
+    }
+}
+
+function checkXmlNamespacePrefix(
+    name: string,
+    namespaceMap: Map<string, string>
+): void {
+    const colonIndex = name.indexOf(":")
+    if (colonIndex === -1) {
+        return
+    }
+    const prefix = name.slice(0, colonIndex)
+    if (prefix === "xml" || prefix === "xmlns") {
+        return
+    }
+    if (!namespaceMap.has(prefix)) {
+        throw new Error(`Namespace prefix "${prefix}" is not declared (${name})`)
+    }
+}
+
+export function validateXml(xmlString: string): void {
+    const wellFormed = XMLValidator.validate(xmlString)
+    if (wellFormed !== true) {
+        const err = wellFormed as {err: {msg?: string; code?: string}}
+        throw new Error(`Invalid XML: ${err.err.msg || err.err.code}`)
+    }
+    const parser = new XMLParser(fastXMLParserOptions)
+    const xmlStructure = parser.parse(xmlString) as unknown[]
+    validateXmlNamespaces(xmlStructure, new Map())
 }
