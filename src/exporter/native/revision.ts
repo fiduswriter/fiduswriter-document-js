@@ -8,6 +8,7 @@ import type {
     TemplateFiles,
     UploadRevision
 } from "../../types.js"
+import type {ProgressCallback} from "./shrink.js"
 
 export class SaveRevision {
     doc: ExportDoc
@@ -21,6 +22,7 @@ export class SaveRevision {
         token: string | boolean
     ) => Promise<TemplateFiles>
     onError?: (error: unknown) => void
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -35,6 +37,7 @@ export class SaveRevision {
                 token: string | boolean
             ) => Promise<TemplateFiles>
             onError?: (error: unknown) => void
+            progressCallback?: ProgressCallback
         } = {}
     ) {
         this.doc = doc
@@ -45,10 +48,17 @@ export class SaveRevision {
         this.token = options.token ?? false
         this.getTemplateFiles = options.getTemplateFiles
         this.onError = options.onError
+        this.progressCallback = options.progressCallback
     }
 
     init(): Promise<unknown> {
-        const shrinker = new ShrinkFidus(this.doc as any, this.imageDB, this.bibDB)
+        this.progressCallback?.(gettext("Saving revision..."), 0)
+        const shrinker = new ShrinkFidus(
+            this.doc as any,
+            this.imageDB,
+            this.bibDB,
+            this.progressCallback
+        )
 
         return shrinker
             .init()
@@ -65,7 +75,14 @@ export class SaveRevision {
                 )
                 return zipper.init()
             })
-            .then(blob => this.uploadRevision(blob, this.doc as any))
+            .then(blob => {
+                this.progressCallback?.(gettext("Uploading revision..."), 95)
+                return this.uploadRevision(blob, this.doc as any)
+            })
+            .then(result => {
+                this.progressCallback?.(gettext("Revision saved."), 100)
+                return result
+            })
             .catch(error => {
                 if (this.onError) {
                     this.onError(error)

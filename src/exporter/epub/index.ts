@@ -1,5 +1,6 @@
 import {HTMLExporter} from "../html/index.js"
 import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {formatHtml, formatXml} from "../tools/format.js"
 
 import {
@@ -19,6 +20,7 @@ export class EpubExporter extends HTMLExporter {
     documentFileName: string
     lang: string
     shortLang: string
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -30,12 +32,14 @@ export class EpubExporter extends HTMLExporter {
             slug: string
             contents: string
             documentstylefile_set: Array<[string, string]>
-        }>
+        }>,
+        progressCallback?: ProgressCallback
     ) {
         super(doc, bibDB, imageDB, csl, updated, documentStyles, {
             xhtml: true,
             epub: true
         })
+        this.progressCallback = progressCallback
         // Overriden properties
         this.documentFileName = "document.xhtml"
         this.contentFileName = "document.xhtml"

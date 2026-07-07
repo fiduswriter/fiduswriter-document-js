@@ -1,8 +1,9 @@
 import download from "downloadjs"
 
-import {shortFileTitle} from "fwtoolkit"
+import {gettext, shortFileTitle} from "fwtoolkit"
 import {formatXml} from "../tools/format.js"
 import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
 import {JATSExporterConverter} from "./convert.js"
@@ -30,6 +31,7 @@ export class JATSExporter {
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
     converter: any
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -37,7 +39,8 @@ export class JATSExporter {
         imageDB: ImageDB,
         csl: CSL,
         updated: any,
-        type: string
+        type: string,
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
@@ -46,6 +49,7 @@ export class JATSExporter {
         this.csl = csl
         this.updated = updated
         this.type = type // "article", "book-part-wrapper" (for documents) or "book" (for document collections)
+        this.progressCallback = progressCallback
 
         this.zipFileName = false
         this.textFiles = []
@@ -53,6 +57,7 @@ export class JATSExporter {
     }
 
     async init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to JATS..."), 0)
         const fileFormat = this.type === "article" ? "jats" : "bits"
         this.zipFileName = `${createSlug(this.docTitle)}.${fileFormat}.zip`
         this.converter = new JATSExporterConverter(
@@ -73,6 +78,7 @@ export class JATSExporter {
             back: string
             imageIds: string[]
         } = await this.converter.init()
+        this.progressCallback?.(gettext("Assembling JATS archive..."), 70)
         const jats =
             this.type === "article"
                 ? articleTemplate({front, body, back})
@@ -124,7 +130,9 @@ export class JATSExporter {
             })
         })
 
-        return this.createZip()
+        const downloadResult = await this.createZip()
+        this.progressCallback?.(gettext("Export to JATS complete."), 100)
+        return downloadResult
     }
 
     createZip(): Promise<void> {

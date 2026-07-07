@@ -11,12 +11,14 @@ import type {
     SaveCopyE2EE,
     User
 } from "../../types.js"
+import type {ProgressCallback} from "./shrink.js"
 
 interface SaveCopyOptions {
     importId?: string | number | null
     e2eeOptions?: E2EEOptions | null
     e2ee?: SaveCopyE2EE
     importDocument: ImportDocument
+    progressCallback?: ProgressCallback
 }
 
 export class SaveCopy {
@@ -28,6 +30,7 @@ export class SaveCopy {
     e2eeOptions: E2EEOptions | null
     e2ee?: SaveCopyE2EE
     importDocument: ImportDocument
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: Record<string, unknown>,
@@ -44,6 +47,7 @@ export class SaveCopy {
         this.e2eeOptions = options.e2eeOptions ?? null
         this.e2ee = options.e2ee
         this.importDocument = options.importDocument
+        this.progressCallback = options.progressCallback
     }
 
     private _requestedPath(): string {
@@ -55,6 +59,7 @@ export class SaveCopy {
     }
 
     init(): Promise<{doc: Record<string, unknown>; docInfo: Record<string, unknown>}> {
+        this.progressCallback?.(gettext("Creating copy..."), 0)
         let shrinkerPromise: Promise<{
             doc: Record<string, unknown>
             shrunkImageDB: Record<string, Record<string, unknown>>
@@ -66,16 +71,23 @@ export class SaveCopy {
                 const shrinker = new ShrinkFidus(
                     decryptedDoc as any,
                     this.imageDB,
-                    this.bibDB
+                    this.bibDB,
+                    this.progressCallback
                 )
                 return shrinker.init()
             })
         } else {
-            const shrinker = new ShrinkFidus(this.doc as any, this.imageDB, this.bibDB)
+            const shrinker = new ShrinkFidus(
+                this.doc as any,
+                this.imageDB,
+                this.bibDB,
+                this.progressCallback
+            )
             shrinkerPromise = shrinker.init()
         }
         return shrinkerPromise
             .then(({doc, shrunkImageDB, shrunkBibDB, httpIncludes}) => {
+                this.progressCallback?.(gettext("Importing copy..."), 80)
                 let targetE2EEPromise: Promise<{
                     doc: Record<string, unknown>
                     e2eeOptions: E2EEOptions | null
@@ -106,7 +118,13 @@ export class SaveCopy {
                                 requestedPath: this._requestedPath(),
                                 e2eeOptions: importerE2EEOptions
                             }
-                        )
+                        ).then(result => {
+                            this.progressCallback?.(
+                                gettext("Copy created."),
+                                100
+                            )
+                            return result
+                        })
                     }
                 )
             })

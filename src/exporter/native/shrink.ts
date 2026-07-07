@@ -1,9 +1,14 @@
-import {addAlert, gettext} from "fwtoolkit"
+import {gettext} from "fwtoolkit"
 
 import {docSchema} from "../../schema/document/index.js"
 import {toMiniJSON} from "../../schema/mini_json.js"
 import type {BibDB, FidusNode, ImageDB} from "../../types.js"
 import {getImageExtension} from "../tools/file.js"
+
+export type ProgressCallback = (
+    message: string,
+    percentage?: number | null
+) => void
 
 interface ShrinkDoc {
     content: FidusNode
@@ -22,7 +27,7 @@ export class ShrinkFidus {
     doc: ShrinkDoc
     imageDB: ImageDB
     bibDB: BibDB
-    silent: boolean
+    progressCallback?: ProgressCallback
     imageList: (number | string)[]
     citeList: (number | string)[]
 
@@ -30,16 +35,20 @@ export class ShrinkFidus {
      * @param doc      - Full document object.
      * @param imageDB  - Image database wrapper, e.g. {db: {...}}.
      * @param bibDB    - Bibliography database wrapper, e.g. {db: {...}}.
-     * @param silent   - When true, suppresses the
-     *   "File export has been initiated" info alert.  Pass true when
-     *   shrinking multiple documents in a loop (e.g. one per book chapter)
-     *   and the caller already shows its own progress notification.
+     * @param progressCallback - Optional callback to report export progress.
+     *   When provided, the caller (usually the main Fidus Writer app) can show
+     *   a progress indicator. The CLI and other non-UI callers should omit it.
      */
-    constructor(doc: ShrinkDoc, imageDB: ImageDB, bibDB: BibDB, silent = false) {
+    constructor(
+        doc: ShrinkDoc,
+        imageDB: ImageDB,
+        bibDB: BibDB,
+        progressCallback?: ProgressCallback
+    ) {
         this.doc = doc
         this.imageDB = imageDB
         this.bibDB = bibDB
-        this.silent = silent
+        this.progressCallback = progressCallback
         this.imageList = []
         this.citeList = []
     }
@@ -48,13 +57,16 @@ export class ShrinkFidus {
         const shrunkImageDB: Record<string, Record<string, unknown>> = {},
             httpIncludes: Array<{url: string; filename: string; blob?: Blob}> = []
 
-        if (!this.silent) {
-            addAlert("info", gettext("File export has been initiated."))
-        }
+        this.progressCallback?.(gettext("Preparing document..."), 10)
 
         this.walkTree(this.doc.content)
 
         this.imageList = [...new Set(this.imageList)] // unique values
+
+        this.progressCallback?.(
+            gettext("Collecting images and bibliography..."),
+            40
+        )
 
         this.imageList.forEach(itemId => {
             const key = String(itemId)
@@ -137,6 +149,8 @@ export class ShrinkFidus {
             delete shrunkBibDB[key].cats
         })
 
+        this.progressCallback?.(gettext("Serializing document..."), 70)
+
         const docCopy = Object.assign({}, this.doc)
 
         // Remove items that aren't needed.
@@ -153,6 +167,8 @@ export class ShrinkFidus {
         docCopy.content = toMiniJSON(
             docSchema.nodeFromJSON(docCopy.content as unknown as Record<string, unknown>)
         ) as unknown as FidusNode
+
+        this.progressCallback?.(gettext("Done preparing document."), 90)
 
         return new Promise(resolve =>
             resolve({

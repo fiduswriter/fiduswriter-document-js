@@ -1,5 +1,5 @@
 import {printHTML} from "@vivliostyle/print"
-import {addAlert, shortFileTitle, gettext, staticUrl} from "fwtoolkit"
+import {shortFileTitle, gettext, staticUrl} from "fwtoolkit"
 
 import {PAPER_SIZES} from "../../schema/const.js"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
@@ -7,7 +7,14 @@ import {HTMLExporter} from "../html/index.js"
 import {HTMLExporterConvert} from "../html/convert.js"
 import {removeHidden} from "../tools/doc_content.js"
 
+export type ProgressCallback = (
+    message: string,
+    percentage?: number | null
+) => void
+
 export class PrintExporter extends HTMLExporter {
+    progressCallback?: ProgressCallback
+
     constructor(
         doc: ExportDoc,
         bibDB: BibDB,
@@ -18,17 +25,19 @@ export class PrintExporter extends HTMLExporter {
             slug: string
             contents: string
             documentstylefile_set: Array<[string, string]>
-        }>
+        }>,
+        progressCallback?: ProgressCallback
     ) {
         super(doc, bibDB, imageDB, csl, updated, documentStyles, {
             relativeUrls: false
         })
+        this.progressCallback = progressCallback
     }
 
     async init(): Promise<void> {
-        addAlert(
-            "info",
-            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Printing has been initiated.")}`
+        this.progressCallback?.(
+            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Printing has been initiated.")}`,
+            0
         )
         this.docContent = removeHidden(this.doc.content) as FidusNode
 
@@ -138,6 +147,11 @@ export class PrintExporter extends HTMLExporter {
 
         const {html, metaData} = await this.converter.init()
 
+        this.progressCallback?.(
+            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Preparing print view...")}`,
+            50
+        )
+
         const config: {title?: string; printCallback?: (iframeWin: Window) => void} = {
             title: metaData.title
         }
@@ -164,6 +178,10 @@ export class PrintExporter extends HTMLExporter {
             }
         }
         await printHTML(html, config)
+        this.progressCallback?.(
+            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Printing complete.")}`,
+            100
+        )
     }
 
     getDocStyle(doc: ExportDoc): {contents: string; filename: string} | false {
