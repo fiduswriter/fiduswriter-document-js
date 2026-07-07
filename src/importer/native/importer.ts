@@ -132,10 +132,11 @@ export class NativeImporter {
                 this.e2eeOptions,
                 files
             )
-            .then(({id, path, e2ee}) => {
+            .then(({id, path, e2ee, template}) => {
                 this.docId = id
                 this.path = path
                 this.doc.e2ee = e2ee || false
+                this.doc.template = template
             })
     }
 

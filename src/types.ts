@@ -262,7 +262,7 @@ export interface NativeImporterBackend {
         requestedPath: string,
         e2eeOptions: E2EEOptions | null,
         files: Record<string, File[]>
-    ) => Promise<{id: number; path: string; e2ee?: boolean}>
+    ) => Promise<{id: number; path: string; e2ee?: boolean; template?: string}>
     saveImages: (
         images: ImageDB,
         docId: number,
