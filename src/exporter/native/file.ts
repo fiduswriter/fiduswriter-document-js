@@ -1,11 +1,16 @@
 import download from "downloadjs"
-import {shortFileTitle} from "fwtoolkit"
+import {shortFileTitle, gettext} from "fwtoolkit"
 
 import {ShrinkFidus} from "./shrink.js"
 import {createSlug} from "../tools/file.js"
 import {ZipFidus} from "./zip.js"
 
 import type {BibDB, ExportDoc, ImageDB, TemplateFiles} from "../../types.js"
+
+export type ProgressCallback = (
+    message: string,
+    percentage?: number | null
+) => void
 
 export class ExportFidusFile {
     doc: ExportDoc
@@ -17,7 +22,7 @@ export class ExportFidusFile {
         docId: string | number,
         token: string | boolean
     ) => Promise<TemplateFiles>
-    silent: boolean
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -29,7 +34,7 @@ export class ExportFidusFile {
             docId: string | number,
             token: string | boolean
         ) => Promise<TemplateFiles>,
-        silent = false
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.bibDB = bibDB
@@ -37,12 +42,21 @@ export class ExportFidusFile {
         this.includeTemplate = includeTemplate
         this.token = token
         this.getTemplateFiles = getTemplateFiles
-        this.silent = silent
+        this.progressCallback = progressCallback
         return this.init() as unknown as ExportFidusFile
     }
 
     init(): Promise<Blob> {
-        const shrinker = new ShrinkFidus(this.doc as any, this.imageDB, this.bibDB, this.silent)
+        this.progressCallback?.(
+            gettext("File export has been initiated."),
+            0
+        )
+        const shrinker = new ShrinkFidus(
+            this.doc as any,
+            this.imageDB,
+            this.bibDB,
+            this.progressCallback
+        )
         return shrinker
             .init()
             .then(({doc, shrunkImageDB, shrunkBibDB, httpIncludes}) => {
@@ -59,6 +73,7 @@ export class ExportFidusFile {
                 return zipper.init()
             })
             .then(blob => {
+                this.progressCallback?.(gettext("Export complete."), 100)
                 this.download(blob)
                 return blob
             })

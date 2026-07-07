@@ -77,7 +77,7 @@ const bibDB = {
 
 describe("Native Fidus format shrink/export", () => {
     it("Shrinks a full native doc, imageDB and bibDB", async () => {
-        const shrinker = new ShrinkFidus(fullDoc, imageDB, bibDB, true)
+        const shrinker = new ShrinkFidus(fullDoc, imageDB, bibDB)
         const result = await shrinker.init()
 
         expect(result.doc.id).toBeUndefined()

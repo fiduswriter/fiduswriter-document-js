@@ -1,8 +1,9 @@
 import {BibLatexExporter} from "biblatex-csl-converter"
 import download from "downloadjs"
 
-import {shortFileTitle} from "fwtoolkit"
+import {gettext, shortFileTitle} from "fwtoolkit"
 import type {BibDB, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
@@ -26,13 +27,15 @@ export class LatexExporter {
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
     conversion: any
+    progressCallback?: ProgressCallback
 
-    constructor(doc: ExportDoc, bibDB: BibDB, imageDB: ImageDB, updated: any) {
+    constructor(doc: ExportDoc, bibDB: BibDB, imageDB: ImageDB, updated: any, progressCallback?: ProgressCallback) {
         this.doc = doc
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.bibDB = bibDB
         this.imageDB = imageDB
         this.updated = updated
+        this.progressCallback = progressCallback
 
         this.docContent = false
         this.zipFileName = false
@@ -41,6 +44,7 @@ export class LatexExporter {
     }
 
     init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to LaTeX..."), 0)
         this.zipFileName = `${createSlug(this.docTitle)}.latex.zip`
         this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
         const converter = new LatexExporterConvert(
@@ -50,6 +54,7 @@ export class LatexExporter {
             this.doc.settings
         )
         this.conversion = converter.init(this.docContent)
+        this.progressCallback?.(gettext("Preparing LaTeX files..."), 50)
         if (Object.keys(this.conversion.usedBibDB).length > 0) {
             const bibExport = new BibLatexExporter(this.conversion.usedBibDB)
             this.textFiles.push({
@@ -82,7 +87,10 @@ export class LatexExporter {
                 })
             }
         })
-        return this.createZip()
+        return this.createZip().then(downloadResult => {
+            this.progressCallback?.(gettext("Export to LaTeX complete."), 100)
+            return downloadResult
+        })
     }
 
     createZip(): Promise<void> {

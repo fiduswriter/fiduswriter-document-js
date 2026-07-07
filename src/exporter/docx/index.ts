@@ -1,7 +1,8 @@
 import download from "downloadjs"
 
-import {shortFileTitle} from "fwtoolkit"
+import {gettext, shortFileTitle} from "fwtoolkit"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden, textContent} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
 import type {XmlZip} from "../tools/xml_zip.js"
@@ -41,6 +42,7 @@ export class DOCXExporter {
     docTitle: string
     mimeType: string
     docContent: any
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -48,7 +50,8 @@ export class DOCXExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        templateBlob?: Blob
+        templateBlob?: Blob,
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.templateUrl = templateUrl
@@ -56,6 +59,7 @@ export class DOCXExporter {
         this.imageDB = imageDB
         this.csl = csl
         this.templateBlob = templateBlob
+        this.progressCallback = progressCallback
 
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.mimeType =
@@ -66,6 +70,7 @@ export class DOCXExporter {
     }
 
     init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to DOCX..."), 0)
         const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType, this.templateBlob)
 
         const tables = new DOCXExporterTables(xml)
@@ -136,7 +141,10 @@ export class DOCXExporter {
             .then(() => math.init())
             .then(() => render.init())
             .then(() => rels.init())
-            .then(() => images.init())
+            .then(() => {
+                this.progressCallback?.(gettext("Rendering document..."), 50)
+                return images.init()
+            })
             .then(() => comments.init())
             .then(() => lists.init())
             .then(() => footnotes.init())
@@ -151,7 +159,10 @@ export class DOCXExporter {
                 )
                 return xml.prepareBlob()
             })
-            .then(blob => this.download(blob))
+            .then(blob => {
+                this.progressCallback?.(gettext("Export to DOCX complete."), 100)
+                return this.download(blob)
+            })
     }
 
     download(blob: Blob): void | Promise<void> {

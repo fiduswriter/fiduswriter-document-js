@@ -1,8 +1,9 @@
 import {BibLatexExporter} from "biblatex-csl-converter"
 import download from "downloadjs"
 
-import {shortFileTitle} from "fwtoolkit"
+import {gettext, shortFileTitle} from "fwtoolkit"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "../tools/zip.js"
@@ -27,13 +28,15 @@ export class PandocExporter {
     textFiles: Array<{filename: string; contents: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
     citations!: PandocExporterCitations
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: any
+        updated: any,
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
@@ -41,6 +44,7 @@ export class PandocExporter {
         this.imageDB = imageDB
         this.csl = csl
         this.updated = updated
+        this.progressCallback = progressCallback
 
         this.docContent = false
         this.zipFileName = ""
@@ -49,6 +53,7 @@ export class PandocExporter {
     }
 
     init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to Pandoc..."), 0)
         //this.docContent = removeHidden(this.doc.content) //
         this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
         const citations = new PandocExporterCitations(
@@ -65,6 +70,7 @@ export class PandocExporter {
             this.doc.settings
         )
         return citations.init().then(() => {
+            this.progressCallback?.(gettext("Converting document..."), 40)
             this.conversion = converter.init(this.docContent)
             if (Object.keys(this.conversion.usedBibDB).length > 0) {
                 const bibExport = new BibLatexExporter(
@@ -111,7 +117,11 @@ export class PandocExporter {
         })
         this.textFiles.push({filename: "README.txt", contents: readMe})
         this.zipFileName = `${createSlug(this.docTitle)}.pandoc.json.zip`
-        return this.createDownload()
+        this.progressCallback?.(gettext("Creating Pandoc archive..."), 90)
+        return this.createDownload().then(downloadResult => {
+            this.progressCallback?.(gettext("Export to Pandoc complete."), 100)
+            return downloadResult
+        })
     }
 
     createDownload(): Promise<void> {

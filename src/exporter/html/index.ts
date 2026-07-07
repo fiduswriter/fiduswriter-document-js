@@ -1,11 +1,12 @@
 import download from "downloadjs"
 
-import {shortFileTitle, staticUrl} from "fwtoolkit"
+import {gettext, shortFileTitle, staticUrl} from "fwtoolkit"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import {formatHtml} from "../tools/format.js"
 import {removeHidden} from "../tools/doc_content.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator, type ZipTextFile} from "../tools/zip.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {HTMLExporterConvert} from "./convert.js"
 import {htmlExportTemplate} from "./templates.js"
 
@@ -38,6 +39,7 @@ export class HTMLExporter {
     fileEnding: string
     mimeType: string
     styleSheets: Array<{url?: string; filename?: string; contents?: string}>
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -51,7 +53,8 @@ export class HTMLExporter {
             documentstylefile_set: Array<[string, string]>
         }>,
         converterOptions: Record<string, unknown> = {},
-        template: typeof htmlExportTemplate = htmlExportTemplate
+        template: typeof htmlExportTemplate = htmlExportTemplate,
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.bibDB = bibDB
@@ -60,6 +63,7 @@ export class HTMLExporter {
         this.updated = updated
         this.documentStyles = documentStyles
         this.converterOptions = converterOptions
+        this.progressCallback = progressCallback
 
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
 
@@ -84,8 +88,12 @@ export class HTMLExporter {
     }
 
     async init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to HTML..."), 0)
         await this.process()
-        return await this.createZip()
+        this.progressCallback?.(gettext("Creating HTML zip file..."), 90)
+        const downloadResult = await this.createZip()
+        this.progressCallback?.(gettext("Export to HTML complete."), 100)
+        return downloadResult
     }
 
     async process(): Promise<void> {

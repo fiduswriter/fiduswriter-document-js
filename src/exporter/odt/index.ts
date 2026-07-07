@@ -1,7 +1,8 @@
 import download from "downloadjs"
 
-import {shortFileTitle} from "fwtoolkit"
+import {gettext, shortFileTitle} from "fwtoolkit"
 import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden, textContent} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
 import type {XmlZip} from "../tools/xml_zip.js"
@@ -38,6 +39,7 @@ export class ODTExporter {
     docContent: any
     docTitle: string
     mimeType: string
+    progressCallback?: ProgressCallback
 
     constructor(
         doc: ExportDoc,
@@ -45,7 +47,8 @@ export class ODTExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        templateBlob?: Blob
+        templateBlob?: Blob,
+        progressCallback?: ProgressCallback
     ) {
         this.doc = doc
         this.templateUrl = templateUrl
@@ -53,6 +56,7 @@ export class ODTExporter {
         this.imageDB = imageDB
         this.csl = csl
         this.templateBlob = templateBlob
+        this.progressCallback = progressCallback
 
         this.pmCits = false
         this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
@@ -61,6 +65,7 @@ export class ODTExporter {
     }
 
     init(): Promise<void> {
+        this.progressCallback?.(gettext("Exporting to ODT..."), 0)
         const xml: XmlZip = new XmlZipImpl(this.templateUrl, this.mimeType, this.templateBlob)
         const styles = new ODTExporterStyles(xml)
         const math = new ODTExporterMath(xml)
@@ -112,7 +117,10 @@ export class ODTExporter {
             .then(() => metadata.init())
             .then(() => citations.init())
             .then(() => render.init())
-            .then(() => images.init())
+            .then(() => {
+                this.progressCallback?.(gettext("Rendering document..."), 50)
+                return images.init()
+            })
             .then(() => footnotes.init())
             .then(() => {
                 const pmBib = footnotes.pmBib || citations.pmBib
@@ -125,7 +133,10 @@ export class ODTExporter {
                 )
                 return xml.prepareBlob()
             })
-            .then(blob => this.download(blob))
+            .then(blob => {
+                this.progressCallback?.(gettext("Export to ODT complete."), 100)
+                return this.download(blob)
+            })
     }
 
     getBaseMetadata(): any {
