@@ -2,7 +2,7 @@ import type {MarkSpec} from "prosemirror-model"
 
 export interface Track {
     type: "insertion" | "deletion" | "block_change"
-    user: number
+    user: number // -1 = large language model, 0 = unknown, positive numbers: user id of human user
     username: string
     date: number
     approved?: boolean
