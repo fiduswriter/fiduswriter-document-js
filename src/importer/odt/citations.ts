@@ -1,4 +1,4 @@
-import {OdtCitationsParser} from "biblatex-csl-converter"
+import {OdtCitationsParser} from "bibliojson"
 
 import {citationResultToNode} from "../citations.js"
 import type {BibDB, FidusNode} from "../../types.js"

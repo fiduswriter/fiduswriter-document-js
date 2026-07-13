@@ -1,6 +1,6 @@
 import {escapeText} from "fwtoolkit"
 
-// CSL-JSON item as produced by biblatex-csl-converter's CSLExporter.
+// CSL-JSON item as produced by bibliojson's CSLExporter.
 interface CSLName {
     family?: string
     given?: string

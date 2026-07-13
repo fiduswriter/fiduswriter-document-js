@@ -1,4 +1,4 @@
-import {CSLExporter} from "biblatex-csl-converter"
+import {CSLExporter} from "bibliojson"
 
 import {FormatCitations} from "../../citations/format.js"
 

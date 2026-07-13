@@ -1,4 +1,4 @@
-// Mock for biblatex-csl-converter
+// Mock for bibliojson
 
 function emptyCheck() {
     return {isCitation: false, isBibliography: false}

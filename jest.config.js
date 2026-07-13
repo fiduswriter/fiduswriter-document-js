@@ -23,7 +23,7 @@ export default {
         "^mathml2omml$": "<rootDir>/test/exporter/mocks/mathml2omml.js",
         "^@vivliostyle/print$": "<rootDir>/test/exporter/mocks/vivliostyle.js",
         "^pretty$": "<rootDir>/test/exporter/mocks/pretty.js",
-        "^biblatex-csl-converter$": "<rootDir>/test/exporter/mocks/biblatex-csl-converter.js",
+        "^bibliojson$": "<rootDir>/test/exporter/mocks/bibliojson.js",
         "^mathml-to-latex$": "<rootDir>/test/importer/mocks/mathml-to-latex.js",
         "^fwtoolkit$": "<rootDir>/test/exporter/mocks/common.js",
         "^fwtoolkit/.*": "<rootDir>/test/exporter/mocks/common.js",

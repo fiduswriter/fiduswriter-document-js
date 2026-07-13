@@ -1,10 +1,10 @@
 /**
  * Helper functions for creating Zotero-compatible citation data.
- * Uses CSLExporter from biblatex-csl-converter to convert Fidus Writer's
+ * Uses CSLExporter from bibliojson to convert Fidus Writer's
  * internal BibLaTeX format to CSL-JSON.
  */
 
-import {CSLExporter} from "biblatex-csl-converter"
+import {CSLExporter} from "bibliojson"
 
 import type {BibDB} from "../../types.js"
 
