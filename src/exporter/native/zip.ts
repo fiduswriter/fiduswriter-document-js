@@ -1,4 +1,4 @@
-import {ZipFileCreator} from "../tools/zip.js"
+import {ZipFileCreator} from "fwtoolkit/file/zip"
 import {FW_DOCUMENT_VERSION} from "../../schema/index.js"
 
 import type {TemplateFiles} from "../../types.js"

@@ -5,7 +5,7 @@ import {formatXml} from "../tools/format.js"
 import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
-import {ZipFileCreator} from "../tools/zip.js"
+import {ZipFileCreator} from "fwtoolkit/file/zip"
 import {JATSExporterConverter} from "./convert.js"
 import {
     articleTemplate,

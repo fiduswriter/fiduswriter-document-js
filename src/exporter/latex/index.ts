@@ -6,7 +6,7 @@ import type {BibDB, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
-import {ZipFileCreator} from "../tools/zip.js"
+import {ZipFileCreator} from "fwtoolkit/file/zip"
 import {LatexExporterConvert} from "./convert.js"
 import {readMe} from "./readme.js"
 

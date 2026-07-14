@@ -1214,7 +1214,7 @@ describe("Exporter tools", () => {
     })
 
     it("ZipFileCreator class exists", async () => {
-        const mod = await import("../../src/exporter/tools/zip.js")
+        const mod = await import("fwtoolkit/file/zip")
         expect(mod.ZipFileCreator).toBeDefined()
     })
 })

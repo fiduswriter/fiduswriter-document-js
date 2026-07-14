@@ -1,6 +1,6 @@
 {
     "name": "@fiduswriter/document",
-    "version": "0.2.17",
+    "version": "0.2.19",
     "description": "Fidus Writer document schema, importers and exporters",
     "repository": {
         "type": "git",
@@ -99,10 +99,6 @@
         "./citations/*": {
             "types": "./dist/citations/*.d.ts",
             "default": "./dist/citations/*.js"
-        },
-        "./bibliography/*": {
-            "types": "./dist/bibliography/*.d.ts",
-            "default": "./dist/bibliography/*.js"
         }
     },
     "directories": {
@@ -132,13 +128,14 @@
         "format:check": "prettier --check ."
     },
     "dependencies": {
+        "@fiduswriter/bibliography-manager": "^0.1.6",
         "@prettier/plugin-xml": "^3.4.2",
         "@vivliostyle/print": "^2.42.0",
         "bibliojson": "^4.0.0",
         "downloadjs": "^1.4.7",
         "fast-deep-equal": "^3.1.3",
         "fast-xml-parser": "^5.9.3",
-        "fwtoolkit": "^0.1.3",
+        "fwtoolkit": "^0.1.9",
         "jszip": "^3.10.1",
         "mathlive": "^0.104.0",
         "mathml-to-latex": "^1.4.3",
