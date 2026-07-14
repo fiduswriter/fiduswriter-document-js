@@ -28,7 +28,7 @@ export default {
         "^@fiduswriter/document/citations/format$": "<rootDir>/test/exporter/mocks/citations-format.js",
         "^@fiduswriter/bibliography-manager/schema/csl_bib$": "<rootDir>/test/exporter/mocks/csl-bib-schema.js",
         "^@fiduswriter/document/mathlive/opf_includes$": "<rootDir>/test/exporter/mocks/empty-module.js",
-        "^fwtoolkit/file/zip$": "<rootDir>/node_modules/fwtoolkit/dist/file/zip.js",
+        "^fwtoolkit/file/zip$": "<rootDir>/test/exporter/mocks/zip.js",
         "^fwtoolkit$": "<rootDir>/test/exporter/mocks/common.js",
         "^fwtoolkit/.*": "<rootDir>/test/exporter/mocks/common.js"
     },

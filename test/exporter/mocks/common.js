@@ -1,3 +1,5 @@
+import JSZip from "jszip"
+
 // Mock for `../../common` and similar paths
 export const escapeText = str => {
     if (typeof str !== "string") {
@@ -67,6 +69,45 @@ export const noSpaceTmp = (strings, ...values) => {
 }
 
 export const longFilePath = (path, filename) => `${path}${filename}`
+
+export class ZipFileCreator {
+    constructor(
+        textFiles = [],
+        binaryFiles = [],
+        zipFiles = [],
+        mimeType = "application/zip",
+        date = new Date()
+    ) {
+        this.textFiles = textFiles
+        this.binaryFiles = binaryFiles
+        this.zipFiles = zipFiles
+        this.mimeType = mimeType
+        this.date = date
+    }
+
+    init() {
+        const zipFs = new JSZip()
+        if (this.mimeType !== "application/zip") {
+            zipFs.file("mimetype", this.mimeType, {compression: "STORE"})
+        }
+        this.textFiles.forEach(textFile => {
+            zipFs.file(textFile.filename, textFile.contents, {
+                compression: "DEFLATE"
+            })
+        })
+        this.binaryFiles.forEach(binaryFile => {
+            zipFs.file(binaryFile.filename, binaryFile.blob || new Blob(), {
+                binary: true,
+                compression: "DEFLATE"
+            })
+        })
+        return zipFs.generateAsync({type: "blob", mimeType: this.mimeType})
+    }
+
+    convertDataURIToBlob(_dataURI) {
+        return new Blob()
+    }
+}
 
 export default {
     escapeText,
