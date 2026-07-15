@@ -822,11 +822,12 @@ export class JATSExporterConverter {
                     node.content?.find(
                         (node: FidusNode) => node.type === "image"
                     )?.attrs?.image || false
-                if (image !== false && typeof image === "string") {
-                    this.imageIds.push(image)
-                    const imageDBEntry = this.imageDB.db[image]
+                if (image !== false) {
+                    const imageId = String(image)
+                    this.imageIds.push(imageId)
+                    const imageDBEntry = this.imageDB.db[imageId]
                     copyright = imageDBEntry.copyright as Copyright | undefined
-                    imageFilename = getImageDBEntryFilename(imageDBEntry, image)
+                    imageFilename = getImageDBEntryFilename(imageDBEntry, imageId)
                 }
                 const caption = getBooleanAttr(node.attrs, "caption")
                     ? node.content?.find(

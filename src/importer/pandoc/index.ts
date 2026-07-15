@@ -120,13 +120,14 @@ export class PandocImporter {
                     return this.output
                 }
                 const firstText =
-                    (convertedDoc.content as FidusNode).content?.[0].content?.[0]
-                        .text
+                    (convertedDoc.content as FidusNode).content?.[0]?.content
+                        ?.[0]?.text
                 if (["Untitled", ""].includes(firstText || "")) {
-                    ;(
-                        (convertedDoc.content as FidusNode).content![0]
-                            .content![0]
-                    ).text = this.title
+                    const firstContentNode = (convertedDoc.content as FidusNode)
+                        .content?.[0]?.content?.[0]
+                    if (firstContentNode) {
+                        firstContentNode.text = this.title
+                    }
                 } else {
                     this.title = firstText || this.title
                 }

@@ -613,7 +613,7 @@ export class DOCXExporterRender {
                     break
                 case "table_part":
                 case "richtext_part":
-                    tag.title = node.attrs?.id as string | undefined
+                    tag.title = `@${node.attrs?.id}`
                     tag.content = node.content
                     break
                 case "contributors_part":
