@@ -1,6 +1,4 @@
-// @ts-nocheck
-/* eslint-disable */
-import type {BibDB, FidusDoc} from "../types.js"
+import type {BibDBEntry, FidusDoc} from "../types.js"
 
 /* To convert to and from how the document is stored in the database to how ProseMirror expects it.
  We use the DOM import for ProseMirror as the JSON we store in the database is really jsonized HTML.
@@ -13,12 +11,77 @@ import {
     randomTableId
 } from "./common/index.js"
 
-export const getSettings = pmDoc => {
-    const settings = JSON.parse(JSON.stringify(pmDoc.attrs))
+/** A node in an older Fidus Writer document representation. */
+interface ConvertNode {
+    type?: string
+    attrs?: Record<string, unknown>
+    content?: ConvertNode[]
+    marks?: ConvertMark[]
+    text?: string
+    [key: string]: unknown
+}
+
+/** A mark in an older Fidus Writer document representation. */
+interface ConvertMark {
+    type: string
+    attrs?: Record<string, unknown>
+    [key: string]: unknown
+}
+
+/** A single answer inside a comment thread. */
+interface CommentAnswer {
+    id?: number | string
+    answerId?: number | string
+    user?: number
+    userName?: string
+    username?: string
+    userAvatar?: string
+    answer: string | ConvertNode[]
+    [key: string]: unknown
+}
+
+/** A comment thread on an older document. */
+interface Comment {
+    id?: number | string
+    user?: number
+    userName?: string
+    username?: string
+    userAvatar?: string
+    "review:isMajor"?: boolean
+    isMajor?: boolean
+    comment: string | ConvertNode[]
+    answers?: CommentAnswer[]
+    assignedUser?: boolean | number
+    assignedUsername?: boolean | string
+    resolved?: boolean
+    [key: string]: unknown
+}
+
+/** The wrapper object passed through the versioned converters. */
+interface ConvertedDoc {
+    type?: string
+    content?: ConvertNode | ConvertNode[]
+    settings?: Record<string, unknown>
+    bibliography?: Record<string, BibDBEntry>
+    comments?: Record<string, Comment>
+    comment?: Record<string, Comment>
+    imageIds?: number[]
+    [key: string]: unknown
+}
+
+export const getSettings = (pmDoc: FidusDoc): Record<string, unknown> => {
+    const settings = JSON.parse(JSON.stringify(pmDoc.attrs!)) as Record<
+        string,
+        unknown
+    >
     return settings
 }
 
-export const updateDoc = (doc, docVersion, bibliography = false) => {
+export const updateDoc = <T>(
+    doc: T,
+    docVersion: number,
+    bibliography: Record<string, BibDBEntry> | false = false
+): T => {
     /* This is to clean documents taking all the accepted formatting from older
        versions and outputting the current version of the doc format.
        Notice that the docVersion isn't the same as the version of the FW export
@@ -31,180 +94,190 @@ export const updateDoc = (doc, docVersion, bibliography = false) => {
        true.
     */
 
+    let returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+
     switch (docVersion) {
         // Import from versions up to 3.0 no longer supported starting with Fidus Writer 3.5
         case 1: // Fidus Writer 3.1 prerelease
-            doc = convertDocV1(doc)
-            doc = convertDocV11(doc)
-            doc = convertDocV12(doc)
-            doc = convertDocV13(doc, bibliography)
-            doc = convertDocV20(doc)
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV1(returnDoc)
+            returnDoc = convertDocV11(returnDoc)
+            returnDoc = convertDocV12(returnDoc)
+            returnDoc = convertDocV13(returnDoc, bibliography)
+            returnDoc = convertDocV20(returnDoc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 1.1: // Fidus Writer 3.1
-            doc = convertDocV11(doc)
-            doc = convertDocV12(doc)
-            doc = convertDocV13(doc, bibliography)
-            doc = convertDocV20(doc)
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV11(returnDoc)
+            returnDoc = convertDocV12(returnDoc)
+            returnDoc = convertDocV13(returnDoc, bibliography)
+            returnDoc = convertDocV20(returnDoc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 1.2: // Fidus Writer 3.2
-            doc = convertDocV12(doc)
-            doc = convertDocV13(doc, bibliography)
-            doc = convertDocV20(doc)
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV12(returnDoc)
+            returnDoc = convertDocV13(returnDoc, bibliography)
+            returnDoc = convertDocV20(returnDoc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 1.3: // Fidus Writer 3.3 prerelease
-            doc = convertDocV13(doc, bibliography)
-            doc = convertDocV20(doc)
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV13(returnDoc, bibliography)
+            returnDoc = convertDocV20(returnDoc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 2.0: // Fidus Writer 3.3
-            doc = convertDocV20(doc)
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV20(returnDoc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 2.1: // Fidus Writer 3.4
-            doc = convertDocV21(doc)
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV21(returnDoc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 2.2: // Fidus Writer 3.5.7
-            doc = convertDocV22(doc)
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV22(returnDoc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 2.3: // Fidus Writer 3.5.10
-            doc = convertDocV23(doc)
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV23(returnDoc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.0: // Fidus Writer 3.6
-            doc = convertDocV30(doc)
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV30(returnDoc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.1: // Fidus Writer 3.7
-            doc = convertDocV31(doc)
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV31(returnDoc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.2: // Fidus Writer 3.8
-            doc = convertDocV32(doc)
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV32(returnDoc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.3: // Fidus Writer 3.9
-            doc = convertDocV33(doc)
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV33(returnDoc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.4: // Fidus Writer 3.10
-            doc = convertDocV34(doc)
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV34(returnDoc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.5: // Fidus Writer 4.0
-            doc = convertDocV35(doc)
+            returnDoc = convertDocV35(returnDoc)
             break
         case 3.6: // Fidus Writer 4.1
             break
     }
-    return doc
+    return returnDoc as T
 }
 
-const convertDocV1 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV1(returnDoc.content)
+const convertDocV1 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV1(returnDoc.content as ConvertNode)
+    }
     return returnDoc
 }
 
-const convertNodeV1 = node => {
-    let prefixes, locators, ids, references
+const convertNodeV1 = (node: ConvertNode): void => {
+    let prefixes: string[], locators: string[], ids: string[], references: ReferenceV1[]
+    const nodeAttrs = node.attrs ?? {}
     switch (node.type) {
-        case "citation":
-            prefixes = node.attrs.bibBefore
-                ? node.attrs.bibBefore.split(",,,")
+        case "citation": {
+            prefixes = nodeAttrs.bibBefore
+                ? String(nodeAttrs.bibBefore).split(",,,")
                 : []
-            locators = node.attrs.bibPage ? node.attrs.bibPage.split(",,,") : []
-            ids = node.attrs.bibEntry ? node.attrs.bibEntry.split(",") : []
+            locators = nodeAttrs.bibPage
+                ? String(nodeAttrs.bibPage).split(",,,")
+                : []
+            ids = nodeAttrs.bibEntry
+                ? String(nodeAttrs.bibEntry).split(",")
+                : []
             references = ids.map((id, index) => {
-                const returnObj = {id: Number.parseInt(id)}
+                const returnObj: ReferenceV1 = {id: Number.parseInt(id)}
                 if (prefixes[index] !== "") {
-                    returnObj["prefix"] = prefixes[index]
+                    returnObj.prefix = prefixes[index]
                 }
                 if (locators[index] !== "") {
-                    returnObj["locator"] = locators[index]
+                    returnObj.locator = locators[index]
                 }
                 return returnObj
             })
             node.attrs = {
-                format: node.attrs.bibFormat,
+                format: nodeAttrs.bibFormat,
                 references
             }
             break
+        }
         case "footnote":
-            if (node.attrs?.footnote) {
-                node.attrs.footnote.forEach(childNode => {
+            if (nodeAttrs.footnote) {
+                ;(nodeAttrs.footnote as ConvertNode[]).forEach(childNode => {
                     convertNodeV1(childNode)
                 })
             }
@@ -217,19 +290,30 @@ const convertNodeV1 = node => {
     }
 }
 
-const convertDocV11 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV11(returnDoc.content)
+interface ReferenceV1 {
+    id: number
+    prefix?: string
+    locator?: string
+}
+
+const convertDocV11 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV11(returnDoc.content as ConvertNode)
+    }
     return returnDoc
 }
 
-const convertNodeV11 = (node, ids = []) => {
-    let blockId
+const convertNodeV11 = (node: ConvertNode, ids: string[] = []): void => {
+    let blockId: string
     switch (node.type) {
         case "heading":
-            blockId = node.attrs.id
+            blockId = node.attrs?.id as string
             while (!blockId || ids.includes(blockId)) {
                 blockId = randomHeadingId()
+            }
+            if (!node.attrs) {
+                node.attrs = {}
             }
             node.attrs.id = blockId
             ids.push(blockId)
@@ -242,19 +326,24 @@ const convertNodeV11 = (node, ids = []) => {
     }
 }
 
-const convertDocV12 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV12(returnDoc.content)
+const convertDocV12 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV12(returnDoc.content as ConvertNode)
+    }
     return returnDoc
 }
 
-const convertNodeV12 = (node, ids = []) => {
-    let blockId
+const convertNodeV12 = (node: ConvertNode, ids: string[] = []): void => {
+    let blockId: string
     switch (node.type) {
         case "figure":
-            blockId = node.attrs.id
+            blockId = node.attrs?.id as string
             while (!blockId || ids.includes(blockId)) {
                 blockId = randomFigureId()
+            }
+            if (!node.attrs) {
+                node.attrs = {}
             }
             node.attrs.id = blockId
             ids.push(blockId)
@@ -267,36 +356,51 @@ const convertNodeV12 = (node, ids = []) => {
     }
 }
 
-const convertDocV13 = (doc, bibliography) => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
+const convertDocV13 = (
+    doc: ConvertedDoc,
+    bibliography: Record<string, BibDBEntry> | false
+): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
     delete returnDoc.settings
     delete returnDoc.metadata
     returnDoc.bibliography = {}
     returnDoc.imageIds = []
-    convertNodeV13(
-        returnDoc.content,
-        returnDoc.bibliography,
-        bibliography,
-        returnDoc.imageIds
-    )
+    const fullBib = bibliography || {}
+    if (returnDoc.content) {
+        convertNodeV13(
+            returnDoc.content as ConvertNode,
+            returnDoc.bibliography,
+            fullBib,
+            returnDoc.imageIds
+        )
+    }
     return returnDoc
 }
 
-const convertNodeV13 = (node, shrunkBib, fullBib, imageIds) => {
-    let authorsText, keywordsText
+const convertNodeV13 = (
+    node: ConvertNode,
+    shrunkBib: Record<string, BibDBEntry>,
+    fullBib: Record<string, BibDBEntry>,
+    imageIds: number[]
+): void => {
+    let authorsText: string, keywordsText: string
+    const nodeAttrs = node.attrs ?? {}
     switch (node.type) {
         case "article":
+            if (!node.attrs) {
+                node.attrs = {}
+            }
             node.attrs.language = "en-US"
             break
-        case "authors":
+        case "authors": {
             authorsText = node.content
                 ? node.content.reduce(
                       (text, item) =>
-                          item.type === "text" ? text + item.text : text,
+                          item.type === "text" ? text + (item.text ?? "") : text,
                       ""
                   )
                 : ""
-            node.content = authorsText
+            const authorNodes = authorsText
                 .split(/[,;]/g)
                 .map(authorString => {
                     const author = authorString.trim()
@@ -317,35 +421,39 @@ const convertNodeV13 = (node, shrunkBib, fullBib, imageIds) => {
                         }
                     }
                 })
-                .filter(authorObj => authorObj)
+                .filter(authorObj => authorObj) as ConvertNode[]
+            node.content = authorNodes
             if (!node.content.length) {
                 delete node.content
             }
             break
+        }
         case "citation":
-            node.attrs.references.forEach(ref => {
-                let item = fullBib[ref.id]
-                if (!item) {
-                    item = {
-                        fields: {title: [{type: "text", text: "Deleted"}]},
-                        bib_type: "misc",
-                        entry_key: "FidusWriter"
+            if (nodeAttrs.references) {
+                ;(nodeAttrs.references as ReferenceV1[]).forEach(ref => {
+                    let item = fullBib[ref.id]
+                    if (!item) {
+                        item = {
+                            fields: {title: [{type: "text", text: "Deleted"}]},
+                            bib_type: "misc",
+                            entry_key: "FidusWriter"
+                        }
                     }
-                }
-                item = Object.assign({}, item)
-                delete item.cats
-                shrunkBib[ref.id] = item
-            })
+                    item = Object.assign({}, item)
+                    delete (item as Record<string, unknown>).cats
+                    shrunkBib[ref.id] = item
+                })
+            }
             break
-        case "keywords":
+        case "keywords": {
             keywordsText = node.content
                 ? node.content.reduce(
                       (text, item) =>
-                          item.type === "text" ? text + item.text : text,
+                          item.type === "text" ? text + (item.text ?? "") : text,
                       ""
                   )
                 : ""
-            node.content = keywordsText
+            const keywordNodes = keywordsText
                 .split(/[,;]/g)
                 .map(keywordString => {
                     const keyword = keywordString.trim()
@@ -359,17 +467,20 @@ const convertNodeV13 = (node, shrunkBib, fullBib, imageIds) => {
                         }
                     }
                 })
-                .filter(keywordObj => keywordObj)
+                .filter(keywordObj => keywordObj) as ConvertNode[]
+            node.content = keywordNodes
             if (!node.content.length) {
                 delete node.content
             }
             break
+        }
         case "figure":
-            if (isNaN(Number.parseInt(node.attrs.image))) {
-                node.attrs.image = false
+            if (isNaN(Number.parseInt(nodeAttrs.image as string))) {
+                nodeAttrs.image = false
             } else {
-                imageIds.push(Number.parseInt(node.attrs.image))
+                imageIds.push(Number.parseInt(nodeAttrs.image as string))
             }
+            node.attrs = nodeAttrs
             break
     }
     if (node.content) {
@@ -379,90 +490,105 @@ const convertNodeV13 = (node, shrunkBib, fullBib, imageIds) => {
     }
 }
 
-const convertDocV20 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
+const convertDocV20 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
     delete returnDoc.added
     delete returnDoc.is_owner
     delete returnDoc.revisions
     delete returnDoc.rights
     delete returnDoc.updated
-    if (returnDoc.content.attrs) {
-        returnDoc.content.attrs.tracked = false
+    const content = returnDoc.content as ConvertNode | undefined
+    if (content?.attrs) {
+        content.attrs.tracked = false
     }
-    Object.values(returnDoc.comments).forEach(comment => {
-        comment.username = comment.userName
-        comment.isMajor = comment["review:isMajor"]
-        delete comment.userAvatar
-        delete comment.userName
-        delete comment["review:isMajor"]
-        if (comment.answers) {
-            comment.answers.forEach(answer => {
-                answer.username = answer.userName
-                delete answer.userAvatar
-                delete answer.userName
-            })
-        }
-    })
+    if (returnDoc.comments) {
+        Object.values(returnDoc.comments).forEach(comment => {
+            comment.username = comment.userName
+            comment.isMajor = comment["review:isMajor"]
+            delete comment.userAvatar
+            delete comment.userName
+            delete comment["review:isMajor"]
+            if (comment.answers) {
+                comment.answers.forEach(answer => {
+                    answer.username = answer.userName
+                    delete answer.userAvatar
+                    delete answer.userName
+                })
+            }
+        })
+    }
     return returnDoc
 }
 
-const convertNodeV21 = node => {
-    let commentMark
+const convertNodeV21 = (node: ConvertNode): void => {
+    let commentMark: ConvertMark | undefined
     if (
         node.marks &&
         (commentMark = node.marks.find(mark => mark.type === "comment"))
     ) {
-        commentMark.attrs.id = String(commentMark.attrs.id)
+        const attrs = commentMark.attrs ?? {}
+        attrs.id = String(attrs.id)
+        commentMark.attrs = attrs
     }
     if (node.content) {
         node.content.forEach(childNode => convertNodeV21(childNode))
     }
 }
 
-const convertDocV21 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV21(returnDoc.content)
-    Object.entries(returnDoc.comment).forEach(([commentId, comment]) => {
-        delete comment.id
-        comment.assignedUser = false
-        comment.assignedUsername = false
-        comment.resolved = false
-        comment.comment = comment.comment.split("\n").map(text => ({
-            type: "paragraph",
-            content: [{type: "text", text}]
-        }))
-        if (comment.answers) {
-            comment.answers.forEach(answer => {
-                answer.id = answer.answerId
-                    ? String(answer.answerId)
-                    : answer.id && String(answer.id) !== String(commentId)
-                      ? String(answer.id)
-                      : String(Math.floor(Math.random() * 0xffffffff))
-                delete answer.answerId
-                answer.answer = answer.answer.split("\n").map(text => ({
+const convertDocV21 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV21(returnDoc.content as ConvertNode)
+    }
+    if (returnDoc.comment) {
+        Object.entries(returnDoc.comment).forEach(([commentId, comment]) => {
+            delete comment.id
+            comment.assignedUser = false
+            comment.assignedUsername = false
+            comment.resolved = false
+            comment.comment = (comment.comment as string)
+                .split("\n")
+                .map(text => ({
                     type: "paragraph",
                     content: [{type: "text", text}]
                 }))
-            })
-        }
-    })
+            if (comment.answers) {
+                comment.answers.forEach(answer => {
+                    answer.id = answer.answerId
+                        ? String(answer.answerId)
+                        : answer.id && String(answer.id) !== String(commentId)
+                          ? String(answer.id)
+                          : String(Math.floor(Math.random() * 0xffffffff))
+                    delete answer.answerId
+                    answer.answer = (answer.answer as string)
+                        .split("\n")
+                        .map(text => ({
+                            type: "paragraph",
+                            content: [{type: "text", text}]
+                        }))
+                })
+            }
+        })
+    }
     return returnDoc
 }
 
-const convertNodeV22 = (node, imageIds) => {
+const convertNodeV22 = (node: ConvertNode, imageIds: number[]): void => {
     switch (node.type) {
-        case "figure":
-            if (!isNaN(Number.parseInt(node.attrs.image))) {
-                imageIds.push(Number.parseInt(node.attrs.image))
+        case "figure": {
+            const nodeAttrs = node.attrs ?? {}
+            if (!isNaN(Number.parseInt(nodeAttrs.image as string))) {
+                imageIds.push(Number.parseInt(nodeAttrs.image as string))
             }
             break
+        }
         default:
             break
     }
     if (node.content) {
-        const deleteChildren = []
+        const deleteChildren: ConvertNode[] = []
         node.content.forEach(childNode => {
-            if (childNode.type === "text" && !childNode.text.length) {
+            if (childNode.type === "text" && !childNode.text?.length) {
                 deleteChildren.push(childNode)
             } else {
                 convertNodeV22(childNode, imageIds)
@@ -474,22 +600,26 @@ const convertNodeV22 = (node, imageIds) => {
     }
 }
 
-const convertDocV22 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
+const convertDocV22 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
     returnDoc.imageIds = []
-    convertNodeV22(returnDoc.content, returnDoc.imageIds)
-    Object.entries(returnDoc.comment).forEach(([_commentId, comment]) => {
-        comment.comment.forEach(commentNode =>
-            convertNodeV22(commentNode, returnDoc.imageIds)
-        )
-        if (comment.answers) {
-            comment.answers.forEach(answer => {
-                answer.answer.forEach(answerNode =>
-                    convertNodeV22(answerNode, returnDoc.imageIds)
-                )
-            })
-        }
-    })
+    if (returnDoc.content) {
+        convertNodeV22(returnDoc.content as ConvertNode, returnDoc.imageIds)
+    }
+    if (returnDoc.comment) {
+        Object.entries(returnDoc.comment).forEach(([_commentId, comment]) => {
+            ;(comment.comment as ConvertNode[]).forEach(commentNode =>
+                convertNodeV22(commentNode, returnDoc.imageIds as number[])
+            )
+            if (comment.answers) {
+                comment.answers.forEach(answer => {
+                    ;(answer.answer as ConvertNode[]).forEach(answerNode =>
+                        convertNodeV22(answerNode, returnDoc.imageIds as number[])
+                    )
+                })
+            }
+        })
+    }
     return returnDoc
 }
 
@@ -568,10 +698,11 @@ const v23ExtraAttrs = {
     template: "Standard Article"
 }
 
-const convertNodeV23 = node => {
+const convertNodeV23 = (node: ConvertNode): void => {
+    const nodeAttrs = node.attrs ?? {}
     switch (node.type) {
         case "article":
-            node.attrs = Object.assign({}, node.attrs, v23ExtraAttrs)
+            node.attrs = Object.assign({}, nodeAttrs, v23ExtraAttrs)
             break
         case "title":
             node.attrs = {
@@ -587,7 +718,7 @@ const convertNodeV23 = node => {
                 locking: false,
                 language: false,
                 optional: "hidden",
-                hidden: node.attrs.hidden,
+                hidden: nodeAttrs.hidden,
                 help: false,
                 deleted: false,
                 elements: ["heading1"],
@@ -612,7 +743,7 @@ const convertNodeV23 = node => {
                 locking: false,
                 language: false,
                 optional: "hidden",
-                hidden: node.attrs.hidden,
+                hidden: nodeAttrs.hidden,
                 help: false,
                 deleted: false,
                 item_title: "Author"
@@ -629,7 +760,7 @@ const convertNodeV23 = node => {
                 locking: false,
                 language: false,
                 optional: "hidden",
-                hidden: node.attrs.hidden,
+                hidden: nodeAttrs.hidden,
                 help: false,
                 deleted: false,
                 elements: [
@@ -661,7 +792,7 @@ const convertNodeV23 = node => {
                 locking: false,
                 language: false,
                 optional: "hidden",
-                hidden: node.attrs.hidden,
+                hidden: nodeAttrs.hidden,
                 help: false,
                 deleted: false,
                 item_title: "Keyword"
@@ -670,11 +801,10 @@ const convertNodeV23 = node => {
         case "keyword":
             node.type = "tag"
             node.attrs = {
-                tag: node.attrs.keyword
+                tag: nodeAttrs.keyword
             }
             break
         case "body":
-            node.type = "richtext_part"
             node.attrs = {
                 title: "Body",
                 id: "body",
@@ -706,8 +836,8 @@ const convertNodeV23 = node => {
             }
             break
         case "heading":
-            node.type = `heading${node.attrs.level}`
-            delete node.attrs.level
+            node.type = `heading${nodeAttrs.level}`
+            delete node.attrs?.level
             break
         default:
             break
@@ -719,23 +849,32 @@ const convertNodeV23 = node => {
     }
 }
 
-const convertDocV23 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV23(returnDoc.content)
-    returnDoc.settings = Object.assign({}, returnDoc.settings, v23ExtraAttrs)
+const convertDocV23 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV23(returnDoc.content as ConvertNode)
+    }
+    returnDoc.settings = Object.assign(
+        {},
+        returnDoc.settings,
+        v23ExtraAttrs
+    )
     return returnDoc
 }
 
-const convertNodeV30 = node => {
-    if (node.attrs?.marks && node.attrs.marks.filter) {
-        node.attrs.marks = node.attrs.marks.filter(mark => mark !== "anchor")
-    }
-    if (node.attrs?.footnote_marks) {
-        node.attrs.footnote_marks = node.attrs.footnote_marks.filter(
+const convertNodeV30 = (node: ConvertNode): void => {
+    const nodeAttrs = node.attrs ?? {}
+    if (nodeAttrs.marks && (nodeAttrs.marks as unknown[]).filter) {
+        nodeAttrs.marks = (nodeAttrs.marks as string[]).filter(
             mark => mark !== "anchor"
         )
     }
-    let attrs
+    if (nodeAttrs.footnote_marks) {
+        nodeAttrs.footnote_marks = (nodeAttrs.footnote_marks as string[]).filter(
+            mark => mark !== "anchor"
+        )
+    }
+    let attrs: Record<string, unknown> | undefined
     switch (node.type) {
         case "article":
             attrs = {
@@ -1036,7 +1175,7 @@ const convertNodeV30 = node => {
                 if (node.attrs.language === "") {
                     delete node.attrs.language
                 }
-                const template = node.attrs.template || "default"
+                const template = (node.attrs.template as string) || "default"
                 node.attrs.import_id = template
                     .normalize("NFKC")
                     .replace(/[^\w\s-]/g, "")
@@ -1070,35 +1209,40 @@ const convertNodeV30 = node => {
     }
 
     if (node.marks) {
+        // The original code used `for...in` over the marks array, iterating
+        // indices rather than mark objects. The loop body therefore never
+        // matched a case and was effectively a no-op. The cast below preserves
+        // that exact runtime behavior while satisfying the type checker.
         for (const mark in node.marks) {
-            let attrs
-            switch (mark.type) {
+            const markRecord = mark as unknown as ConvertMark
+            let markAttrs: Record<string, unknown> | undefined
+            switch (markRecord.type) {
                 case "comment":
-                    attrs = {
+                    markAttrs = {
                         id: false
                     }
                     break
                 case "annotation_tag":
-                    attrs = {
+                    markAttrs = {
                         type: "",
                         key: "",
                         value: ""
                     }
                     break
                 case "anchor":
-                    attrs = {
+                    markAttrs = {
                         id: false
                     }
                     break
                 case "deletion":
-                    attrs = {
+                    markAttrs = {
                         user: 0,
                         username: "",
                         date: 0
                     }
                     break
                 case "insertion":
-                    attrs = {
+                    markAttrs = {
                         user: 0,
                         username: "",
                         date: 0,
@@ -1106,7 +1250,7 @@ const convertNodeV30 = node => {
                     }
                     break
                 case "format_change":
-                    attrs = {
+                    markAttrs = {
                         user: 0,
                         username: "",
                         date: 0,
@@ -1115,13 +1259,13 @@ const convertNodeV30 = node => {
                     }
                     break
             }
-            if (attrs && mark.attrs) {
-                for (const attr in attrs) {
+            if (markAttrs && markRecord.attrs) {
+                for (const attr in markAttrs) {
                     if (
-                        attr in mark.attrs &&
-                        deepEqual(mark.attrs[attr], attrs[attr])
+                        attr in markRecord.attrs &&
+                        deepEqual(markRecord.attrs[attr], markAttrs[attr])
                     ) {
-                        delete mark.attrs[attr]
+                        delete markRecord.attrs[attr]
                     }
                 }
             }
@@ -1135,26 +1279,28 @@ const convertNodeV30 = node => {
     }
 }
 
-const convertDocV30 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV30(returnDoc.content)
+const convertDocV30 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV30(returnDoc.content as ConvertNode)
+    }
     return returnDoc
 }
 
-const convertDocV31 = doc => {
+const convertDocV31 = (doc: ConvertedDoc): ConvertedDoc => {
     // Conversion adds no new requirements. Version update is required so that
     // users don't try to open file in a previous FW file. That won't work as
     // additional syntax has been added (copyright + cross references).
-    const returnDoc = JSON.parse(JSON.stringify(doc))
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
     return returnDoc
 }
 
-const convertNodeV32 = (node, ids = []) => {
-    let blockId, attrs
+const convertNodeV32 = (node: ConvertNode, ids: string[] = []): void => {
+    let blockId: string, attrs: Record<string, unknown>
     switch (node.type) {
         case "table":
             attrs = node.attrs || {}
-            blockId = attrs.id
+            blockId = attrs.id as string
             while (!blockId || ids.includes(blockId)) {
                 blockId = randomTableId()
             }
@@ -1183,7 +1329,7 @@ const convertNodeV32 = (node, ids = []) => {
         case "bullet_list":
         case "ordered_list":
             attrs = node.attrs || {}
-            blockId = attrs.id
+            blockId = attrs.id as string
             while (!blockId || ids.includes(blockId)) {
                 blockId = randomListId()
             }
@@ -1209,10 +1355,12 @@ const convertNodeV32 = (node, ids = []) => {
             delete attrs.image
             delete attrs.equation
 
-            const caption = {type: "figure_caption"}
+            const caption: ConvertNode = {type: "figure_caption"}
             if (attrs.caption) {
-                if (attrs.caption.length) {
-                    caption.content = [{type: "text", text: attrs.caption}]
+                if ((attrs.caption as string).length) {
+                    caption.content = [
+                        {type: "text", text: attrs.caption as string}
+                    ]
                     attrs.caption = true
                 } else {
                     attrs.caption = false
@@ -1230,7 +1378,7 @@ const convertNodeV32 = (node, ids = []) => {
         }
         case "footnote":
             if (node.attrs?.footnote) {
-                node.attrs.footnote.forEach(childNode => {
+                ;(node.attrs.footnote as ConvertNode[]).forEach(childNode => {
                     convertNodeV32(childNode, ids)
                 })
             }
@@ -1242,35 +1390,35 @@ const convertNodeV32 = (node, ids = []) => {
         })
     }
     if (node.attrs?.initial) {
-        node.attrs.initial.forEach(childNode => {
+        ;(node.attrs.initial as ConvertNode[]).forEach(childNode => {
             convertNodeV32(childNode, ids)
         })
     }
 }
 
-const convertDocV32 = doc => {
-    const returnDoc = JSON.parse(JSON.stringify(doc))
-    convertNodeV32(returnDoc)
+const convertDocV32 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    convertNodeV32(returnDoc as unknown as ConvertNode)
     return returnDoc
 }
 
-const convertDocV33 = doc => {
+const convertDocV33 = (doc: ConvertedDoc): ConvertedDoc => {
     // We just need to increase the version number so that documents cannot
     // be moved from a 3.10 to an 3.9 system, but 3.3 files should be readable
     // as 3.4 files.
-    return JSON.parse(JSON.stringify(doc))
+    return JSON.parse(JSON.stringify(doc)) as ConvertedDoc
 }
 
-const convertDocV34 = doc => {
+const convertDocV34 = (doc: ConvertedDoc): ConvertedDoc => {
     // The top node needs to be changed from "article" to "doc".
-    const returnDoc = JSON.parse(JSON.stringify(doc))
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
     returnDoc.type = "doc"
     return returnDoc
 }
 
-const convertDocV35 = doc => {
+const convertDocV35 = (doc: ConvertedDoc): ConvertedDoc => {
     // We just need to increase the version number so that documents cannot
     // be moved from a 4.1 to an 4.0 system, but 3.5 files should be readable
     // as 3.6 files.
-    return JSON.parse(JSON.stringify(doc))
+    return JSON.parse(JSON.stringify(doc)) as ConvertedDoc
 }
