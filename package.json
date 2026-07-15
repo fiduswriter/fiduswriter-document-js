@@ -1,178 +1,186 @@
 {
-    "name": "@fiduswriter/document",
-    "version": "0.2.23",
-    "description": "Fidus Writer document schema, importers and exporters",
-    "repository": {
-        "type": "git",
-        "url": "ssh://git@codeberg.org/fiduswriter/fiduswriter-document.git"
+  "name": "@fiduswriter/document",
+  "version": "0.2.23",
+  "description": "Fidus Writer document schema, importers and exporters",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@codeberg.org/fiduswriter/fiduswriter-document.git"
+  },
+  "license": "AGPL-3.0",
+  "author": "Johannes Wilm",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
-    "license": "AGPL-3.0",
-    "author": "Johannes Wilm",
-    "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "default": "./dist/index.js"
-        },
-        "./schema": {
-            "types": "./dist/schema/index.d.ts",
-            "default": "./dist/schema/index.js"
-        },
-        "./schema/*": {
-            "types": "./dist/schema/*.d.ts",
-            "default": "./dist/schema/*.js"
-        },
-        "./importer/native": {
-            "types": "./dist/importer/native/index.d.ts",
-            "default": "./dist/importer/native/index.js"
-        },
-        "./importer/docx": {
-            "types": "./dist/importer/docx/index.d.ts",
-            "default": "./dist/importer/docx/index.js"
-        },
-        "./importer/odt": {
-            "types": "./dist/importer/odt/index.d.ts",
-            "default": "./dist/importer/odt/index.js"
-        },
-        "./importer/pandoc": {
-            "types": "./dist/importer/pandoc/index.d.ts",
-            "default": "./dist/importer/pandoc/index.js"
-        },
-        "./importer/*": {
-            "types": "./dist/importer/*.d.ts",
-            "default": "./dist/importer/*.js"
-        },
-        "./exporter/native": {
-            "types": "./dist/exporter/native/index.d.ts",
-            "default": "./dist/exporter/native/index.js"
-        },
-        "./exporter/docx": {
-            "types": "./dist/exporter/docx/index.d.ts",
-            "default": "./dist/exporter/docx/index.js"
-        },
-        "./exporter/odt": {
-            "types": "./dist/exporter/odt/index.d.ts",
-            "default": "./dist/exporter/odt/index.js"
-        },
-        "./exporter/latex": {
-            "types": "./dist/exporter/latex/index.d.ts",
-            "default": "./dist/exporter/latex/index.js"
-        },
-        "./exporter/html": {
-            "types": "./dist/exporter/html/index.d.ts",
-            "default": "./dist/exporter/html/index.js"
-        },
-        "./exporter/epub": {
-            "types": "./dist/exporter/epub/index.d.ts",
-            "default": "./dist/exporter/epub/index.js"
-        },
-        "./exporter/jats": {
-            "types": "./dist/exporter/jats/index.d.ts",
-            "default": "./dist/exporter/jats/index.js"
-        },
-        "./exporter/pandoc": {
-            "types": "./dist/exporter/pandoc/index.d.ts",
-            "default": "./dist/exporter/pandoc/index.js"
-        },
-        "./exporter/template": {
-            "types": "./dist/exporter/template/index.d.ts",
-            "default": "./dist/exporter/template/index.js"
-        },
-        "./exporter/*": {
-            "types": "./dist/exporter/*.d.ts",
-            "default": "./dist/exporter/*.js"
-        },
-        "./transform": {
-            "types": "./dist/transform/index.d.ts",
-            "default": "./dist/transform/index.js"
-        },
-        "./mathlive": {
-            "types": "./dist/mathlive/index.d.ts",
-            "default": "./dist/mathlive/index.js"
-        },
-        "./mathlive/*": {
-            "types": "./dist/mathlive/*.d.ts",
-            "default": "./dist/mathlive/*.js"
-        },
-        "./citations/*": {
-            "types": "./dist/citations/*.d.ts",
-            "default": "./dist/citations/*.js"
-        }
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/index.js"
     },
-    "directories": {
-        "test": "test"
+    "./schema/*": {
+      "types": "./dist/schema/*.d.ts",
+      "default": "./dist/schema/*.js"
     },
-    "files": [
-        "dist/",
-        "src/",
-        "scripts/",
-        "static-libs/",
-        "schema.json",
-        "README.md",
-        "LICENSE"
-    ],
-    "scripts": {
-        "build": "tsc",
-        "build-schema": "tsx scripts/export-schema.js",
-        "bundle-mathlive": "tsx scripts/bundle-mathlive.ts --force",
-        "prepare": "npm run build && npm run build-schema && npm run bundle-mathlive",
-        "prepublishOnly": "npm run build && npm run build-schema && npm run bundle-mathlive",
-        "typecheck": "tsc --noEmit",
-        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js",
-        "deploy-pages": "./scripts/deploy-pages.sh",
-        "lint": "eslint src test",
-        "lint:fix": "eslint src test --fix",
-        "format": "prettier --write .",
-        "format:check": "prettier --check ."
+    "./importer/native": {
+      "types": "./dist/importer/native/index.d.ts",
+      "default": "./dist/importer/native/index.js"
     },
-    "dependencies": {
-        "@fiduswriter/bibliography-manager": "^0.1.6",
-        "@prettier/plugin-xml": "^3.4.2",
-        "@vivliostyle/print": "^2.42.0",
-        "bibliojson": "^4.0.0",
-        "downloadjs": "^1.4.7",
-        "fast-deep-equal": "^3.1.3",
-        "fast-xml-parser": "^5.9.3",
-        "fwtoolkit": "^0.1.9",
-        "jszip": "^3.10.1",
-        "mathlive": "^0.104.0",
-        "mathml-to-latex": "^1.4.3",
-        "mathml2omml": "^0.5.0",
-        "orderedmap": "^2.1.1",
-        "prettier": "^3.5.3",
-        "prosemirror-commands": "^1.7.1",
-        "prosemirror-history": "^1.5.0",
-        "prosemirror-keymap": "^1.2.3",
-        "prosemirror-model": "^1.25.0",
-        "prosemirror-schema-basic": "^1.2.4",
-        "prosemirror-schema-list": "^1.5.1",
-        "prosemirror-state": "^1.4.4",
-        "prosemirror-tables": "^1.6.4",
-        "prosemirror-transform": "^1.12.0",
-        "prosemirror-view": "^1.41.9"
+    "./importer/docx": {
+      "types": "./dist/importer/docx/index.d.ts",
+      "default": "./dist/importer/docx/index.js"
     },
-    "devDependencies": {
-        "@eslint/js": "^10.0.1",
-        "@types/node": "^26.0.1",
-        "@types/prosemirror-model": "^1.16.2",
-        "@types/prosemirror-schema-basic": "^1.0.2",
-        "@types/prosemirror-schema-list": "^1.2.0",
-        "@types/prosemirror-state": "^1.4.0",
-        "@types/prosemirror-tables": "^0.8.0",
-        "@types/prosemirror-transform": "^1.5.0",
-        "@xmldom/xmldom": "^0.9.10",
-        "citeproc-plus": "^1.0.3",
-        "eslint": "^10.6.0",
-        "globals": "^15.15.0",
-        "happy-dom": "^20.10.6",
-        "jest": "^30.4.2",
-        "prettier": "^3.5.3",
-        "ts-jest": "^29.1.2",
-        "ts-jest-resolver": "^2.0.1",
-        "tsx": "^4.22.4",
-        "typescript": "^6.0.3",
-        "typescript-eslint": "^8.62.0"
+    "./importer/odt": {
+      "types": "./dist/importer/odt/index.d.ts",
+      "default": "./dist/importer/odt/index.js"
+    },
+    "./importer/pandoc": {
+      "types": "./dist/importer/pandoc/index.d.ts",
+      "default": "./dist/importer/pandoc/index.js"
+    },
+    "./importer/*": {
+      "types": "./dist/importer/*.d.ts",
+      "default": "./dist/importer/*.js"
+    },
+    "./exporter/native": {
+      "types": "./dist/exporter/native/index.d.ts",
+      "default": "./dist/exporter/native/index.js"
+    },
+    "./exporter/docx": {
+      "types": "./dist/exporter/docx/index.d.ts",
+      "default": "./dist/exporter/docx/index.js"
+    },
+    "./exporter/odt": {
+      "types": "./dist/exporter/odt/index.d.ts",
+      "default": "./dist/exporter/odt/index.js"
+    },
+    "./exporter/latex": {
+      "types": "./dist/exporter/latex/index.d.ts",
+      "default": "./dist/exporter/latex/index.js"
+    },
+    "./exporter/html": {
+      "types": "./dist/exporter/html/index.d.ts",
+      "default": "./dist/exporter/html/index.js"
+    },
+    "./exporter/epub": {
+      "types": "./dist/exporter/epub/index.d.ts",
+      "default": "./dist/exporter/epub/index.js"
+    },
+    "./exporter/jats": {
+      "types": "./dist/exporter/jats/index.d.ts",
+      "default": "./dist/exporter/jats/index.js"
+    },
+    "./exporter/pandoc": {
+      "types": "./dist/exporter/pandoc/index.d.ts",
+      "default": "./dist/exporter/pandoc/index.js"
+    },
+    "./exporter/template": {
+      "types": "./dist/exporter/template/index.d.ts",
+      "default": "./dist/exporter/template/index.js"
+    },
+    "./exporter/*": {
+      "types": "./dist/exporter/*.d.ts",
+      "default": "./dist/exporter/*.js"
+    },
+    "./transform": {
+      "types": "./dist/transform/index.d.ts",
+      "default": "./dist/transform/index.js"
+    },
+    "./mathlive": {
+      "types": "./dist/mathlive/index.d.ts",
+      "default": "./dist/mathlive/index.js"
+    },
+    "./mathlive/*": {
+      "types": "./dist/mathlive/*.d.ts",
+      "default": "./dist/mathlive/*.js"
+    },
+    "./citations/*": {
+      "types": "./dist/citations/*.d.ts",
+      "default": "./dist/citations/*.js"
     }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "scripts/",
+    "static-libs/",
+    "schema.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build-schema": "tsx scripts/export-schema.js",
+    "bundle-mathlive": "tsx scripts/bundle-mathlive.ts --force",
+    "prepare": "npm run build && npm run build-schema && npm run bundle-mathlive",
+    "prepublishOnly": "npm run build && npm run build-schema && npm run bundle-mathlive",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js",
+    "deploy-pages": "./scripts/deploy-pages.sh",
+    "lint": "eslint src test",
+    "lint:fix": "eslint src test --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@fiduswriter/bibliography-manager": "^0.1.6",
+    "@prettier/plugin-xml": "^3.4.2",
+    "@vivliostyle/print": "^2.42.0",
+    "bibliojson": "^4.0.0",
+    "downloadjs": "^1.4.7",
+    "fast-deep-equal": "^3.1.3",
+    "fast-xml-parser": "^5.9.3",
+    "fwtoolkit": "^0.1.9",
+    "jszip": "^3.10.1",
+    "mathlive": "^0.104.0",
+    "mathml-to-latex": "^1.4.3",
+    "mathml2omml": "^0.5.0",
+    "orderedmap": "^2.1.1",
+    "prettier": "^3.5.3",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-history": "^1.5.0",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.0",
+    "prosemirror-schema-basic": "^1.2.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-tables": "^1.6.4",
+    "prosemirror-transform": "^1.12.0",
+    "prosemirror-view": "^1.41.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.0.1",
+    "@types/prosemirror-model": "^1.16.2",
+    "@types/prosemirror-schema-basic": "^1.0.2",
+    "@types/prosemirror-schema-list": "^1.2.0",
+    "@types/prosemirror-state": "^1.4.0",
+    "@types/prosemirror-tables": "^0.8.0",
+    "@types/prosemirror-transform": "^1.5.0",
+    "@xmldom/xmldom": "^0.9.10",
+    "citeproc-plus": "^1.0.3",
+    "eslint": "^10.6.0",
+    "globals": "^15.15.0",
+    "happy-dom": "^20.10.6",
+    "jest": "^30.4.2",
+    "prettier": "^3.5.3",
+    "ts-jest": "^29.1.2",
+    "ts-jest-resolver": "^2.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.0"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,css,md,json,html}": [
+      "prettier --write"
+    ],
+    "*.{ts,js,mjs}": [
+      "eslint --fix"
+    ]
+  }
 }
