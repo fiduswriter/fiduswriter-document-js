@@ -162,28 +162,28 @@ export class ODTExporterRichtext {
     }
 
     run(
-        node: any,
-        options: any = {},
-        parent: any = null,
+        node: FidusNode,
+        options: RunOptions = {},
+        parent: FidusNode | null = null,
         siblingIndex: number = 0
     ): string {
         options.comments = this.findComments(node) // Data related to comments. We need to mark the first and last occurence of comment
         return this.transformRichtext(node, options, parent, siblingIndex)
     }
 
-    findComments(node: any, comments: any = {}): any {
+    findComments(node: FidusNode, comments: Record<string, CommentRange> = {}): Record<string, CommentRange> {
         if (node.marks) {
             node.marks
-                .filter((mark: any) => mark.type === "comment")
-                .forEach((comment: any) => {
-                    if (!comments[comment.attrs.id]) {
-                        comments[comment.attrs.id] = {
+                .filter((mark: FidusMark) => mark.type === "comment")
+                .forEach((comment: FidusMark) => {
+                    if (!comments[comment.attrs?.id as string]) {
+                        comments[comment.attrs?.id as string] = {
                             start: node,
                             end: node,
-                            content: this.comments[comment.attrs.id]
+                            content: this.comments[comment.attrs?.id as string]
                         }
                     } else {
-                        comments[comment.attrs.id]["end"] = node
+                        comments[comment.attrs?.id as string]["end"] = node
                     }
                 })
         }
@@ -196,9 +196,9 @@ export class ODTExporterRichtext {
     }
 
     transformRichtext(
-        node: any,
-        options: any = {},
-        parent: any = null,
+        node: FidusNode,
+        options: RunOptions = {},
+        parent: FidusNode | null = null,
         siblingIndex: number = 0
     ): string {
         let start = "",
@@ -210,18 +210,18 @@ export class ODTExporterRichtext {
 
         const inlineNode = INLINE_TYPES.includes(node.type)
 
-        let blockDelete: any, blockInsert: any
+        let blockDelete: Track | undefined, blockInsert: Track | undefined
 
         if (!inlineNode && node.attrs?.track) {
             blockDelete = node.attrs.track.find(
-                (mark: any) => mark.type === "deletion"
+                (mark: Track) => mark.type === "deletion"
             )
             if (blockDelete) {
                 options = Object.assign({}, options)
                 options.blockDelete = blockDelete
             }
             blockInsert = node.attrs.track.find(
-                (mark: any) => mark.type === "insertion"
+                (mark: Track) => mark.type === "insertion"
             )
             if (blockInsert) {
                 options = Object.assign({}, options)
@@ -231,29 +231,29 @@ export class ODTExporterRichtext {
 
         if (node.marks) {
             node.marks
-                .filter((mark: any) => mark.type === "comment")
-                .forEach((comment: any) => {
-                    const commentData = options.comments[comment.attrs.id]
+                .filter((mark: FidusMark) => mark.type === "comment")
+                .forEach((comment: FidusMark) => {
+                    const commentData = options.comments![comment.attrs?.id as string]
                     if (!commentData || !commentData.content) {
                         return
                     }
                     if (commentData.start === node) {
-                        start += `<office:annotation office:name="comment_${options.tag}_${comment.attrs.id}" loext:resolved="${commentData.content.resolved}">
+                        start += `<office:annotation office:name="comment_${options.tag}_${comment.attrs?.id}" loext:resolved="${commentData.content.resolved}">
                                      <dc:creator>${escapeText(commentData.content.username)}</dc:creator>
                                         <dc:date>${new Date(commentData.content.date).toISOString().slice(0, -1)}000000</dc:date>
-                                        ${commentData.content.comment.map((node: any) => this.transformRichtext(node, options)).join("")}
+                                        ${commentData.content.comment.map((node: FidusNode) => this.transformRichtext(node, options)).join("")}
                                     </office:annotation>`
                     }
                     if (commentData.end === node) {
                         end =
-                            `<office:annotation-end office:name="comment_${options.tag}_${comment.attrs.id}"/>` +
+                            `<office:annotation-end office:name="comment_${options.tag}_${comment.attrs?.id}"/>` +
                             (commentData.content.answers || [])
                                 .map(
-                                    (answer: any) =>
-                                        `<office:annotation loext:resolved="${commentData.content.resolved}">
+                                    (answer) =>
+                                        `<office:annotation loext:resolved="${commentData.content!.resolved}">
                                     <dc:creator>${escapeText(answer.username)}</dc:creator>
                                     <dc:date>${new Date(answer.date).toISOString().slice(0, -1)}000000</dc:date>
-                                    ${answer.answer.map((node: any) => this.transformRichtext(node, options)).join("")}
+                                    ${answer.answer.map((node: FidusNode) => this.transformRichtext(node, options)).join("")}
                                 </office:annotation>`
                                 )
                                 .join("") +
@@ -286,12 +286,12 @@ export class ODTExporterRichtext {
                     this.styles.checkParStyle(options.section)
                 }
                 const nextBlockDelete = nextSibling?.attrs?.track?.find(
-                    (mark: any) => mark.type === "deletion"
+                    (mark: Track) => mark.type === "deletion"
                 )
                 const nextBlockInsert = nextSibling?.attrs?.track?.find(
-                    (mark: any) => mark.type === "insertion"
+                    (mark: Track) => mark.type === "insertion"
                 )
-                let lastNonMergedBlock: any
+                let lastNonMergedBlock: FidusNode | undefined
                 if (blockDelete) {
                     // This block has been deleted, so we need to check which text block
                     // it is being merged in to. If it has, we need to merge the
@@ -301,12 +301,12 @@ export class ODTExporterRichtext {
                         // this text block as merged.
                         blockDelete = false
                     } else {
-                        let searchNode = previousSibling
+                        let searchNode: FidusNode | undefined | false = previousSibling
                         while (searchNode && TEXT_TYPES[searchNode.type]) {
                             lastNonMergedBlock = searchNode
                             if (
                                 searchNode?.attrs?.track?.find(
-                                    (mark: any) => mark.type === "deletion"
+                                    (mark: Track) => mark.type === "deletion"
                                 )
                             ) {
                                 searchNode =
@@ -448,45 +448,45 @@ export class ODTExporterRichtext {
                 break
             }
             case "text": {
-                let hyperlink: any,
-                    strong: any,
-                    em: any,
-                    underline: any,
-                    sup: any,
-                    sub: any,
-                    smallcaps: any,
-                    code: any,
-                    anchor: any
+                let hyperlink: FidusMark | undefined,
+                    strong: FidusMark | undefined,
+                    em: FidusMark | undefined,
+                    underline: FidusMark | undefined,
+                    sup: FidusMark | undefined,
+                    sub: FidusMark | undefined,
+                    smallcaps: FidusMark | undefined,
+                    code: FidusMark | undefined,
+                    anchor: FidusMark | undefined
                 // Check for hyperlink, bold/strong and italic/em
                 if (node.marks) {
-                    hyperlink = node.marks.find((mark: any) => mark.type === "link")
-                    anchor = node.marks.find((mark: any) => mark.type === "anchor")
-                    strong = node.marks.find((mark: any) => mark.type === "strong")
-                    em = node.marks.find((mark: any) => mark.type === "em")
+                    hyperlink = node.marks.find((mark: FidusMark) => mark.type === "link")
+                    anchor = node.marks.find((mark: FidusMark) => mark.type === "anchor")
+                    strong = node.marks.find((mark: FidusMark) => mark.type === "strong")
+                    em = node.marks.find((mark: FidusMark) => mark.type === "em")
                     underline = node.marks.find(
-                        (mark: any) => mark.type === "underline"
+                        (mark: FidusMark) => mark.type === "underline"
                     )
                     smallcaps = node.marks.find(
-                        (mark: any) => mark.type === "smallcaps"
+                        (mark: FidusMark) => mark.type === "smallcaps"
                     )
-                    sup = node.marks.find((mark: any) => mark.type === "sup")
-                    sub = node.marks.find((mark: any) => mark.type === "sub")
-                    code = node.marks.find((mark: any) => mark.type === "code")
+                    sup = node.marks.find((mark: FidusMark) => mark.type === "sup")
+                    sub = node.marks.find((mark: FidusMark) => mark.type === "sub")
+                    code = node.marks.find((mark: FidusMark) => mark.type === "code")
                 }
 
                 if (hyperlink) {
-                    start += `<text:a xlink:type="simple" xlink:href="${escapeText(hyperlink.attrs.href)}">`
+                    start += `<text:a xlink:type="simple" xlink:href="${escapeText(hyperlink.attrs?.href as string)}">`
                     end = "</text:a>" + end
                 }
                 if (anchor) {
-                    start += `<text:reference-mark-start text:name="${anchor.attrs.id}"/>`
+                    start += `<text:reference-mark-start text:name="${anchor.attrs?.id}"/>`
                     end =
-                        `<text:reference-mark-end text:name="${anchor.attrs.id}"/>` +
+                        `<text:reference-mark-end text:name="${anchor.attrs?.id}"/>` +
                         end
 
-                    start += `<text:bookmark-start text:name="${anchor.attrs.id}"/>`
+                    start += `<text:bookmark-start text:name="${anchor.attrs?.id}"/>`
                     end =
-                        `<text:bookmark-end text:name="${anchor.attrs.id}"/>` +
+                        `<text:bookmark-end text:name="${anchor.attrs?.id}"/>` +
                         end
                 }
 
@@ -525,7 +525,7 @@ export class ODTExporterRichtext {
                 break
             }
             case "citation": {
-                let cit: any
+                let cit: FidusNode | undefined
                 // We take the first citation from the stack and remove it.
                 if (options.inFootnote) {
                     cit = this.footnotes.citations.pmCits.shift()
@@ -593,7 +593,7 @@ export class ODTExporterRichtext {
                             end
                     } else {
                         // Fallback to formatted text only
-                        cit.content.forEach((citContent: any) => {
+                        cit!.content!.forEach((citContent: FidusNode) => {
                             content += this.transformRichtext(
                                 citContent,
                                 options
@@ -620,11 +620,11 @@ export class ODTExporterRichtext {
                     end = end + '<text:p text:style-name="Standard"></text:p>'
                 }
                 const figureCaption = node.content.find(
-                    (node: any) => node.type === "figure_caption"
+                    (node: FidusNode) => node.type === "figure_caption"
                 )
                 let caption = node.attrs.caption
                     ? figureCaption?.content
-                          ?.map((node: any, index: number) =>
+                          ?.map((node: FidusNode, index: number) =>
                               this.transformRichtext(
                                   node,
                                   options,
@@ -656,8 +656,8 @@ export class ODTExporterRichtext {
                 let aligned = node.attrs.aligned
                 let frame = false
                 const image =
-                    node.content.find((node: any) => node.type === "image")?.attrs
-                        .image || false
+                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
+                        ?.image || false
                 if (caption.length || image === false) {
                     frame = true
                     this.styles.checkParStyle("Caption")
@@ -700,8 +700,8 @@ export class ODTExporterRichtext {
                         </draw:frame>`
                 } else {
                     const latex = node.content.find(
-                        (node: any) => node.type === "figure_equation"
-                    )?.attrs.equation
+                        (node: FidusNode) => node.type === "figure_equation"
+                    )?.attrs?.equation
                     const objectNumber = this.math.addMath(latex)
                     const graphicStyleId =
                         this.styles.getGraphicStyleId("Formula")
@@ -749,7 +749,7 @@ export class ODTExporterRichtext {
                 const tableCaption = node.content[0]
                 let caption = node.attrs.caption
                     ? tableCaption?.content
-                          ?.map((node: any, index: number) =>
+                          ?.map((node: FidusNode, index: number) =>
                               this.transformRichtext(
                                   node,
                                   options,
@@ -890,14 +890,14 @@ export class ODTExporterRichtext {
         }
 
         if (inlineNode) {
-            const inlineInsert =
-                node.marks?.find(
-                    (mark: any) =>
+            const inlineInsert: Track | undefined =
+                (node.marks?.find(
+                    (mark: FidusMark) =>
                         mark.type === "insertion" &&
-                        mark.attrs.approved === false
-                )?.attrs || blockInsert
-            const inlineDelete =
-                node.marks?.find((mark: any) => mark.type === "deletion")?.attrs ||
+                        mark.attrs?.approved === false
+                )?.attrs as Track | undefined) || (blockInsert as Track | undefined)
+            const inlineDelete: Track | undefined =
+                (node.marks?.find((mark: FidusMark) => mark.type === "deletion")?.attrs as Track | undefined) ||
                 options.blockDelete
             if (inlineDelete) {
                 if (parent) {

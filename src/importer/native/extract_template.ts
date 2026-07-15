@@ -7,13 +7,16 @@ import type {FidusNode, JSONValue, Template} from "../../types.js"
  * Extract a document-template definition from a Fidus document's content node.
  */
 export function extractTemplate(doc: FidusNode): Template {
-    const template = toFullJSON(doc as any, docSchema) as any
-    template.attrs.papersize = template.attrs.papersizes[0]
+    const template = toFullJSON(
+        doc as unknown as Record<string, unknown>,
+        docSchema
+    ) as {attrs: Record<string, unknown>; content: FidusNode[]}
+    template.attrs.papersize = (template.attrs.papersizes as string[])[0]
     template.content = template.content.filter(
-        (part: any) =>
+        (part: FidusNode) =>
             !part.attrs || !part.attrs.deleted
     )
-    template.content.forEach((part: any) => {
+    template.content.forEach((part: FidusNode) => {
         delete part.content
         if (part.type === "title") {
             delete part.attrs

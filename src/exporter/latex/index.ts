@@ -1,8 +1,9 @@
 import {BibLatexExporter} from "bibliojson"
+import type {BibDB as BibjsonBibDB} from "bibliojson"
 import download from "downloadjs"
 
 import {gettext, shortFileTitle} from "fwtoolkit"
-import type {BibDB, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {BibDB, BibDBEntries, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden} from "../tools/doc_content.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
@@ -19,17 +20,17 @@ export class LatexExporter {
     docTitle: string
     bibDB: BibDB
     imageDB: ImageDB
-    updated: any
+    updated: Date
 
-    docContent: any
+    docContent: FidusNode | false
     zipFileName: string | false
     textFiles: Array<{filename: string; contents: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
-    conversion: any
+    conversion: {latex: string; imageIds: string[]; usedBibDB: BibDBEntries} | undefined
     progressCallback?: ProgressCallback
 
-    constructor(doc: ExportDoc, bibDB: BibDB, imageDB: ImageDB, updated: any, progressCallback?: ProgressCallback) {
+    constructor(doc: ExportDoc, bibDB: BibDB, imageDB: ImageDB, updated: Date, progressCallback?: ProgressCallback) {
         this.doc = doc
         this.docTitle = shortFileTitle(this.doc.title, this.doc.path || "")
         this.bibDB = bibDB
@@ -53,10 +54,12 @@ export class LatexExporter {
             this.bibDB,
             this.doc.settings
         )
-        this.conversion = converter.init(this.docContent)
+        this.conversion = converter.init(this.docContent as FidusNode)
         this.progressCallback?.(gettext("Preparing LaTeX files..."), 50)
-        if (Object.keys(this.conversion.usedBibDB).length > 0) {
-            const bibExport = new BibLatexExporter(this.conversion.usedBibDB)
+        if (Object.keys(this.conversion!.usedBibDB).length > 0) {
+            const bibExport = new BibLatexExporter(
+                this.conversion!.usedBibDB as unknown as BibjsonBibDB
+            )
             this.textFiles.push({
                 filename: "bibliography.bib",
                 contents: bibExport.parse()
@@ -64,10 +67,10 @@ export class LatexExporter {
         }
         this.textFiles.push({
             filename: "document.tex",
-            contents: this.conversion.latex
+            contents: this.conversion!.latex
         })
         this.textFiles.push({filename: "README.txt", contents: readMe})
-        this.conversion.imageIds.forEach((id: string) => {
+        this.conversion!.imageIds.forEach((id: string) => {
             const imageEntry = this.imageDB.db[id]
             const imageValue = imageEntry.image
             if (imageValue instanceof Blob) {

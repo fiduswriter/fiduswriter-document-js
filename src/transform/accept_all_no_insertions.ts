@@ -76,7 +76,7 @@ export function acceptAllNoInsertions(doc: Node): Node {
                 )
             } else {
                 const track = node.attrs.track.filter(
-                    (track: any) => track !== insertionTrack
+                    (track: Track) => track !== insertionTrack
                 )
                 tr.setNodeMarkup(
                     map.map(pos),
@@ -97,7 +97,7 @@ export function acceptAllNoInsertions(doc: Node): Node {
         }
         if (blockChangeTrack) {
             const track = node.attrs.track.filter(
-                (track: any) => track.type !== blockChangeTrack
+                (track: Track) => track.type !== blockChangeTrack
             )
             tr.setNodeMarkup(
                 map.map(pos),

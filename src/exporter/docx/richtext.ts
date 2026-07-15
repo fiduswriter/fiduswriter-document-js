@@ -4,6 +4,14 @@ import {getCat} from "../../schema/i18n.js"
 import {xmlDOM} from "../tools/xml.js"
 import type {XMLElement} from "../tools/xml.js"
 import {createZoteroCitation} from "../tools/zotero_csl.js"
+import type {BibDB, CommentData, DocSettings, ExportDoc, FidusMark, FidusNode, Track} from "../../types.js"
+import type {DOCXExporterCitations} from "./citations.js"
+import type {DOCXExporterFootnotes} from "./footnotes.js"
+import type {DOCXExporterImages} from "./images.js"
+import type {DOCXExporterLists} from "./lists.js"
+import type {DOCXExporterMath} from "./math.js"
+import type {DOCXExporterRels} from "./rels.js"
+import type {DOCXExporterTables} from "./tables.js"
 
 import {translateBlockType} from "./tools.js"
 
@@ -44,8 +52,8 @@ const INLINE_TYPES = [
  */
 
 function createZoteroCitationField(
-    references: any[],
-    bibDB: any,
+    references: Array<{id: number; [key: string]: unknown}>,
+    bibDB: BibDB,
     formattedCitation: string,
     citationId: string | null = null
 ): string | null {
@@ -62,18 +70,41 @@ function createZoteroCitationField(
     return ` ADDIN ZOTERO_ITEM CSL_CITATION${jsonStr} `
 }
 
-export class DOCXExporterRichtext {
-    doc: any
-    settings: any
-    lists: any
-    footnotes: any
-    math: any
-    tables: any
-    rels: any
-    citations: any
-    images: any
+interface DocxCommentRange {
+    start: FidusNode
+    end: FidusNode
+    content: CommentData
+}
 
-    comments: Record<string, any>
+interface RunOptions {
+    comments?: Record<string, DocxCommentRange>
+    section?: string
+    list_type?: string | null
+    list_depth?: number
+    paragraphId?: string | number
+    inFootnote?: boolean
+    citationType?: string
+    blockInsert?: Track
+    blockDelete?: Track
+    footnoteRefMissing?: boolean
+    commentReference?: boolean
+    dimensions?: {width: number; height?: number}
+    tableSideMargins?: number
+    [key: string]: unknown
+}
+
+export class DOCXExporterRichtext {
+    doc: ExportDoc
+    settings: DocSettings
+    lists: DOCXExporterLists
+    footnotes: DOCXExporterFootnotes
+    math: DOCXExporterMath
+    tables: DOCXExporterTables
+    rels: DOCXExporterRels
+    citations: DOCXExporterCitations
+    images: DOCXExporterImages
+
+    comments: Record<string, number>
     commentRangeCounter: number
     changeCounter: number
     fnCounter: number // footnotes 0 and 1 are occupied by separators by default.
@@ -85,15 +116,15 @@ export class DOCXExporterRichtext {
     paragraphIdCounter: number // Used for w14:paraId attributes on comments
 
     constructor(
-        doc: any,
-        settings: any,
-        lists: any,
-        footnotes: any,
-        math: any,
-        tables: any,
-        rels: any,
-        citations: any,
-        images: any
+        doc: ExportDoc,
+        settings: DocSettings,
+        lists: DOCXExporterLists,
+        footnotes: DOCXExporterFootnotes,
+        math: DOCXExporterMath,
+        tables: DOCXExporterTables,
+        rels: DOCXExporterRels,
+        citations: DOCXExporterCitations,
+        images: DOCXExporterImages
     ) {
         this.doc = doc
         this.settings = settings
@@ -117,28 +148,28 @@ export class DOCXExporterRichtext {
         this.paragraphIdCounter = 0 // Used for w14:paraId attributes on comments
     }
 
-    run(node: any, options: any = {}, nextNode: any = null): string {
+    run(node: FidusNode, options: RunOptions = {}, nextNode: FidusNode | null = null): string {
         options.comments = this.findComments(node) // Data related to comments. We need to mark the first and last occurence of comment
         return this.transformRichtext(node, options, nextNode)
     }
 
-    findComments(node: any, comments: any = {}): any {
+    findComments(node: FidusNode, comments: Record<string, DocxCommentRange> = {}): Record<string, DocxCommentRange> {
         if (node.marks) {
             node.marks
-                .filter((mark: any) => mark.type === "comment")
-                .forEach((comment: any) => {
-                    const commentData = this.doc.comments?.[comment.attrs.id]
+                .filter((mark: FidusMark) => mark.type === "comment")
+                .forEach((comment: FidusMark) => {
+                    const commentData = this.doc.comments?.[comment.attrs?.id as string]
                     if (!commentData) {
                         return
                     }
-                    if (!comments[comment.attrs.id]) {
-                        comments[comment.attrs.id] = {
+                    if (!comments[comment.attrs?.id as string]) {
+                        comments[comment.attrs?.id as string] = {
                             start: node,
                             end: node,
                             content: commentData
                         }
                     } else {
-                        comments[comment.attrs.id]["end"] = node
+                        comments[comment.attrs?.id as string]["end"] = node
                     }
                 })
         }
@@ -150,7 +181,7 @@ export class DOCXExporterRichtext {
         return comments
     }
 
-    transformRichtext(node: any, options: any = {}, nextNode: any = null): string {
+    transformRichtext(node: FidusNode, options: RunOptions = {}, nextNode: FidusNode | null = null): string {
         let start = "",
             content = "",
             end = ""
@@ -158,29 +189,29 @@ export class DOCXExporterRichtext {
         if (node.marks && options.comments) {
             // Footnotes don't allow comments in DOCX
             node.marks
-                .filter((mark: any) => mark.type === "comment")
-                .forEach((comment: any) => {
-                    const commentData = options.comments[comment.attrs.id]
+                .filter((mark: FidusMark) => mark.type === "comment")
+                .forEach((comment: FidusMark) => {
+                    const commentData = options.comments![comment.attrs?.id as string]
                     if (!commentData) {
                         return
                     }
                     if (commentData.start === node) {
-                        let commentId = this.comments[comment.attrs.id]
+                        let commentId = this.comments[comment.attrs?.id as string]
                         start += `<w:commentRangeStart w:id="${commentId}"/>`
                         commentData.content.answers?.forEach(
-                            (_answer: any) =>
+                            (_answer) =>
                                 (start += `<w:commentRangeStart w:id="${++commentId}"/>`)
                         )
                     }
 
                     if (commentData.end === node) {
-                        let commentId = this.comments[comment.attrs.id]
+                        let commentId = this.comments[comment.attrs?.id as string]
                         end =
                             `<w:commentRangeEnd w:id="${commentId}"/><w:r><w:commentReference w:id="${
                                 commentId
                             }"/></w:r>${(commentData.content.answers || [])
                                 .map(
-                                    (_answer: any) =>
+                                    (_answer) =>
                                         `<w:commentRangeEnd w:id="${++commentId}"/><w:r><w:commentReference w:id="${commentId}"/></w:r>`
                                 )
                                 .join("")}` + end
@@ -190,26 +221,24 @@ export class DOCXExporterRichtext {
 
         const inlineType = INLINE_TYPES.includes(node.type)
 
-        let inlineDelete: any,
-            nextBlockDelete: any,
-            nextBlockInsert: any,
-            blockChange: any,
-            blockDelete: any,
-            blockInsert: any
+        let inlineDelete: Track | undefined,
+            nextBlockDelete: Track | undefined,
+            nextBlockInsert: Track | undefined,
+            blockChange: Track | undefined,
+            blockDelete: Track | undefined,
+            blockInsert: Track | undefined
         if (inlineType) {
-            const inlineInsert =
-                inlineType &&
+            const inlineInsert: Track | undefined =
                 (node.marks?.find(
-                    (mark: any) =>
+                    (mark: FidusMark) =>
                         mark.type === "insertion" &&
-                        mark.attrs.approved === false
-                )?.attrs ||
-                    options.blockInsert)
+                        mark.attrs?.approved === false
+                )?.attrs as Track | undefined) ||
+                options.blockInsert
             inlineDelete =
-                inlineType &&
-                (node.marks?.find((mark: any) => mark.type === "deletion")
-                    ?.attrs ||
-                    options.blockDelete)
+                (node.marks?.find((mark: FidusMark) => mark.type === "deletion")
+                    ?.attrs as Track | undefined) ||
+                options.blockDelete
             if (
                 inlineInsert &&
                 inlineDelete &&
@@ -229,27 +258,27 @@ export class DOCXExporterRichtext {
             }
         } else if (TEXT_BLOCK_TYPES.includes(node.type)) {
             blockChange = node.attrs?.track?.find(
-                (mark: any) => mark.type === "block_change"
+                (mark: Track) => mark.type === "block_change"
             )
 
             if (nextNode && TEXT_BLOCK_TYPES.includes(nextNode.type)) {
                 nextBlockDelete = nextNode.attrs?.track?.find(
-                    (mark: any) => mark.type === "deletion"
+                    (mark: Track) => mark.type === "deletion"
                 )
                 nextBlockInsert = nextNode.attrs?.track?.find(
-                    (mark: any) => mark.type === "insertion"
+                    (mark: Track) => mark.type === "insertion"
                 )
             }
         } else {
             blockDelete = node.attrs?.track?.find(
-                (mark: any) => mark.type === "deletion"
+                (mark: Track) => mark.type === "deletion"
             )
             if (blockDelete) {
                 options = Object.assign({}, options)
                 options.blockDelete = blockDelete
             }
             blockInsert = node.attrs?.track?.find(
-                (mark: any) => mark.type === "insertion"
+                (mark: Track) => mark.type === "insertion"
             )
             if (blockInsert) {
                 options = Object.assign({}, options)
@@ -510,72 +539,72 @@ export class DOCXExporterRichtext {
                     </w:r>`
                 break
             case "text": {
-                let hyperlink: any,
-                    anchor: any,
-                    em: any,
-                    strong: any,
-                    underline: any,
-                    smallcaps: any,
-                    sup: any,
-                    sub: any,
-                    code: any,
-                    formatChange: any
+                let hyperlink: FidusMark | undefined,
+                    anchor: FidusMark | undefined,
+                    em: FidusMark | undefined,
+                    strong: FidusMark | undefined,
+                    underline: FidusMark | undefined,
+                    smallcaps: FidusMark | undefined,
+                    sup: FidusMark | undefined,
+                    sub: FidusMark | undefined,
+                    code: FidusMark | undefined,
+                    formatChange: FidusMark | undefined
                 // Check for hyperlink, anchor, bold/strong and italic/em
                 if (node.marks) {
-                    hyperlink = node.marks.find((mark: any) => mark.type === "link")
-                    anchor = node.marks.find((mark: any) => mark.type === "anchor")
-                    em = node.marks.find((mark: any) => mark.type === "em")
-                    strong = node.marks.find((mark: any) => mark.type === "strong")
+                    hyperlink = node.marks.find((mark: FidusMark) => mark.type === "link")
+                    anchor = node.marks.find((mark: FidusMark) => mark.type === "anchor")
+                    em = node.marks.find((mark: FidusMark) => mark.type === "em")
+                    strong = node.marks.find((mark: FidusMark) => mark.type === "strong")
                     underline = node.marks.find(
-                        (mark: any) => mark.type === "underline"
+                        (mark: FidusMark) => mark.type === "underline"
                     )
                     smallcaps = node.marks.find(
-                        (mark: any) => mark.type === "smallcaps"
+                        (mark: FidusMark) => mark.type === "smallcaps"
                     )
-                    sup = node.marks.find((mark: any) => mark.type === "sup")
-                    sub = node.marks.find((mark: any) => mark.type === "sub")
-                    code = node.marks.find((mark: any) => mark.type === "code")
+                    sup = node.marks.find((mark: FidusMark) => mark.type === "sup")
+                    sub = node.marks.find((mark: FidusMark) => mark.type === "sub")
+                    code = node.marks.find((mark: FidusMark) => mark.type === "code")
                     formatChange = node.marks.find(
-                        (mark: any) => mark.type === "format_change"
+                        (mark: FidusMark) => mark.type === "format_change"
                     )
                 }
                 if (anchor) {
-                    start += `<w:bookmarkStart w:name="${anchor.attrs.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>`
+                    start += `<w:bookmarkStart w:name="${anchor.attrs?.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>`
                     end =
-                        `<w:bookmarkStart w:name="${anchor.attrs.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
+                        `<w:bookmarkStart w:name="${anchor.attrs?.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
                         end
                 }
                 if (hyperlink) {
-                    const href = hyperlink.attrs.href
+                    const href = hyperlink.attrs?.href as string
                     if (href[0] === "#") {
                         // Internal link
                         start += `<w:hyperlink w:anchor="${href.slice(1)}">`
                     } else {
                         // External link
                         const refId = this.rels.addLinkRel(href)
-                        start += `<w:hyperlink r:id="rId${refId}">`
+                            start += `<w:hyperlink r:id="rId${refId}">`
+                        }
+                        start += "<w:r>"
+                        end = "</w:r></w:hyperlink>" + end
+                    } else {
+                        start += "<w:r>"
+                        end = "</w:r>" + end
                     }
-                    start += "<w:r>"
-                    end = "</w:r></w:hyperlink>" + end
-                } else {
-                    start += "<w:r>"
-                    end = "</w:r>" + end
-                }
-                start += "<w:rPr>"
-                if (
-                    hyperlink ||
-                    em ||
-                    strong ||
-                    underline ||
-                    smallcaps ||
-                    sup ||
-                    sub ||
-                    code
-                ) {
-                    if (hyperlink) {
-                        this.rels.addLinkStyle()
-                        start += `<w:rStyle w:val="${this.rels.hyperLinkStyle}"/>`
-                    }
+                    start += "<w:rPr>"
+                    if (
+                        hyperlink ||
+                        em ||
+                        strong ||
+                        underline ||
+                        smallcaps ||
+                        sup ||
+                        sub ||
+                        code
+                    ) {
+                        if (hyperlink) {
+                            this.rels.addLinkStyle()
+                            start += `<w:rStyle w:val="${this.rels.hyperLinkStyle}"/>`
+                        }
                     if (em) {
                         start += "<w:i/><w:iCs/>"
                     }
@@ -599,8 +628,8 @@ export class DOCXExporterRichtext {
                     }
                 }
                 if (formatChange) {
-                    const beforeStyle = formatChange.attrs.before
-                    start += `<w:rPrChange w:id="${++this.changeCounter}" w:author="${escapeText(formatChange.attrs.username)}" w:date="${new Date(formatChange.attrs.date * 60000).toISOString().split(".")[0]}Z"><w:rPr>`
+                    const beforeStyle = formatChange.attrs?.before as string[]
+                    start += `<w:rPrChange w:id="${++this.changeCounter}" w:author="${escapeText(formatChange.attrs?.username as string)}" w:date="${new Date((formatChange.attrs?.date as number) * 60000).toISOString().split(".")[0]}Z"><w:rPr>`
                     if (beforeStyle.includes("em")) {
                         start += "<w:i/><w:iCs/>"
                     }
@@ -643,7 +672,7 @@ export class DOCXExporterRichtext {
                         type: "link",
                         attrs: {href: `#${id}`, title}
                     }
-                    marks = marks.filter((mark: any) => mark.type !== "link")
+                    marks = marks.filter((mark: FidusMark) => mark.type !== "link")
                     marks.push(hyperlink)
                 }
                 content += this.transformRichtext(
@@ -773,8 +802,8 @@ export class DOCXExporterRichtext {
             }
             case "figure": {
                 const category = node.attrs.category
-                let caption = node.attrs.caption
-                    ? node.content.find((node: any) => node.type === "figure_caption")
+                const caption = node.attrs.caption
+                    ? node.content.find((node: FidusNode) => node.type === "figure_caption")
                           ?.content || []
                     : []
                 let catCountXML = ""
@@ -814,8 +843,8 @@ export class DOCXExporterRichtext {
                 }
                 let cx: number, cy: number
                 const image =
-                    node.content.find((node: any) => node.type === "image")?.attrs
-                        .image || false
+                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
+                        ?.image || false
                 if (image !== false) {
                     const imageEntry = this.images.images[image]
                     cx = imageEntry.width * 9525 // width in EMU
@@ -891,8 +920,8 @@ export class DOCXExporterRichtext {
                     cy = 9525 * 100
                     const latex =
                         node.content.find(
-                            (node: any) => node.type === "figure_equation"
-                        )?.attrs.equation || ""
+                            (node: FidusNode) => node.type === "figure_equation"
+                        )?.attrs?.equation || ""
                     content += this.math.getOmml(latex)
                 }
                 const captionSpace = !!(catCountXML.length || caption.length)
@@ -913,7 +942,7 @@ export class DOCXExporterRichtext {
                             ? `<w:p>
                           <w:pPr><w:pStyle w:val="Caption"/><w:rPr></w:rPr></w:pPr>
                           ${catCountXML}
-                          ${caption.map((node: any, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
+                          ${caption.map((node: FidusNode, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
                     </w:p>`
                             : ""
                     }` + end
@@ -963,7 +992,7 @@ export class DOCXExporterRichtext {
                     end =
                         `
                                                         ${catCountXML}
-                                                        ${caption.map((node: any, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
+                                                        ${caption.map((node: FidusNode, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
                                                     </w:p>
                                                 </w:txbxContent>
                                             </wps:txbx>
@@ -1051,7 +1080,7 @@ export class DOCXExporterRichtext {
                         <w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/>
                         <w:bookmarkEnd w:id="${this.bookmarkCounter}"/>
                         ${catCountXML}
-                        ${caption.map((node: any, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
+                        ${caption.map((node: FidusNode, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
                     </w:p>`
                 }
                 this.tables.addTableGridStyle()

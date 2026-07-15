@@ -1,7 +1,11 @@
+import type JSZip from "jszip"
 import {ZipAnalyzer} from "./zip_analyzer.js"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ImporterClass = new (...args: any[]) => unknown
+
 interface ImporterEntry {
-    importer: any
+    importer: ImporterClass
     description: string
 }
 
@@ -14,7 +18,7 @@ export class ImporterRegistry {
 
     register(
         fileTypes: Array<[string, Array<string>]>,
-        importer: any
+        importer: ImporterClass
     ): void {
         fileTypes.forEach(([description, types]) => {
             types.forEach(extension =>
@@ -23,8 +27,8 @@ export class ImporterRegistry {
         })
     }
 
-    getZipImporter(zip: any): {
-        importer: any
+    getZipImporter(zip: JSZip): {
+        importer: ImporterClass
         getContents: () => ReturnType<ZipAnalyzer["getContents"]>
     } | null {
         const analyzer = new ZipAnalyzer(zip, this.getAllFormats())
@@ -63,7 +67,7 @@ export const importerRegistry = new ImporterRegistry()
 
 export function registerImporter(
     fileTypes: Array<[string, Array<string>]>,
-    importer: any
+    importer: ImporterClass
 ): void {
     importerRegistry.register(fileTypes, importer)
 }

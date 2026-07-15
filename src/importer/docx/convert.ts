@@ -15,8 +15,72 @@ import {
 import {normalizeText} from "./helpers.js"
 import {omml2mathml} from "./omml2mathml.js"
 import {DocxParser} from "./parse.js"
+import type {RunProperties} from "./parse.js"
 import {gettext} from "fwtoolkit"
-import type {FidusDoc, ImageDBEntry} from "../../types.js"
+import type JSZip from "jszip"
+import type {
+    CommentData,
+    FidusMark,
+    FidusDoc,
+    FidusNode,
+    ImageDBEntry,
+    Track
+} from "../../types.js"
+
+/** Text extracted from a document section for metadata or body. */
+interface ExtractedContent {
+    content: FidusNode[]
+    containerNodes: XMLElement[]
+    header?: XMLElement
+}
+
+/** A metadata section grouped by semantic type. */
+interface MetadataItem {
+    type: string
+    content: ExtractedContent
+}
+
+/** A document section (heading + its body content). */
+interface DocxSection {
+    title: string | null
+    content: FidusNode[]
+}
+
+/** An in-progress DOCX field (FLDCHAR state machine). */
+interface FieldState {
+    status: "instruction" | "display"
+    display: FidusNode[]
+    instructions: string
+    data: string | null
+}
+
+/** Paragraph style information returned by getParaStyle(). */
+interface ParaStyle {
+    id?: string
+    name?: string
+    isHeading?: boolean
+    isCaption?: boolean
+    level?: number
+    numbering: {
+        id: string
+        level: number
+        definition?: {
+            abstractId: string
+            levels: Array<{level: string; format: string; text: string; start: number}>
+            overrides: Array<{level: string; start: number}>
+        }
+    } | null
+}
+
+/** A partially assembled document during conversion (before cast to FidusDoc). */
+interface InProgressDoc {
+    type: string
+    attrs: {
+        import_id: string
+        title?: string
+    }
+    content: FidusNode[]
+}
 
 function attr(node: unknown, name: string): string {
     if (node && typeof node === "object" && "getAttribute" in node) {
@@ -26,24 +90,24 @@ function attr(node: unknown, name: string): string {
 }
 
 export class DocxConvert {
-    zip: any
+    zip: JSZip
     importId: string
     template: {content: FidusDoc}
-    bibliography: Record<string, any>
+    bibliography: Record<string, unknown>
     images: Record<number, ImageDBEntry>
     parser: DocxParser
-    tracks: Record<string, any>
-    currentTracks: any[]
-    currentFields: any[]
+    tracks: Record<string, Track>
+    currentTracks: Track[]
+    currentFields: FieldState[]
     currentCommentIds: string[]
     sourcesXml: string | null
     referenceTargets: Record<string, {id: string; type: string; text?: string}>
 
     constructor(
-        zip: any,
+        zip: JSZip,
         importId: string,
         template: {content: FidusDoc},
-        bibliography: Record<string, any>
+        bibliography: Record<string, unknown>
     ) {
         this.zip = zip
         this.importId = importId
@@ -61,8 +125,8 @@ export class DocxConvert {
 
     async init(): Promise<{
         content: FidusDoc
-        settings: Record<string, any>
-        comments: Record<string, any>
+        settings: Record<string, unknown>
+        comments: Record<string, CommentData>
     }> {
         await this.parser.init()
         // Load Word-native bibliography sources if present.
@@ -101,11 +165,11 @@ export class DocxConvert {
         }
     }
 
-    convertDocument(body: any): FidusDoc {
+    convertDocument(body: XMLElement): FidusDoc {
         const templateParts = this.template.content.content.slice()
         templateParts.shift() // Remove first element
 
-        const document: any = {
+        const document: InProgressDoc = {
             type: "doc",
             attrs: {
                 import_id: this.importId

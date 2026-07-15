@@ -1,6 +1,6 @@
 import {updateDoc} from "../../schema/convert.js"
 
-import type {FidusDoc, ImageDBEntries} from "../../types.js"
+import type {BibDBEntry, FidusDoc, ImageDBEntries} from "../../types.js"
 
 export function updateFile(
     doc: FidusDoc,
@@ -28,9 +28,9 @@ export function updateFile(
     }
     if (filetypeVersion < 2.0) {
         // Before 2.0, version numbers of the doc and of the file differed.
-        doc = updateDoc(doc, (docRecord.settings as Record<string, unknown>)["doc_version"] as number, bibliography as any) as FidusDoc
+        doc = updateDoc(doc, (docRecord.settings as Record<string, unknown>)["doc_version"] as number, bibliography as Record<string, BibDBEntry>) as FidusDoc
     } else {
-        doc = updateDoc(doc, filetypeVersion, bibliography as any) as FidusDoc
+        doc = updateDoc(doc, filetypeVersion, bibliography as Record<string, BibDBEntry>) as FidusDoc
     }
 
     return {doc, bibliography, images}

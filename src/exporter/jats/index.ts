@@ -4,6 +4,7 @@ import {gettext, shortFileTitle} from "fwtoolkit"
 import {formatXml} from "../tools/format.js"
 import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
+import type {JATSExporterConverter} from "./convert.js"
 import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator} from "fwtoolkit/file/zip"
 import {JATSExporterConverter} from "./convert.js"
@@ -23,14 +24,14 @@ export class JATSExporter {
     bibDB: BibDB
     imageDB: ImageDB
     csl: CSL
-    updated: any
+    updated: Date
     type: string
 
     zipFileName: string | false
     textFiles: Array<{filename: string; contents: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
 
-    converter: any
+    converter: JATSExporterConverter
     progressCallback?: ProgressCallback
 
     constructor(
@@ -38,7 +39,7 @@ export class JATSExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: any,
+        updated: Date,
         type: string,
         progressCallback?: ProgressCallback
     ) {

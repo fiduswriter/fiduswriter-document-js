@@ -1,5 +1,5 @@
 import {HTMLExporter} from "../html/index.js"
-import type {BibDB, CSL, ExportDoc, ImageDB} from "../../types.js"
+import type {BibDB, Contributor, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
 import {formatHtml, formatXml} from "../tools/format.js"
 
@@ -27,7 +27,7 @@ export class EpubExporter extends HTMLExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: any,
+        updated: Date,
         documentStyles: Array<{
             slug: string
             contents: string
@@ -114,23 +114,24 @@ export class EpubExporter extends HTMLExporter {
 
         // Extract authors and keywords from metaData
         const rawAuthors = this.converter.metaData.authors.map(
-            ({attrs: author}: any) => {
+            (node: FidusNode) => {
+                const author = (node.attrs || {}) as Contributor
                 if (author.firstname || author.lastname) {
                     const nameParts: string[] = []
                     if (author.firstname) {
-                        nameParts.push(author.firstname)
+                        nameParts.push(author.firstname as string)
                     }
                     if (author.lastname) {
-                        nameParts.push(author.lastname)
+                        nameParts.push(author.lastname as string)
                     }
                     return nameParts.join(" ")
                 } else if (author.institution) {
-                    return author.institution
+                    return author.institution as string
                 }
             }
         )
         const authors = rawAuthors.filter(
-            (author: any): author is string => typeof author === "string"
+            (author): author is string => typeof author === "string"
         )
         return opfTemplate({
             language: this.lang,

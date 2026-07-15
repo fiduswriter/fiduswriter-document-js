@@ -10,6 +10,40 @@ import {getImageDBEntryFilename} from "../tools/file.js"
 import {JATSExporterCitations} from "./citations.js"
 import {convertText} from "./text.js"
 
+interface License {
+    url?: string
+    start?: string
+    [key: string]: unknown
+}
+
+interface Copyright {
+    holder?: string
+    year?: number
+    freeToRead?: boolean
+    licenses: License[]
+    [key: string]: unknown
+}
+
+interface JATSFrontMatter {
+    title: Record<string, FidusNode>
+    subtitle: Record<string, FidusNode>
+    contributors: FidusNode[]
+    abstract: Record<string, FidusNode>
+    keywords: FidusNode[]
+    tags: FidusNode[]
+    copyright: Copyright
+}
+
+interface WalkOptions {
+    breakAllowed?: boolean
+    inKeywords?: boolean
+    inFootnote?: boolean
+    ignoreHeading?: boolean
+    partMetadata?: string
+    inOrderedList?: number
+    [key: string]: unknown
+}
+
 export class JATSExporterConverter {
     type: string
     doc: ExportDoc
@@ -27,8 +61,8 @@ export class JATSExporterConverter {
     orderedListLengths: number[]
     footnotes: string[]
     fnCounter: number
-    frontMatter: any
-    citInfos: any[]
+    frontMatter: JATSFrontMatter
+    citInfos: Record<string, unknown>[]
     citationCount: number
     citations: JATSExporterCitations
 
@@ -90,20 +124,20 @@ export class JATSExporterConverter {
     }
 
     // Remove items from the body that should be in the front.
-    preWalkJson(node: any, parentNode: any = false): void {
+    preWalkJson(node: FidusNode, parentNode: FidusNode | false = false): void {
         switch (node.type) {
             case "doc":
                 if (node.attrs.copyright) {
-                    this.frontMatter.copyright = node.attrs.copyright
+                    this.frontMatter.copyright = node.attrs.copyright as Copyright
                 }
                 break
             case "title":
                 this.frontMatter.title["default"] = node
                 parentNode.content = parentNode.content.filter(
-                    (child: any) => child !== node
-                )
-                break
-            case "heading_part":
+                (child: FidusNode) => child !== node
+            )
+            break
+        case "heading_part":
                 if (
                     ["title", "subtitle"].includes(node.attrs.metadata) &&
                     !this.frontMatter[node.attrs.metadata][
@@ -126,7 +160,7 @@ export class JATSExporterConverter {
                         content: node.content[0].content
                     }
                     parentNode.content = parentNode.content.filter(
-                        (child: any) => child !== node
+                        (child: FidusNode) => child !== node
                     )
                 }
                 break
@@ -149,7 +183,7 @@ export class JATSExporterConverter {
                         content: node.content
                     }
                     parentNode.content = parentNode.content.filter(
-                        (child: any) => child !== node
+                        (child: FidusNode) => child !== node
                     )
                 }
                 break
@@ -166,24 +200,24 @@ export class JATSExporterConverter {
                     this.frontMatter.tags.push(node)
                 }
                 parentNode.content = parentNode.content.filter(
-                    (child: any) => child !== node
+                    (child: FidusNode) => child !== node
                 )
                 break
             case "contributors_part":
                 this.frontMatter.contributors.push(node)
                 parentNode.content = parentNode.content.filter(
-                    (child: any) => child !== node
+                    (child: FidusNode) => child !== node
                 )
                 break
             default:
                 break
         }
         if (node.content) {
-            node.content.forEach((child: any) => this.preWalkJson(child, node))
+            node.content.forEach((child: FidusNode) => this.preWalkJson(child, node))
         }
     }
 
-    findAllCitations(docContent: any): void {
+    findAllCitations(docContent: FidusNode): void {
         // We need to look for citations in the same order they will be found in front + body
         // to get the formatting right.
         if (this.frontMatter.subtitle.default) {
@@ -208,19 +242,19 @@ export class JATSExporterConverter {
         this.findCitations(docContent)
     }
 
-    findCitations(node: any): void {
+    findCitations(node: FidusNode): void {
         switch (node.type) {
             case "citation":
                 this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
                 break
             case "footnote":
-                node.attrs.footnote.forEach((child: any) => this.findCitations(child))
+                (node.attrs?.footnote as FidusNode[] | undefined)?.forEach((child: FidusNode) => this.findCitations(child))
                 break
             default:
                 break
         }
         if (node.content) {
-            node.content.forEach((child: any) => this.findCitations(child))
+            node.content.forEach((child: FidusNode) => this.findCitations(child))
         }
     }
 
@@ -230,7 +264,7 @@ export class JATSExporterConverter {
             "<journal-meta><journal-id></journal-id><issn></issn></journal-meta>" // Required by DTD
         front += "<article-meta>"
         if (this.frontMatter.tags.length) {
-            front += `<article-categories>${this.frontMatter.tags.map((node: any) => this.walkJson(node)).join("")}</article-categories>`
+            front += `<article-categories>${this.frontMatter.tags.map((node: FidusNode) => this.walkJson(node)).join("")}</article-categories>`
         }
         Object.keys(this.frontMatter.subtitle)
             .filter(language => language !== "default")
@@ -259,7 +293,7 @@ export class JATSExporterConverter {
                 front += "</trans-title-group>"
             })
         front += "</title-group>"
-        this.frontMatter.contributors.forEach((contributors: any) => {
+        this.frontMatter.contributors.forEach((contributors: FidusNode) => {
             front += this.walkJson(contributors)
         })
         Object.entries(this.affiliations).forEach(
@@ -279,8 +313,8 @@ export class JATSExporterConverter {
             }
             front += this.frontMatter.copyright.licenses
                 .map(
-                    (license: any) =>
-                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
+                    (license: License) =>
+                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url as string)}</ali:license_ref></license>`
                 )
                 .join("")
             front += "</permissions>"
@@ -297,7 +331,7 @@ export class JATSExporterConverter {
                 front += this.walkJson(this.frontMatter.abstract[language])
                 front += this.closeSections(0)
             })
-        this.frontMatter.keywords.forEach((keywords: any) => {
+        this.frontMatter.keywords.forEach((keywords: FidusNode) => {
             front += this.walkJson(keywords)
         })
         front += "</article-meta></front>"
@@ -307,7 +341,7 @@ export class JATSExporterConverter {
     assembleBookPartFront(): string {
         let front = "<front-matter><book-part-meta>"
         if (this.frontMatter.tags.length) {
-            front += `<subj-group>${this.frontMatter.tags.map((node: any) => this.walkJson(node)).join("")}</subj-group>`
+            front += `<subj-group>${this.frontMatter.tags.map((node: FidusNode) => this.walkJson(node)).join("")}</subj-group>`
         }
         Object.keys(this.frontMatter.subtitle)
             .filter(language => language !== "default")
@@ -336,7 +370,7 @@ export class JATSExporterConverter {
                 front += "</trans-title-group>"
             })
         front += "</title-group>"
-        this.frontMatter.contributors.forEach((contributors: any) => {
+        this.frontMatter.contributors.forEach((contributors: FidusNode) => {
             front += this.walkJson(contributors)
         })
         Object.entries(this.affiliations).forEach(
@@ -356,8 +390,8 @@ export class JATSExporterConverter {
             }
             front += this.frontMatter.copyright.licenses
                 .map(
-                    (license: any) =>
-                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
+                    (license: License) =>
+                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url as string)}</ali:license_ref></license>`
                 )
                 .join("")
             front += "</permissions>"
@@ -374,14 +408,14 @@ export class JATSExporterConverter {
                 front += this.walkJson(this.frontMatter.abstract[language])
                 front += this.closeSections(0)
             })
-        this.frontMatter.keywords.forEach((keywords: any) => {
+        this.frontMatter.keywords.forEach((keywords: FidusNode) => {
             front += this.walkJson(keywords)
         })
         front += "</book-part-meta></front-matter>"
         return front
     }
 
-    walkJson(node: any, options: any = {}): string {
+    walkJson(node: FidusNode, options: WalkOptions = {}): string {
         let start = "",
             content = "",
             end = ""
@@ -442,7 +476,7 @@ export class JATSExporterConverter {
                     end = "</contrib-group>" + end
                     const contributorTypeId = node.attrs.id
                     let counter = 1
-                    node.content.forEach((childNode: any) => {
+                    node.content.forEach((childNode: FidusNode) => {
                         const contributor = childNode.attrs
                         if (contributor.firstname || contributor.lastname) {
                             content += `<contrib id="${contributorTypeId}-${counter++}" contrib-type="person">`
@@ -696,18 +730,18 @@ export class JATSExporterConverter {
                     // only allows <p> block level elements https://jats.nlm.nih.gov/archiving/tag-library/1.2/element/fn.html
                     break
                 }
-                let imageFilename: string | undefined, copyright: any
+                let imageFilename: string | undefined, copyright: Copyright | undefined
                 const image =
-                    node.content.find((node: any) => node.type === "image")?.attrs
-                        .image || false
+                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
+                        ?.image || false
                 if (image !== false) {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image]
-                    copyright = imageDBEntry.copyright
+                    copyright = imageDBEntry.copyright as Copyright | undefined
                     imageFilename = getImageDBEntryFilename(imageDBEntry, image)
                 }
                 const caption = node.attrs.caption
-                    ? node.content.find((node: any) => node.type === "figure_caption")
+                    ? node.content.find((node: FidusNode) => node.type === "figure_caption")
                           ?.content || []
                     : []
                 if (
@@ -717,7 +751,7 @@ export class JATSExporterConverter {
                     (!copyright || !copyright.holder)
                 ) {
                     content += `<graphic id="${node.attrs.id}" position="anchor" xlink:href="${imageFilename}">`
-                    content += `<alt-text>${escapeText(caption.map((node: any) => node.text || "").join("") || imageFilename)}</alt-text>`
+                    content += `<alt-text>${escapeText(caption.map((node: FidusNode) => node.text || "").join("") || imageFilename)}</alt-text>`
                     content += "</graphic>"
                 } else {
                     start += `<fig id="${node.attrs.id}">`
@@ -725,19 +759,19 @@ export class JATSExporterConverter {
 
                     const category = node.attrs.category
                     if (category !== "none") {
-                        if (!this.categoryCounter[category]) {
-                            this.categoryCounter[category] = 0
+                        if (!this.categoryCounter[category as string]) {
+                            this.categoryCounter[category as string] = 0
                         }
-                        const catCount = ++this.categoryCounter[category]
-                        const catLabel = `${getCat(category, this.doc.settings.language || "en-US")} ${catCount}`
+                        const catCount = ++this.categoryCounter[category as string]
+                        const catLabel = `${getCat(category as string, this.doc.settings.language || "en-US")} ${catCount}`
                         start += `<label>${escapeText(catLabel)}</label>`
                     }
                     if (caption.length) {
-                        start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
+                        start += `<caption><p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p></caption>`
                     }
                     const equation = node.content.find(
-                        (node: any) => node.type === "figure_equation"
-                    )?.attrs.equation
+                        (node: FidusNode) => node.type === "figure_equation"
+                    )?.attrs?.equation
                     if (equation) {
                         start += "<disp-formula>"
                         end = "</disp-formula>" + end
@@ -761,15 +795,15 @@ export class JATSExporterConverter {
                             }
                             start += copyright.licenses
                                 .map(
-                                    (license: any) =>
-                                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url)}</ali:license_ref></license>`
+                                    (license: License) =>
+                                        `<license><ali:license_ref${license.start ? ` start_date="${license.start}"` : ""}>${escapeText(license.url as string)}</ali:license_ref></license>`
                                 )
                                 .join("")
                             start += "</permissions>"
                         }
                         if (imageFilename) {
                             content += `<graphic position="anchor" xlink:href="${imageFilename}">`
-                            content += `<alt-text>${escapeText(caption.map((node: any) => node.text || "").join("") || imageFilename)}</alt-text>`
+                            content += `<alt-text>${escapeText(caption.map((node: FidusNode) => node.text || "").join("") || imageFilename)}</alt-text>`
                             content += "</graphic>"
                         }
                     }
@@ -793,7 +827,7 @@ export class JATSExporterConverter {
                 }
                 start += `<table-wrap id="${node.attrs.id}">`
                 end = "</table-wrap>" + end
-                const category = node.attrs.category
+                const category = node.attrs.category as string
                 if (category !== "none") {
                     if (!this.categoryCounter[category]) {
                         this.categoryCounter[category] = 0
@@ -806,7 +840,7 @@ export class JATSExporterConverter {
                     ? node.content[0].content || []
                     : []
                 if (caption.length) {
-                    start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
+                    start += `<caption><p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p></caption>`
                 }
                 start += `<table width="${node.attrs.width}%"><tbody>`
                 end = "</tbody></table>" + end
@@ -856,7 +890,7 @@ export class JATSExporterConverter {
         }
 
         if (!content.length && node.content) {
-            node.content.forEach((child: any) => {
+            node.content.forEach((child: FidusNode) => {
                 content += this.walkJson(child, options)
             })
         }
@@ -874,7 +908,7 @@ export class JATSExporterConverter {
         return returnValue
     }
 
-    assembleBody(docContent: any): string {
+    assembleBody(docContent: FidusNode): string {
         return `<body id="body">${this.walkJson(docContent) + this.closeSections(0)}</body>`
     }
 

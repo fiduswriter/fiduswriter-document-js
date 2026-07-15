@@ -9,6 +9,7 @@ import {
     Transform,
     replaceStep
 } from "prosemirror-transform"
+import type {Track} from "../types.js"
 
 export const deleteNode = (
     tr: Transform,
@@ -44,7 +45,7 @@ export const deleteNode = (
                 delStep = replaceStep(tr.doc, start, end)
             } else {
                 const track = node.attrs.track.filter(
-                    (track: any) => track.type !== trackType
+                    (track: Track) => track.type !== trackType
                 )
                 tr.setNodeMarkup(
                     newNodePos,
@@ -56,7 +57,7 @@ export const deleteNode = (
         } else {
             // There is a block node right in front of it that cannot be removed. Give up. (table/figure/etc.)
             const track = node.attrs.track.filter(
-                (track: any) => track.type !== trackType
+                (track: Track) => track.type !== trackType
             )
             tr.setNodeMarkup(
                 newNodePos,

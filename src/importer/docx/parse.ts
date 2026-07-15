@@ -3,7 +3,7 @@ import type {XMLElement} from "../../exporter/tools/xml.js"
 import {randomCommentId} from "../../schema/common/index.js"
 import {gettext} from "fwtoolkit"
 import type JSZip from "jszip"
-import type {CommentData, FidusNode} from "../../types.js"
+import type {CommentData, FidusMark, FidusNode} from "../../types.js"
 
 interface ParagraphProperties {
     indent?: {
@@ -17,7 +17,7 @@ interface ParagraphProperties {
     keepNext?: boolean
 }
 
-interface RunProperties {
+export interface RunProperties {
     bold?: boolean
     italic?: boolean
     underline?: string | false
@@ -279,11 +279,11 @@ export class DocxParser {
 
             // Parse abstract numbering definitions
             const abstractNums = numberingDoc.queryAll("w:abstractNum")
-            const abstractNumbering: Record<string, any> = {}
+            const abstractNumbering: Record<string, NumberingLevel[]> = {}
 
-            abstractNums.forEach((abstractNum: any) => {
+    abstractNums.forEach((abstractNum: XMLElement) => {
                 const id = attr(abstractNum, "w:abstractNumId")
-                const levels = abstractNum.queryAll("w:lvl").map((lvl: any) => ({
+                const levels = abstractNum.queryAll("w:lvl").map((lvl: XMLElement) => ({
                     level: attr(lvl, "w:ilvl"),
                     format: attr(lvl.query("w:numFmt"), "w:val"),
                     text: attr(lvl.query("w:lvlText"), "w:val"),
@@ -296,7 +296,7 @@ export class DocxParser {
 
             // Parse numbering instances
             const nums = numberingDoc.queryAll("w:num")
-            nums.forEach((num: any) => {
+            nums.forEach((num: XMLElement) => {
                 const numId = attr(num, "w:numId")
                 const abstractNumId = attr(num
                                     .query("w:abstractNumId"), "w:val")
@@ -312,8 +312,8 @@ export class DocxParser {
         }
     }
 
-    extractNumberingOverrides(num: any) {
-        return num.queryAll("w:lvlOverride").map((override: any) => ({
+    extractNumberingOverrides(num: XMLElement) {
+        return num.queryAll("w:lvlOverride").map((override: XMLElement) => ({
             level: attr(override, "w:ilvl"),
             start: parseInt(
                 attr(override.query("w:startOverride"), "w:val") || "1"
@@ -334,7 +334,7 @@ export class DocxParser {
             const commentList = commentsDoc.queryAll("w:comment")
 
             // First pass: parse all comments into the expected format
-            commentList.forEach((comment: any) => {
+            commentList.forEach((comment: XMLElement) => {
                 const id = attr(comment, "w:id")
                 const dateStr = attr(comment, "w:date")
                 this.comments[id] = {
@@ -369,10 +369,10 @@ export class DocxParser {
             }
 
             // Parse extended entries into main (no parentParaId) and answer entries
-            const mainEntries: any[] = []
-            const answerEntries: any[] = []
+            const mainEntries: {paraId: string; done: boolean}[] = []
+            const answerEntries: {paraId: string; parentParaId: string; done: boolean}[] = []
 
-            extendedEntries.forEach((entry: any) => {
+            extendedEntries.forEach((entry: XMLElement) => {
                 const paraId = attr(entry, "w15:paraId")
                 const done = attr(entry, "w15:done") === "1"
                 const paraIdParent = attr(entry, "w15:paraIdParent")
@@ -395,13 +395,13 @@ export class DocxParser {
             // extended entries appear first in commentsExtended.xml.
             const commentIds = Object.keys(this.comments)
                 .map(Number)
-                .sort((a: any, b: any) => a - b)
+                .sort((a: number, b: number) => a - b)
                 .map(String)
 
             // Track which comment IDs are parents vs answers
-            const parentCommentIds: any[] = []
+            const parentCommentIds: string[] = []
 
-            commentIds.forEach((commentId: any, index: any) => {
+            commentIds.forEach((commentId, index) => {
                 if (index < mainEntries.length) {
                     // This is a main comment - apply resolved status
                     this.comments[commentId].resolved = mainEntries[index].done
@@ -439,9 +439,9 @@ export class DocxParser {
         }
     }
 
-    extractCommentContent(comment: any) {
-        const content: any[] = []
-        comment.queryAll("w:p").forEach((p: any) => {
+    extractCommentContent(comment: XMLElement): FidusNode[] {
+        const content: FidusNode[] = []
+        comment.queryAll("w:p").forEach((p: XMLElement) => {
             content.push({
                 type: "paragraph",
                 content: this.extractParagraphContent(p)
@@ -460,7 +460,7 @@ export class DocxParser {
             }
             const footnotesDoc = xmlDOM(content)
 
-            footnotesDoc.queryAll("w:footnote").forEach((footnote: any) => {
+            footnotesDoc.queryAll("w:footnote").forEach((footnote: XMLElement) => {
                 const id = attr(footnote, "w:id")
                 if (id === "0" || id === "-1") {
                     return // Skip separator footnotes
@@ -650,7 +650,7 @@ export class DocxParser {
             }
             const endnotesDoc = xmlDOM(content)
 
-            endnotesDoc.queryAll("w:endnote").forEach((endnote: any) => {
+            endnotesDoc.queryAll("w:endnote").forEach((endnote: XMLElement) => {
                 const id = attr(endnote, "w:id")
                 if (id === "0" || id === "-1") {
                     return // Skip separator endnotes
@@ -675,7 +675,7 @@ export class DocxParser {
             }
             const relsDoc = xmlDOM(content)
 
-            relsDoc.queryAll("Relationship").forEach((rel: any) => {
+            relsDoc.queryAll("Relationship").forEach((rel: XMLElement) => {
                 const id = attr(rel, "Id")
                 this.relationships[id] = {
                     id,
@@ -690,7 +690,7 @@ export class DocxParser {
 
     async parseImages() {
         // Find and extract image files
-        const imageFiles = Object.keys(this.zip.files).filter((path: any) =>
+        const imageFiles = Object.keys(this.zip.files).filter((path: string) =>
             path.startsWith("word/media/")
         )
 
@@ -706,13 +706,13 @@ export class DocxParser {
         }
     }
 
-    addMimeType(blob: any, filename: any) {
+    addMimeType(blob: Blob, filename: string) {
         return new File([blob], filename, {
             type: this.getImageFileType(filename)
         })
     }
 
-    getImageFileType(filename: any) {
+    getImageFileType(filename: string) {
         const ext = filename.split(".").pop().toLowerCase()
         switch (ext) {
             case "avif":
@@ -734,9 +734,9 @@ export class DocxParser {
         }
     }
 
-    extractBlockContent(node: any) {
-        const content: any[] = []
-        node.queryAll("w:p").forEach((p: any) => {
+    extractBlockContent(node: XMLElement): FidusNode[] {
+        const content: FidusNode[] = []
+        node.queryAll("w:p").forEach((p: XMLElement) => {
             content.push({
                 type: "paragraph",
                 content: this.extractParagraphContent(p)
@@ -745,9 +745,9 @@ export class DocxParser {
         return content
     }
 
-    extractParagraphContent(p: any) {
-        const content: any[] = []
-        p.queryAll("w:r").forEach((r: any) => {
+    extractParagraphContent(p: XMLElement): FidusNode[] {
+        const content: FidusNode[] = []
+        p.queryAll("w:r").forEach((r: XMLElement) => {
             const text = r.query("w:t")?.textContent
             if (!text) {
                 return
@@ -765,8 +765,8 @@ export class DocxParser {
         return content
     }
 
-    createMarksFromFormatting(formatting: any) {
-        const marks: any[] = []
+    createMarksFromFormatting(formatting: RunProperties): FidusMark[] {
+        const marks: FidusMark[] = []
         if (formatting.bold) {
             marks.push({type: "strong"})
         }

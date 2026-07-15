@@ -23,7 +23,7 @@ export class PandocImporter {
     user: User
     path: string
     importId: string | number | null
-    additionalFiles: Record<string, any>
+    additionalFiles: Record<string, unknown>
     e2eeOptions: E2EEOptions | null
     getTemplate: (importId: string | number | null) => Promise<Record<string, unknown>>
     importBibliography: (bibString: string) => Promise<Record<string, BibDBEntry>>
@@ -54,7 +54,7 @@ export class PandocImporter {
         this.user = user
         this.path = path
         this.importId = importId
-        this.additionalFiles = (options as PandocImporterOptions & {files?: Record<string, any>}).files || {}
+        this.additionalFiles = (options as PandocImporterOptions & {files?: Record<string, unknown>}).files || {}
         this.e2eeOptions = options.e2eeOptions ?? null
         this.getTemplate = options.getTemplate
         this.importBibliography = options.importBibliography
@@ -88,8 +88,8 @@ export class PandocImporter {
         let pandocJson
         try {
             pandocJson = JSON.parse(jsonString)
-        } catch (error: any) {
-            this.output.statusText = error.message
+        } catch (error: unknown) {
+            this.output.statusText = (error as Error).message
             return Promise.resolve(this.output)
         }
 
@@ -98,25 +98,25 @@ export class PandocImporter {
                 const converter = new PandocConvert(
                     pandocJson,
                     this.importId as string,
-                    this.template as {content: any},
+                    this.template as {content: FidusNode},
                     bibliography
                 )
 
                 let convertedDoc
                 try {
                     convertedDoc = converter.init()
-                } catch (error: any) {
-                    this.output.statusText = error.message
+                } catch (error: unknown) {
+                    this.output.statusText = (error as Error).message
                     console.error(error)
                     return this.output
                 }
                 const firstText =
                     (convertedDoc.content as FidusNode).content?.[0].content?.[0]
                         .text
-                if (["", "Untitled"].includes(firstText || "")) {
+                if (["Untitled", ""].includes(firstText || "")) {
                     ;(
                         (convertedDoc.content as FidusNode).content![0]
-                            .content![0] as any
+                            .content![0]
                     ).text = this.title
                 } else {
                     this.title = firstText || this.title
