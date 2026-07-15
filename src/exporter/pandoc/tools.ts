@@ -1,26 +1,13 @@
-interface PandocText {
-    t: "Str"
-    c: string
-}
+import type {
+    PandocElement,
+    PandocInline,
+    PandocMetaInlines,
+    PandocSpace,
+    PandocStr
+} from "./types.js"
 
-interface PandocSpace {
-    t: "Space"
-}
-
-interface PandocNote {
-    t: "Note"
-    c: Array<{t: "Para"; c: Array<PandocText | PandocSpace>}>
-}
-
-interface PandocMetaInlines {
-    t: "MetaInlines"
-    c: Array<PandocText | PandocSpace | PandocNote>
-}
-
-type _PandocInline = PandocText | PandocSpace | PandocNote | PandocMetaInlines
-
-export const convertText = (text: string): Array<PandocText | PandocSpace> => {
-    const textContent: Array<PandocText | PandocSpace> = []
+export const convertText = (text: string): PandocInline[] => {
+    const textContent: Array<PandocStr | PandocSpace> = []
     if (!text.length) {
         return []
     }
@@ -44,7 +31,7 @@ export const convertText = (text: string): Array<PandocText | PandocSpace> => {
 export const convertContributor = (
     contributor: Record<string, string>
 ): PandocMetaInlines | false => {
-    const contributorContent: Array<PandocText | PandocSpace | PandocNote> = []
+    const contributorContent: PandocInline[] = []
     if (contributor.firstname || contributor.lastname) {
         const nameParts: string[] = []
         if (contributor.lastname) {
@@ -69,6 +56,6 @@ export const convertContributor = (
         })
     }
     return contributorContent.length
-        ? {t: "MetaInlines", c: contributorContent}
+        ? {t: "MetaInlines", c: contributorContent as PandocElement[]}
         : false
 }

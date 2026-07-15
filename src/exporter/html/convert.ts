@@ -8,8 +8,7 @@ import type {
     DocSettings,
     FidusMark,
     FidusNode,
-    ImageDB,
-    NodeAttrs
+    ImageDB
 } from "../../types.js"
 import {descendantNodes} from "../tools/doc_content.js"
 import {formatCss} from "../tools/format.js"
@@ -32,7 +31,7 @@ interface HTMLExporterConvertOptions {
     figureOffset?: Record<string, number>
 }
 
-interface HTMLExportMetadata {
+export interface HTMLExportMetadata {
     title: string
     authors: FidusNode[]
     abstract: Record<string, FidusNode> | false
@@ -159,7 +158,7 @@ export class HTMLExporterConvert {
         html: string
         imageIds: string[]
         extraStyleSheets: Array<{filename?: string | null; contents?: string}>
-        metaData: Record<string, unknown>
+        metaData: HTMLExportMetadata
     }> {
         this.analyze(this.docContent)
         return this.process()
@@ -179,7 +178,7 @@ export class HTMLExporterConvert {
         html: string
         imageIds: string[]
         extraStyleSheets: Array<{filename?: string | null; contents?: string}>
-        metaData: Record<string, unknown>
+        metaData: HTMLExportMetadata
     }> {
         if (this.citInfos.length) {
             await this.processCitInfos()
@@ -214,7 +213,7 @@ export class HTMLExporterConvert {
             html,
             imageIds: this.imageIds,
             extraStyleSheets: this.extraStyleSheets,
-            metaData: this.metaData as unknown as Record<string, unknown>
+            metaData: this.metaData
         }
     }
 

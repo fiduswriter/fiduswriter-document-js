@@ -6,6 +6,7 @@ import {NativeImporter} from "../native/importer.js"
 import type {
     BibDBEntry,
     E2EEOptions,
+    FidusDoc,
     FidusNode,
     NativeImporterBackend,
     User
@@ -23,7 +24,7 @@ export class PandocImporter {
     user: User
     path: string
     importId: string | number | null
-    additionalFiles: Record<string, unknown>
+    additionalFiles: {images?: Record<string, Blob>; bibliography?: string}
     e2eeOptions: E2EEOptions | null
     getTemplate: (importId: string | number | null) => Promise<Record<string, unknown>>
     importBibliography: (bibString: string) => Promise<Record<string, BibDBEntry>>
@@ -54,7 +55,15 @@ export class PandocImporter {
         this.user = user
         this.path = path
         this.importId = importId
-        this.additionalFiles = (options as PandocImporterOptions & {files?: Record<string, unknown>}).files || {}
+        this.additionalFiles =
+            (
+                options as PandocImporterOptions & {
+                    files?: {
+                        images?: Record<string, Blob>
+                        bibliography?: string
+                    }
+                }
+            ).files || {}
         this.e2eeOptions = options.e2eeOptions ?? null
         this.getTemplate = options.getTemplate
         this.importBibliography = options.importBibliography
@@ -98,7 +107,7 @@ export class PandocImporter {
                 const converter = new PandocConvert(
                     pandocJson,
                     this.importId as string,
-                    this.template as {content: FidusNode},
+                    this.template as {content: FidusDoc},
                     bibliography
                 )
 

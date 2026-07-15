@@ -3,40 +3,27 @@
  */
 
 import type {BibDB, FidusNode} from "../types.js"
-import type {EntryObject} from "bibliojson"
+import type {DocxCitationResult, OdtCitationResult} from "bibliojson"
 
-interface CitationEntry {
-    entry_key: string
-    fields: Record<string, unknown>
-    bib_type?: string
-    [key: string]: unknown
-}
+/**
+ * The citation result produced by bibliojson's DOCX and ODT citation parsers.
+ * Both share the same structural shape (entries keyed by number, optional
+ * per-entry metadata) so we accept either here.
+ */
+export type CitationResult = DocxCitationResult | OdtCitationResult
 
-interface CitationMetadata {
-    entry_key: string
-    prefix?: string
-    suffix?: string
-    locator?: string
-    authorOnly?: boolean
-    authorYear?: boolean
-    suppressAuthor?: boolean
-    [key: string]: unknown
-}
-
-export interface CitationResult {
-    isCitation: boolean
-    entries?: Record<string, CitationEntry> | Record<number, EntryObject>
-    metadata?: CitationMetadata[]
-}
+type CitationEntries = NonNullable<CitationResult["entries"]>
+type CitationEntry = CitationEntries[number]
+type CitationMetadata = NonNullable<CitationResult["metadata"]>[number]
 
 function mergeBibEntries(
-    entries: Record<string, CitationEntry> | Record<number, EntryObject>,
+    entries: CitationEntries,
     bibliography: Record<string, unknown>,
     bibDB: BibDB | false
 ): Record<string, string> {
     const keyMap: Record<string, string> = {}
 
-    for (const entry of Object.values(entries)) {
+    for (const entry of Object.values(entries) as CitationEntry[]) {
         if (!entry || !entry.entry_key) {
             continue
         }
@@ -64,7 +51,9 @@ function mergeBibEntries(
                 )
                 if (bibEntry) {
                     entry.fields = JSON.parse(JSON.stringify(bibEntry.fields))
-                    entry.bib_type = bibEntry.bib_type
+                    if (bibEntry.bib_type) {
+                        entry.bib_type = bibEntry.bib_type
+                    }
                 }
             }
             // TODO: add for jabref citations - according to entry_key import from user
@@ -87,22 +76,26 @@ export function citationResultToNode(
         return null
     }
     const entries = result.entries
-    const metadata = result.metadata || []
+    const metadata: CitationMetadata[] = result.metadata || []
 
     if (Object.keys(entries).length === 0) {
         return null
     }
     const keyMap = mergeBibEntries(entries, bibliography, bibDB)
 
-    const references = Object.entries(entries).map(([, entry]) => {
-        const entryKey = entry.entry_key
-        const entryMetadata = metadata.find(meta => meta.entry_key === entryKey)
-        return {
-            id: keyMap[entryKey],
-            prefix: entryMetadata?.prefix || "",
-            locator: entryMetadata?.locator || entryMetadata?.suffix || ""
+    const references = (Object.values(entries) as CitationEntry[]).map(
+        entry => {
+            const entryKey = entry.entry_key
+            const entryMetadata = metadata.find(
+                meta => meta.entry_key === entryKey
+            )
+            return {
+                id: keyMap[entryKey],
+                prefix: entryMetadata?.prefix || "",
+                locator: entryMetadata?.locator || entryMetadata?.suffix || ""
+            }
         }
-    })
+    )
 
     if (references.length === 0) {
         return null

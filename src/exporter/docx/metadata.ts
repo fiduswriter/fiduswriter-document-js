@@ -28,14 +28,16 @@ export class DOCXExporterMetadata {
     }
 
     async hasBibliography(): Promise<string> {
-        if (!this.csl || !this.metadata.citationStyle || !this.csl.getStyle) {
+        if (!this.csl || !this.metadata.citationStyle) {
             return "0"
         }
         try {
             const style = await this.csl.getStyle(this.metadata.citationStyle)
             // Check if the style has a bibliography section
             const hasBib = style.children.some(
-                section => section.name === "bibliography"
+                section =>
+                    typeof section !== "string" &&
+                    section.name === "bibliography"
             )
             return hasBib ? "1" : "0"
         } catch (_error) {

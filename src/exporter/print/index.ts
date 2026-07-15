@@ -20,7 +20,7 @@ export class PrintExporter extends HTMLExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: unknown,
+        updated: Date,
         documentStyles: Array<{
             slug: string
             contents: string
@@ -204,11 +204,15 @@ export class PrintExporter extends HTMLExporter {
         return {contents, filename: ""}
     }
 
-    loadStyle(sheet: {url?: string; filename?: string; contents?: string}): Promise<void> {
+    loadStyle(sheet: {
+        url?: string
+        filename?: string | null
+        contents?: string
+    }): Promise<{url?: string; filename?: string | null; contents?: string}> {
         if (sheet.url) {
             sheet.filename = sheet.url
             delete sheet.url
         }
-        return Promise.resolve()
+        return Promise.resolve(sheet)
     }
 }

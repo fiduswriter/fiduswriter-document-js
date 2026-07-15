@@ -6,11 +6,14 @@ import {validateXml, xmlDOM, XMLElement} from "./xml.js"
 // Handle a zip file containing XML files. Make sure files are only opened once,
 // and provide a mechanism to save the file.
 
+/** Content types accepted by JSZip's `file()` method that we produce here. */
+type ZipFileContents = string | ArrayBuffer | Uint8Array | Blob
+
 export class XmlZip {
     url: string
     mimeType: string
     docs: Record<string, XMLElement>
-    extraFiles: Record<string, unknown>
+    extraFiles: Record<string, ZipFileContents>
     rawFile: Blob | false
     zip!: JSZip
     loadedBlob: Blob | undefined
@@ -55,7 +58,11 @@ export class XmlZip {
     }
 
     loadZip(data?: ArrayBuffer | Blob) {
-        return this.zip.loadAsync(data || this.rawFile)
+        const input = data || this.rawFile
+        if (!input) {
+            return Promise.reject(new Error("No zip data to load"))
+        }
+        return this.zip.loadAsync(input)
     }
 
     // Open file at filePath from zip file and parse it as XML.
@@ -64,13 +71,14 @@ export class XmlZip {
             // file has been loaded already.
             return Promise.resolve(this.docs[filePath])
         } else if (this.zip.files[filePath]) {
-            return this.zip
-                .file(filePath)
-                .async("string")
-                .then((string: string) => {
-                    this.docs[filePath] = xmlDOM(string)
-                    return Promise.resolve(this.docs[filePath])
-                })
+            const file = this.zip.file(filePath)
+            if (!file) {
+                return Promise.reject(new Error("File not found"))
+            }
+            return file.async("string").then((string: string) => {
+                this.docs[filePath] = xmlDOM(string)
+                return Promise.resolve(this.docs[filePath])
+            })
         } else if (defaultContents) {
             return Promise.resolve(defaultContents).then(string => {
                 this.docs[filePath] = xmlDOM(string)
@@ -88,7 +96,7 @@ export class XmlZip {
     }
 
     // Add extra file to be saved in zip later.
-    addExtraFile(filePath: string, fileContents: unknown): void {
+    addExtraFile(filePath: string, fileContents: ZipFileContents): void {
         this.extraFiles[filePath] = fileContents
     }
 

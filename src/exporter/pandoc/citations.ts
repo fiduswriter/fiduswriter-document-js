@@ -54,7 +54,7 @@ export class PandocExporterCitations {
         })
         const citFm = new FormatCitations(
             this.csl,
-            this.citInfos as CitationInfo[],
+            this.citInfos as unknown as CitationInfo[],
             this.exporter.doc.settings.citationstyle || "",
             "",
             this.bibDB,

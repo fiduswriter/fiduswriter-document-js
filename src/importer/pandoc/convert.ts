@@ -1,5 +1,4 @@
 import {parseCSL} from "bibliojson"
-import type {EntryObject} from "bibliojson"
 
 import {applyAnnotation, applyMarkToNodes, mergeTextNodes} from "./helpers.js"
 import {gettext} from "fwtoolkit"
@@ -27,7 +26,6 @@ type PandocMetaValue =
     | {t: "MetaString"; c: string}
     | {t: "MetaMap"; c: Record<string, PandocMetaValue>}
     | {t: "MetaBool"; c: boolean}
-    | {t: string; c?: unknown}
 
 type PandocInline =
     | {t: "Str"; c: string}
@@ -419,7 +417,13 @@ export class PandocConvert {
             case "Div":
                 // Handle special figure containers
                 if (block.c[0][1].includes("figure")) {
-                    return [this.convertFigure(block)]
+                    const figureBlock = (block.c[1] || []).find(
+                        (b): b is PandocBlock & {t: "Figure"; c: PandocFigureContent} =>
+                            b.t === "Figure"
+                    )
+                    if (figureBlock) {
+                        return [this.convertFigure(figureBlock)]
+                    }
                 }
                 // Ignore otherwise. Could be bibliography
                 // or other non-content block
@@ -786,9 +790,10 @@ export class PandocConvert {
                                 const parseData = parseCSL({
                                     [id]: item.itemData
                                 } as Parameters<typeof parseCSL>[0])
-                                const bibEntry = parseData["1"] as EntryObject
+                                const bibEntry = parseData["1"]
                                 bibKey = `${Object.keys(this.bibliography).length + 1}`
-                                this.bibliography[bibKey] = bibEntry as BibDBEntry
+                                this.bibliography[bibKey] =
+                                    bibEntry as unknown as BibDBEntry
                             }
                             return {
                                 id: bibKey,
@@ -811,9 +816,11 @@ export class PandocConvert {
                 // If not a citation or parsing failed, fall through to regular text
                 return this.convertInlines(inline.c[1])
             }
-            default:
-                console.warn(`Unhandled inline type: ${inline.t}`)
+            default: {
+                const t = (inline as {t?: string}).t
+                console.warn(`Unhandled inline type: ${t}`)
                 return null
+            }
         }
     }
 
@@ -918,8 +925,8 @@ export class PandocConvert {
         }
     }
 
-    getImageFileType(filename: string): string {
-        const ext = (filename.split(".").pop() || "").toLowerCase()
+    getImageFileType(filename: string | undefined): string {
+        const ext = (filename ? filename.split(".").pop() : "") || ""
         switch (ext) {
             case "avif":
             case "avifs":

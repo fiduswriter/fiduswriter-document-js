@@ -78,7 +78,10 @@ export class SaveRevision {
             })
             .then(blob => {
                 this.progressCallback?.(gettext("Uploading revision..."), 95)
-                return this.uploadRevision(blob, this.doc as Record<string, unknown>)
+                return this.uploadRevision(
+                    blob,
+                    this.doc as unknown as Record<string, unknown>
+                )
             })
             .then(result => {
                 this.progressCallback?.(gettext("Revision saved."), 100)

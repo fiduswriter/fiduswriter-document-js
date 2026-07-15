@@ -8,9 +8,8 @@ import {createSlug, getImageExtension} from "../tools/file.js"
 import {ZipFileCreator, type ZipTextFile} from "fwtoolkit/file/zip"
 import type {ProgressCallback} from "../tools/progress.js"
 import {HTMLExporterConvert} from "./convert.js"
+import type {HTMLExportMetadata} from "./convert.js"
 import {htmlExportTemplate} from "./templates.js"
-
-import type {HTMLExporterConvert} from "./convert.js"
 
 /*
  Exporter to HTML
@@ -35,7 +34,7 @@ export class HTMLExporter {
     textFiles: Array<{filename: string; contents?: string; url?: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
     includeZips: Array<{directory: string; url: string}>
-    metaData: Record<string, unknown>
+    metaData!: HTMLExportMetadata
     htmlExportTemplate: typeof htmlExportTemplate
     contentFileName: string
     fileEnding: string
@@ -74,7 +73,7 @@ export class HTMLExporter {
         this.textFiles = []
         this.httpFiles = []
         this.includeZips = []
-        this.metaData = {} // Information to be used in sub classes.
+        // this.metaData is populated during export() from the converter.
         // To override in subclasses
         this.htmlExportTemplate = template
         this.contentFileName = "document.html"
@@ -148,7 +147,7 @@ export class HTMLExporter {
         textFiles: Array<{filename: string; contents?: string; url?: string}>
         httpFiles: Array<{filename: string; url: string; blob?: Blob}>
         includeZips: Array<{directory: string; url: string}>
-        metaData: Record<string, unknown>
+        metaData: HTMLExportMetadata
         converter: HTMLExporterConvert
     } {
         // Return the processed files and metadata. Used when using the
@@ -220,8 +219,8 @@ export class HTMLExporter {
     }
 
     async loadStyle(
-        sheet: {url?: string; filename?: string; contents?: string}
-    ): Promise<{url?: string; filename?: string; contents?: string}> {
+        sheet: {url?: string; filename?: string | null; contents?: string}
+    ): Promise<{url?: string; filename?: string | null; contents?: string}> {
         if (sheet.url) {
             // Use simple fetch without X-Requested-With header and credentials
             // to avoid CORS preflight redirect issues with CDNs

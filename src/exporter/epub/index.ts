@@ -128,6 +128,7 @@ export class EpubExporter extends HTMLExporter {
                 } else if (author.institution) {
                     return author.institution as string
                 }
+                return undefined
             }
         )
         const authors = rawAuthors.filter(

@@ -1,4 +1,5 @@
 import {BibLatexExporter} from "bibliojson"
+import type {BibDB as BibliojsonBibDB} from "bibliojson"
 import download from "downloadjs"
 
 import {gettext, shortFileTitle} from "fwtoolkit"
@@ -57,12 +58,15 @@ export class PandocExporter {
     init(): Promise<void> {
         this.progressCallback?.(gettext("Exporting to Pandoc..."), 0)
         //this.docContent = removeHidden(this.doc.content) //
-        this.docContent = fixTables(removeHidden(this.doc.content) as FidusNode)
+        const docContent = fixTables(
+            removeHidden(this.doc.content) as FidusNode
+        )
+        this.docContent = docContent
         const citations = new PandocExporterCitations(
             this,
             this.bibDB,
             this.csl,
-            this.docContent
+            docContent
         )
         this.citations = citations
         const converter = new PandocExporterConvert(
@@ -73,10 +77,10 @@ export class PandocExporter {
         )
         return citations.init().then(() => {
             this.progressCallback?.(gettext("Converting document..."), 40)
-            this.conversion = converter.init(this.docContent)
+            this.conversion = converter.init(docContent)
             if (Object.keys(this.conversion.usedBibDB).length > 0) {
                 const bibExport = new BibLatexExporter(
-                    this.conversion.usedBibDB
+                    this.conversion.usedBibDB as unknown as BibliojsonBibDB
                 )
                 this.textFiles.push({
                     filename: "bibliography.bib",

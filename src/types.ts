@@ -120,6 +120,7 @@ export interface CommentData {
     username: string
     date: number
     resolved?: boolean
+    isMajor?: boolean
     comment: FidusNode[]
     answers?: Array<{
         id?: string
@@ -165,33 +166,20 @@ export interface ImageDB {
     db: ImageDBEntries
 }
 
-/** A parsed CSL/CSL-M stylesheet node. */
-export interface CSLStyleNode {
-    name: string
-    attrs?: Record<string, unknown>
-    children?: CSLStyleNode[]
-}
-
-/** A parsed CSL/CSL-M stylesheet. */
-export interface CSLStyle {
-    children: CSLStyleNode[]
-}
-
-/** A CSL/CSL-M stylesheet reference / engine provider. */
-export interface CSL {
-    citationType?: string
-    getStyle?: (styleId: string) => Promise<CSLStyle>
-    getEngine?: (
-        sys: unknown,
-        styleId: string | object,
-        lang: string
-    ) => Promise<CiteprocInstance>
-    getEngineSync?: (
-        sys: unknown,
-        styleId: string | object,
-        lang: string
-    ) => CiteprocInstance | undefined
-}
+/**
+ * A CSL/CSL-M stylesheet reference / engine provider.
+ *
+ * This is the concrete `CSL` class provided by `citeproc-plus`; it resolves
+ * bundled (and caller-registered) styles and locales and creates citeproc-js
+ * engines.
+ */
+import type {
+    CSL,
+    CSLNode,
+    CslSys,
+    CiteprocEngine
+} from "citeproc-plus/dist/index.js"
+export type {CSL, CSLNode, CslSys, CiteprocEngine}
 
 /** A minimal citeproc-js engine interface. */
 export interface CiteprocInstance {

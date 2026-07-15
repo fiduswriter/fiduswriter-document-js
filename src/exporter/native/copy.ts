@@ -11,6 +11,7 @@ import type {
     ImageDB,
     ImageDBEntries,
     ImportDocument,
+    JSONValue,
     SaveCopyE2EE,
     User
 } from "../../types.js"
@@ -183,7 +184,7 @@ export class SaveCopy {
                                 (await this.e2ee!.decryptObject(
                                     copyright,
                                     key
-                                )) as Record<string, unknown>
+                                )) as Record<string, JSONValue>
                         } catch (_e) {
                             // If decryption fails, leave as-is
                         }

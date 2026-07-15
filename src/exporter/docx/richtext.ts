@@ -76,7 +76,7 @@ interface DocxCommentRange {
     content: CommentData
 }
 
-interface RunOptions {
+export interface RunOptions {
     comments?: Record<string, DocxCommentRange>
     section?: string
     list_type?: number | false | null
@@ -173,9 +173,9 @@ export class DOCXExporterRichtext {
                     }
                 })
         }
-        if (node.content) {
-            for (let i = 0; i < node.content.length; i++) {
-                this.findComments(node.content[i], comments)
+        if (node.content!) {
+            for (let i = 0; i < node.content!.length; i++) {
+                this.findComments(node.content![i], comments)
             }
         }
         return comments
@@ -394,7 +394,7 @@ export class DOCXExporterRichtext {
                                     : ""
                             }
                         </w:pPr>
-                        <w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/>
+                        <w:bookmarkStart w:name="${node.attrs!.id}" w:id="${++this.bookmarkCounter}"/>
                         <w:bookmarkEnd w:id="${this.bookmarkCounter}"/>`
                 end = "</w:p>" + end
                 break
@@ -406,7 +406,7 @@ export class DOCXExporterRichtext {
                 break
             case "code_block": {
                 // Handle code blocks with category support
-                const attrs = node.attrs
+                const attrs = node.attrs!
                 const category = attrs?.category
                 const id = attrs?.id
                 let categoryLabel = ""
@@ -420,13 +420,13 @@ export class DOCXExporterRichtext {
                     const categoryCounter = options.inFootnote
                         ? this.fncategoryCounter
                         : this.categoryCounter
-                    if (!categoryCounter[category]) {
-                        categoryCounter[category] = 1
+                    if (!categoryCounter[category as string]) {
+                        categoryCounter[category as string] = 1
                     }
                     const catCount = categoryCounter[category]++
                     const categoryLabelText = getCat(
                         category,
-                        this.settings.language
+                        (this.settings.language as string)
                     )
                     const title =
                         typeof attrs?.title === "string"
@@ -676,7 +676,7 @@ export class DOCXExporterRichtext {
                 break
             }
             case "cross_reference": {
-                const attrs = node.attrs
+                const attrs = node.attrs!
                 if (!attrs) {
                     break
                 }
@@ -826,9 +826,9 @@ export class DOCXExporterRichtext {
                 break
             }
             case "figure": {
-                const category = node.attrs.category
-                const caption = node.attrs.caption
-                    ? node.content.find((node: FidusNode) => node.type === "figure_caption")
+                const category = node.attrs!.category
+                let caption = node.attrs!.caption
+                    ? node.content!.find((node: FidusNode) => node.type === "figure_caption")
                           ?.content || []
                     : []
                 let catCountXML = ""
@@ -836,11 +836,11 @@ export class DOCXExporterRichtext {
                     const categoryCounter = options.inFootnote
                         ? this.fncategoryCounter
                         : this.categoryCounter
-                    if (!categoryCounter[category]) {
-                        categoryCounter[category] = 1
+                    if (!categoryCounter[category as string]) {
+                        categoryCounter[category as string] = 1
                     }
                     catCountXML = `<w:r>
-                        <w:t xml:space="preserve">${getCat(category, this.settings.language)} </w:t>
+                        <w:t xml:space="preserve">${getCat(category as string, this.settings.language as string)} </w:t>
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
@@ -856,22 +856,22 @@ export class DOCXExporterRichtext {
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
-                        <w:t>${categoryCounter[category]++}${options.inFootnote ? "A" : ""}</w:t>
+                        <w:t>${categoryCounter[category as string]++}${options.inFootnote ? "A" : ""}</w:t>
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
                         <w:fldChar w:fldCharType="end" />
                     </w:r>`
                     if (caption.length) {
-                        caption = [{type: "text", text: ": "}].concat(caption)
+                        caption = ([{type: "text", text: ": "}] as FidusNode[]).concat(caption as FidusNode[])
                     }
                 }
                 let cx: number, cy: number
                 const image =
-                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
+                    node.content!.find((node: FidusNode) => node.type === "image")?.attrs
                         ?.image || false
                 if (image !== false) {
-                    const imageEntry = this.images.images[image]
+                    const imageEntry = this.images.images[image as string]
                     cx = imageEntry.width * 9525 // width in EMU
                     cy = imageEntry.height * 9525 // height in EMU
                     const imgTitle = imageEntry.title
@@ -882,15 +882,15 @@ export class DOCXExporterRichtext {
                             width = width - options.tableSideMargins
                         }
                         width =
-                            (width * Number.parseInt(node.attrs.width)) / 100
+                            (width * Number.parseInt(node.attrs!.width as string)) / 100
                         if (cx > width) {
                             const rel = cy / cx
                             cx = width
                             cy = cx * rel
                         }
-                        if (cy > options.dimensions.height) {
+                        if (cy > (options.dimensions?.height ?? 0)) {
                             const rel = cx / cy
-                            cy = options.dimensions.height
+                            cy = options.dimensions?.height ?? 0
                             cx = cy * rel
                         }
                     }
@@ -944,20 +944,20 @@ export class DOCXExporterRichtext {
                     cx = 9525 * 100 // We pick a random size of 100x100. We hope this will fit the formula
                     cy = 9525 * 100
                     const latex =
-                        node.content.find(
+                        node.content!.find(
                             (node: FidusNode) => node.type === "figure_equation"
                         )?.attrs?.equation || ""
-                    content += this.math.getOmml(latex)
+                    content += this.math.getOmml(latex as string)
                 }
                 const captionSpace = !!(catCountXML.length || caption.length)
-                if (node.attrs.aligned === "center") {
+                if (node.attrs!.aligned === "center") {
                     start += `
                     <w:p>
                       <w:pPr>
                         <w:jc w:val="center"/>
                       </w:pPr>`
                     content =
-                        `<w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
+                        `<w:bookmarkStart w:name="${node.attrs!.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
                         content
                     end =
                         `
@@ -983,7 +983,7 @@ export class DOCXExporterRichtext {
                             <wp:anchor behindDoc="0" distT="95250" distB="95250" distL="95250" distR="95250" simplePos="0" locked="0" layoutInCell="1" allowOverlap="0" relativeHeight="2">
                                 <wp:simplePos x="0" y="0" />
                                 <wp:positionH relativeFrom="column">
-                                    <wp:align>${node.attrs.aligned}</wp:align>
+                                    <wp:align>${node.attrs!.aligned}</wp:align>
                                 </wp:positionH>
                                 <wp:positionV relativeFrom="paragraph">
                                     <wp:posOffset>0</wp:posOffset>
@@ -1012,7 +1012,7 @@ export class DOCXExporterRichtext {
                                                             <w:rPr></w:rPr>
                                                         </w:pPr>`
                     content =
-                        `<w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
+                        `<w:bookmarkStart w:name="${node.attrs!.id}" w:id="${++this.bookmarkCounter}"/><w:bookmarkEnd w:id="${this.bookmarkCounter}"/>` +
                         content
                     end =
                         `
@@ -1028,7 +1028,7 @@ export class DOCXExporterRichtext {
                                     </a:graphicData>
                                 </a:graphic>
                                   <wp14:sizeRelH relativeFrom="margin">
-                                    <wp14:pctWidth>${node.attrs.width}000</wp14:pctWidth>
+                                    <wp14:pctWidth>${node.attrs!.width}000</wp14:pctWidth>
                                 </wp14:sizeRelH>
                             </wp:anchor>
                         </w:drawing>
@@ -1055,20 +1055,20 @@ export class DOCXExporterRichtext {
                 // We are already dealing with this in the figure.
                 break
             case "table": {
-                const category = node.attrs.category
-                let caption = node.attrs.caption
-                    ? node.content[0].content || []
+                const category = node.attrs!.category
+                let caption = node.attrs!.caption
+                    ? node.content![0].content || []
                     : []
                 let catCountXML = ""
                 if (category !== "none") {
                     const categoryCounter = options.inFootnote
                         ? this.fncategoryCounter
                         : this.categoryCounter
-                    if (!categoryCounter[category]) {
-                        categoryCounter[category] = 1
+                    if (!categoryCounter[category as string]) {
+                        categoryCounter[category as string] = 1
                     }
                     catCountXML = `<w:r>
-                        <w:t xml:space="preserve">${getCat(category, this.settings.language)} </w:t>
+                        <w:t xml:space="preserve">${getCat(category as string, this.settings.language as string)} </w:t>
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
@@ -1084,14 +1084,14 @@ export class DOCXExporterRichtext {
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
-                        <w:t>${categoryCounter[category]++}${options.inFootnote ? "A" : ""}</w:t>
+                        <w:t>${categoryCounter[category as string]++}${options.inFootnote ? "A" : ""}</w:t>
                     </w:r>
                     <w:r>
                         <w:rPr></w:rPr>
                         <w:fldChar w:fldCharType="end" />
                     </w:r>`
                     if (caption.length) {
-                        caption = [{type: "text", text: ": "}].concat(caption)
+                        caption = ([{type: "text", text: ": "}] as FidusNode[]).concat(caption as FidusNode[])
                     }
                 }
                 const captionSpace = !!(catCountXML.length || caption.length)
@@ -1102,7 +1102,7 @@ export class DOCXExporterRichtext {
                             <w:pStyle w:val="Caption"/>
                             <w:keepNext/>
                         </w:pPr>
-                        <w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/>
+                        <w:bookmarkStart w:name="${node.attrs!.id}" w:id="${++this.bookmarkCounter}"/>
                         <w:bookmarkEnd w:id="${this.bookmarkCounter}"/>
                         ${catCountXML}
                         ${caption.map((node: FidusNode, i: number) => this.transformRichtext(node, options, caption[i + 1])).join("")}
@@ -1114,27 +1114,36 @@ export class DOCXExporterRichtext {
                         <w:tblPr>
                             <w:tblStyle w:val="${this.tables.tableGridStyle}" />
                             ${
-                                node.attrs.width === "100"
+                                node.attrs!.width === "100"
                                     ? '<w:tblW w:w="0" w:type="auto" />'
-                                    : `<w:tblW w:w="${50 * Number.parseInt(node.attrs.width)}" w:type="pct" />
-                                    <w:jc w:val="${node.attrs.aligned}" />`
+                                    : `<w:tblW w:w="${50 * Number.parseInt(node.attrs!.width as string)}" w:type="pct" />
+                                    <w:jc w:val="${node.attrs!.aligned}" />`
                             }
                             <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1" />
                         </w:tblPr>
                         <w:tblGrid>`
-                const columns = node.content[1].content[0].content.length
+                const tblContent = node.content!
+                let columns = 0
+                const firstRowNode = tblContent[1]
+                if (firstRowNode && firstRowNode.content && firstRowNode.content[0]) {
+                    const fr = firstRowNode.content[0].content
+                    columns = fr ? fr.length : 0
+                }
                 let cellWidth = 63500 // standard width
                 options = Object.assign({}, options)
                 if (options.dimensions?.width) {
                     cellWidth =
                         Math.floor(options.dimensions.width / columns) -
                         2540 // subtracting for border width
-                } else if (!options.dimensions) {
-                    options.dimensions = {}
+                } else {
+                    options.dimensions = {width: 0, height: 0}
                 }
                 options.section = "Normal"
                 options.list_type = null
-                options.dimensions = Object.assign({}, options.dimensions)
+                options.dimensions = Object.assign(
+                    {width: 0, height: 0},
+                    options.dimensions
+                )
                 options.dimensions.width = cellWidth
                 options.tableSideMargins = this.tables.getSideMargins()
                 for (let i = 0; i < columns; i++) {
@@ -1161,32 +1170,32 @@ export class DOCXExporterRichtext {
                     <w:tc>
                         <w:tcPr>
                             ${
-                                node.attrs.rowspan && node.attrs.colspan
+                                node.attrs!.rowspan && node.attrs!.colspan
                                     ? `<w:tcW w:w="${Number.parseInt(String((options.dimensions?.width || 0) / 635))}" w:type="dxa" />`
                                     : '<w:tcW w:w="0" w:type="auto" />'
                             }
                             ${
-                                node.attrs.rowspan
-                                    ? node.attrs.rowspan > 1
+                                node.attrs!.rowspan
+                                    ? (node.attrs!.rowspan as number) > 1
                                         ? '<w:vMerge w:val="restart" />'
                                         : ""
                                     : "<w:vMerge/>"
                             }
                             ${
-                                node.attrs.colspan
-                                    ? node.attrs.colspan > 1
+                                node.attrs!.colspan
+                                    ? (node.attrs!.colspan as number) > 1
                                         ? '<w:hMerge w:val="restart" />'
                                         : ""
                                     : "<w:hMerge/>"
                             }
                         </w:tcPr>
-                        ${node.content ? "" : "<w:p/>"}`
+                        ${node.content! ? "" : "<w:p/>"}`
                 end = "</w:tc>" + end
 
                 break
             case "equation": {
-                const latex = node.attrs.equation
-                content += this.math.getOmml(latex)
+                const latex = node.attrs!.equation
+                content += this.math.getOmml(latex as string)
                 break
             }
             case "hard_break":
@@ -1248,12 +1257,12 @@ export class DOCXExporterRichtext {
                 break
         }
 
-        if (node.content) {
-            for (let i = 0; i < node.content.length; i++) {
+        if (node.content!) {
+            for (let i = 0; i < node.content!.length; i++) {
                 content += this.transformRichtext(
-                    node.content[i],
+                    node.content![i],
                     options,
-                    node.content[i + 1]
+                    node.content![i + 1]
                 )
             }
         }

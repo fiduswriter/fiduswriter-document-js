@@ -141,12 +141,14 @@ export class DocxParser {
                     id,
                     type,
                     name,
-                    isHeading:
+                    isHeading: Boolean(
                         (id && /heading\d+/i.test(id)) ||
-                        (basedOn && /heading\d+/i.test(basedOn)),
-                    isCaption:
+                            (basedOn && /heading\d+/i.test(basedOn))
+                    ),
+                    isCaption: Boolean(
                         (id && /caption/i.test(id)) ||
-                        (basedOn && /caption/i.test(basedOn)),
+                            (basedOn && /caption/i.test(basedOn))
+                    ),
                     level: id ? parseInt(id.match(/\d+/)?.[0] || "0") : 0,
                     basedOn,
                     paragraphProps: this.extractParagraphProperties(style),
@@ -163,7 +165,7 @@ export class DocxParser {
         const visited = new Set<string>()
         while (current && !visited.has(current)) {
             visited.add(current)
-            const style = this.styles[current]
+            const style: DocxStyle | undefined = this.styles[current]
             if (!style) {
                 return false
             }
@@ -419,8 +421,8 @@ export class DocxParser {
                             const parentId = parentCommentIds.length
                                 ? parentCommentIds[parentCommentIds.length - 1]
                                 : null
-                            if (parentId && this.comments[parentId]) {
-                                this.comments[parentId].answers.push({
+                            if (parentId && this.comments[parentId]?.answers) {
+                                this.comments[parentId].answers!.push({
                                     id: randomCommentId(),
                                     user: 0,
                                     username: answerComment.username,
@@ -696,7 +698,11 @@ export class DocxParser {
 
         for (const path of imageFiles) {
             try {
-                const blob = await this.zip.file(path).async("blob")
+                const file = this.zip.file(path)
+                if (!file) {
+                    continue
+                }
+                const blob = await file.async("blob")
                 const filename = path.split("/").pop() || ""
                 const content = this.addMimeType(blob, filename)
                 this.images[filename] = content
@@ -713,7 +719,7 @@ export class DocxParser {
     }
 
     getImageFileType(filename: string) {
-        const ext = filename.split(".").pop().toLowerCase()
+        const ext = filename.split(".").pop()?.toLowerCase()
         switch (ext) {
             case "avif":
             case "avifs":

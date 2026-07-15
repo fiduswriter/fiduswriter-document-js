@@ -5,7 +5,7 @@ import {descendantNodes} from "../tools/doc_content.js"
 import type {XMLElement} from "../tools/xml.js"
 import type {XmlZip} from "../tools/xml_zip.js"
 import type {DOCXExporterRels} from "./rels.js"
-import type {DOCXExporterRichtext, RichtextOptions} from "./richtext.js"
+import type {DOCXExporterRichtext, RunOptions} from "./richtext.js"
 
 const DEFAULT_COMMENTS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:comments xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" mc:Ignorable="w14 wp14 w15">
@@ -137,7 +137,7 @@ export class DOCXExporterComments {
         let parentParagraphId = ""
         string += commentDBEntry.comment
             .map((node, index) => {
-                const options: RichtextOptions = {section: "CommentText"}
+                const options: RunOptions = {section: "CommentText"}
                 if (
                     (commentDBEntry.resolved ||
                         commentDBEntry.answers?.length) &&
@@ -174,7 +174,7 @@ export class DOCXExporterComments {
             )}">`
             string += answer.answer
                 .map((node, index) => {
-                    const options: RichtextOptions = {section: "CommentText"}
+                    const options: RunOptions = {section: "CommentText"}
                     if (index === answer.answer.length - 1) {
                         // We need to add an id to the last paragraph of the comment and add an entry
                         // into commentsExtended.xml pointing to the last paragraph of the parent comment.

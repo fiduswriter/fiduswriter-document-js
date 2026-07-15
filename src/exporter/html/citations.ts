@@ -3,7 +3,7 @@ import {escapeText} from "fwtoolkit"
 import {FormatCitations} from "../../citations/format.js"
 import type {CitationInfo} from "../../citations/format.js"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
-import type {BibDB, CSL, DocSettings} from "../../types.js"
+import type {BibDB, CSL, CSLNode, DocSettings} from "../../types.js"
 
 interface CitationLayout {
     prefix?: string
@@ -95,7 +95,7 @@ export class HTMLExporterCitations {
         const citFm = new FormatCitations(
             this.csl,
             this.citInfos as unknown as CitationInfo[],
-            modStyle as object,
+            modStyle as unknown as CSLNode,
             "",
             this.bibDB,
             false,

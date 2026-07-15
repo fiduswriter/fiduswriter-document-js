@@ -5,6 +5,7 @@
  */
 
 import {CSLExporter} from "bibliojson"
+import type {BibDB as BibliojsonBibDB} from "bibliojson"
 
 import type {BibDB} from "../../types.js"
 
@@ -44,7 +45,7 @@ function generateCitationId(): string {
  */
 function convertToCSL(bibDB: BibDB, ids: number[]): Record<string, unknown> {
     const exporter = new CSLExporter(
-        bibDB.db as Record<string, unknown>,
+        bibDB.db as unknown as BibliojsonBibDB,
         ids as unknown as string[]
     )
     return exporter.parse()

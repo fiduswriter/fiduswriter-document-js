@@ -64,16 +64,19 @@ export function getImageMimeType(filename: string): string | null {
     return extension ? imageMimeTypes[extension] || null : null
 }
 
-export interface HierarchyItem extends Record<string, unknown> {
+export interface HierarchyItemBase extends Record<string, unknown> {
     id: string
     title: string
     level: number
     link?: string
     docNum?: number
+}
+
+export interface HierarchyItem extends HierarchyItemBase {
     children: HierarchyItem[]
 }
 
-export function buildHierarchy(flatList: HierarchyItem[]): HierarchyItem[] {
+export function buildHierarchy(flatList: HierarchyItemBase[]): HierarchyItem[] {
     const hierarchy: HierarchyItem[] = []
     const levelMap: Record<number, HierarchyItem[]> = {}
 

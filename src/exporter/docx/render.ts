@@ -6,7 +6,7 @@ import type {XMLElement} from "../tools/xml.js"
 import type {XmlZip} from "../tools/xml_zip.js"
 import type {Contributor, DocSettings, FidusNode} from "../../types.js"
 import type {DOCXExporterCitations} from "./citations.js"
-import type {DOCXExporterRichtext, RichtextOptions} from "./richtext.js"
+import type {DOCXExporterRichtext, RunOptions} from "./richtext.js"
 
 interface TagData {
     title?: string
@@ -984,11 +984,11 @@ export class DOCXExporterRender {
             return
         }
         const pStyle = tag.block.query("w:pStyle")
-        const options: RichtextOptions = {
+        const options: RunOptions = {
             dimensions: tag.dimensions,
-            citationType: citations.citFm?.citationType || "",
+            citationType: citations.citFm ? citations.citFm.citationType : "",
             section: pStyle ? String(pStyle.getAttribute("w:val")) : "Normal",
-            tag: tag.title.slice(1)
+            tag: tag.title ? tag.title.slice(1) : ""
         }
         const content = tag.content as FidusNode[] | undefined
         const outXML = content

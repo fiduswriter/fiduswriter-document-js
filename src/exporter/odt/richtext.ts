@@ -188,7 +188,7 @@ export class ODTExporterRichtext {
                 })
         }
         if (node.content) {
-            for (let i = 0; i < node.content.length; i++) {
+            for (let i = 0; i < node.content!.length; i++) {
                 this.findComments(node.content[i], comments)
             }
         }
@@ -210,17 +210,18 @@ export class ODTExporterRichtext {
 
         const inlineNode = INLINE_TYPES.includes(node.type)
 
-        let blockDelete: Track | undefined, blockInsert: Track | undefined
+        let blockDelete: Track | undefined,
+            blockInsert: (Track & {trackId?: string}) | undefined
 
         if (!inlineNode && node.attrs?.track) {
-            blockDelete = node.attrs.track.find(
+            blockDelete = node.attrs!.track.find(
                 (mark: Track) => mark.type === "deletion"
             )
             if (blockDelete) {
                 options = Object.assign({}, options)
                 options.blockDelete = blockDelete
             }
-            blockInsert = node.attrs.track.find(
+            blockInsert = node.attrs!.track.find(
                 (mark: Track) => mark.type === "insertion"
             )
             if (blockInsert) {
@@ -290,7 +291,7 @@ export class ODTExporterRichtext {
                 )
                 const nextBlockInsert = nextSibling?.attrs?.track?.find(
                     (mark: Track) => mark.type === "insertion"
-                )
+                ) as (Track & {trackId?: string}) | undefined
                 let lastNonMergedBlock: FidusNode | undefined
                 if (blockDelete) {
                     // This block has been deleted, so we need to check which text block
@@ -299,7 +300,7 @@ export class ODTExporterRichtext {
                     if (!previousSibling || !TEXT_TYPES[previousSibling.type]) {
                         // We cannot merge into previous block. Therefore, we don't consider
                         // this text block as merged.
-                        blockDelete = false
+                        blockDelete = undefined
                     } else {
                         let searchNode: FidusNode | undefined | false = previousSibling
                         while (searchNode && TEXT_TYPES[searchNode.type]) {
@@ -366,15 +367,15 @@ export class ODTExporterRichtext {
                     nextBlockInsert.trackId = trackId
                 }
                 if (TEXT_TYPES[node.type].tag === "text:h") {
-                    start += `<text:bookmark-start text:name="${node.attrs.id}"/>`
+                    start += `<text:bookmark-start text:name="${node.attrs!.id}"/>`
                     end =
-                        `<text:bookmark-end text:name="${node.attrs.id}"/>` +
+                        `<text:bookmark-end text:name="${node.attrs!.id}"/>` +
                         end
                 }
                 // Handle code block category labels
                 if (node.type === "code_block") {
-                    const category = node.attrs.category
-                    if (category && node.attrs.id) {
+                    const category = node.attrs!.category as string
+                    if (category && node.attrs!.id) {
                         const categoryCounter = options.inFootnote
                             ? this.fnCategoryCounter
                             : this.categoryCounter
@@ -383,10 +384,10 @@ export class ODTExporterRichtext {
                         }
                         const catCount = categoryCounter[category]++
                         const catCountXml = `<text:sequence text:ref-name="ref${category}${catCount - 1}${options.inFootnote ? "A" : ""}" text:name="${category}" text:formula="ooow:${category}+1" style:num-format="1">${catCount}${options.inFootnote ? "A" : ""}</text:sequence>`
-                        const title = node.attrs.title
-                            ? `: ${escapeText(node.attrs.title)}`
+                        const title = node.attrs!.title
+                            ? `: ${escapeText(String(node.attrs!.title))}`
                             : ""
-                        const categoryLabel = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}${title}<text:bookmark-end text:name="${node.attrs.id}"/><text:line-break/>`
+                        const categoryLabel = `<text:bookmark-start text:name="${node.attrs!.id as string}"/>${getCat(category, this.settings.language || "en-US")} ${catCountXml}${title}<text:bookmark-end text:name="${node.attrs!.id as string}"/><text:line-break/>`
                         start += categoryLabel
                     }
                 }
@@ -398,7 +399,7 @@ export class ODTExporterRichtext {
                 options.section = "Quote"
                 break
             case "ordered_list": {
-                const olId = this.styles.getOrderedListStyleId(node.attrs.order)
+                const olId = this.styles.getOrderedListStyleId(Number(node.attrs!.order))
                 start += `<text:list text:style-name="L${olId[0]}">`
                 end = "</text:list>" + end
                 options = Object.assign({}, options)
@@ -431,9 +432,9 @@ export class ODTExporterRichtext {
                 fnOptions.section = "Footnote"
                 fnOptions.tag = `footnote${fnCounter}`
                 fnOptions.inFootnote = true
-                const fnNode = {
+                const fnNode: FidusNode = {
                     type: "footnotecontainer",
-                    content: node.attrs.footnote
+                    content: node.attrs!.footnote as FidusNode[]
                 }
                 fnOptions.comments = this.findComments(fnNode)
                 content += this.transformRichtext(fnNode, fnOptions)
@@ -519,7 +520,7 @@ export class ODTExporterRichtext {
                     end = "</text:span>" + end
                 }
 
-                content += escapeText(node.text).replace(/^\s+|\s+$/g, match =>
+                content += escapeText(node.text || "").replace(/^\s+|\s+$/g, match =>
                     "<text:s/>".repeat(match.length)
                 )
                 break
@@ -528,7 +529,7 @@ export class ODTExporterRichtext {
                 let cit: FidusNode | undefined
                 // We take the first citation from the stack and remove it.
                 if (options.inFootnote) {
-                    cit = this.footnotes.citations.pmCits.shift()
+                    cit = this.footnotes.citations?.pmCits.shift()
                 } else {
                     cit = this.citations.pmCits.shift()
                 }
@@ -579,7 +580,7 @@ export class ODTExporterRichtext {
                         options = Object.assign({}, options)
                         options.section = "Footnote"
                         content += this.transformRichtext(
-                            {type: "paragraph", content: cit.content},
+                            {type: "paragraph", content: cit?.content || []},
                             options
                         )
                     }
@@ -615,14 +616,14 @@ export class ODTExporterRichtext {
                 start += `<text:p text:style-name="${options.section}">`
                 end = "</text:p>" + end
 
-                if (node.attrs.aligned === "center") {
+                if (node.attrs!.aligned === "center") {
                     // Needed to prevent subsequent image from overlapping
                     end = end + '<text:p text:style-name="Standard"></text:p>'
                 }
-                const figureCaption = node.content.find(
+                const figureCaption = node.content!.find(
                     (node: FidusNode) => node.type === "figure_caption"
                 )
-                let caption = node.attrs.caption
+                let caption = node.attrs!.caption
                     ? figureCaption?.content
                           ?.map((node: FidusNode, index: number) =>
                               this.transformRichtext(
@@ -636,7 +637,7 @@ export class ODTExporterRichtext {
                     : ""
                 // The figure category should not be in the
                 // user's language but rather the document language
-                const category = node.attrs.category
+                const category = node.attrs!.category as string
                 if (category !== "none") {
                     const categoryCounter = options.inFootnote
                         ? this.fnCategoryCounter
@@ -647,17 +648,17 @@ export class ODTExporterRichtext {
                     const catCount = categoryCounter[category]++
                     const catCountXml = `<text:sequence text:ref-name="ref${category}${catCount - 1}${options.inFootnote ? "A" : ""}" text:name="${category}" text:formula="ooow:${category}+1" style:num-format="1">${catCount}${options.inFootnote ? "A" : ""}</text:sequence>`
                     if (caption.length) {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
+                        caption = `<text:bookmark-start text:name="${node.attrs!.id as string}"/>${getCat(category, this.settings.language || "en-US")} ${catCountXml}<text:bookmark-end text:name="${node.attrs!.id as string}"/>: ${caption}`
                     } else {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
+                        caption = `<text:bookmark-start text:name="${node.attrs!.id as string}"/>${getCat(category, this.settings.language || "en-US")} ${catCountXml}<text:bookmark-end text:name="${node.attrs!.id as string}"/>`
                     }
                 }
-                let relWidth = node.attrs.width
-                let aligned = node.attrs.aligned
+                let relWidth = node.attrs!.width as string
+                let aligned = node.attrs!.aligned as string
                 let frame = false
                 const image =
-                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
-                        ?.image || false
+                    node.content!.find((node: FidusNode) => node.type === "image")?.attrs
+                        ?.image as string | false || false
                 if (caption.length || image === false) {
                     frame = true
                     this.styles.checkParStyle("Caption")
@@ -699,10 +700,10 @@ export class ODTExporterRichtext {
                             <draw:image xlink:href="Pictures/${imageEntry.id}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad" draw:mime-type="${imageEntry.type}"/>
                         </draw:frame>`
                 } else {
-                    const latex = node.content.find(
+                    const latex = node.content!.find(
                         (node: FidusNode) => node.type === "figure_equation"
-                    )?.attrs?.equation
-                    const objectNumber = this.math.addMath(latex)
+                    )?.attrs?.equation as string | undefined
+                    const objectNumber = this.math.addMath(latex || "")
                     const graphicStyleId =
                         this.styles.getGraphicStyleId("Formula")
                     content += `
@@ -712,7 +713,7 @@ export class ODTExporterRichtext {
                         </draw:frame>`
                 }
                 if (category === "none") {
-                    content = `<text:bookmark-start text:name="${node.attrs.id}"/>${content}<text:bookmark-end text:name="${node.attrs.id}"/>`
+                    content = `<text:bookmark-start text:name="${node.attrs!.id}"/>${content}<text:bookmark-end text:name="${node.attrs!.id}"/>`
                 }
                 if (blockDelete) {
                     const trackId = this.tracks.addChange(
@@ -746,8 +747,8 @@ export class ODTExporterRichtext {
                         start += "</text:list-item></text:list>"
                     })
                 }
-                const tableCaption = node.content[0]
-                let caption = node.attrs.caption
+                const tableCaption = node.content![0]
+                let caption = node.attrs!.caption
                     ? tableCaption?.content
                           ?.map((node: FidusNode, index: number) =>
                               this.transformRichtext(
@@ -761,7 +762,7 @@ export class ODTExporterRichtext {
                     : ""
                 // The table category should not be in the
                 // user's language but rather the document language
-                const category = node.attrs.category
+                const category = node.attrs!.category as string
                 if (category !== "none") {
                     const categoryCounter = options.inFootnote
                         ? this.fnCategoryCounter
@@ -772,9 +773,9 @@ export class ODTExporterRichtext {
                     const catCount = categoryCounter[category]++
                     const catCountXml = `<text:sequence text:ref-name="ref${category}${catCount - 1}${options.inFootnote ? "A" : ""}" text:name="${category}" text:formula="ooow:${category}+1" style:num-format="1">${catCount}${options.inFootnote ? "A" : ""}</text:sequence>`
                     if (caption.length) {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>: ${caption}`
+                        caption = `<text:bookmark-start text:name="${node.attrs!.id as string}"/>${getCat(category, this.settings.language || "en-US")} ${catCountXml}<text:bookmark-end text:name="${node.attrs!.id as string}"/>: ${caption}`
                     } else {
-                        caption = `<text:bookmark-start text:name="${node.attrs.id}"/>${getCat(category, this.settings.language)} ${catCountXml}<text:bookmark-end text:name="${node.attrs.id}"/>`
+                        caption = `<text:bookmark-start text:name="${node.attrs!.id as string}"/>${getCat(category, this.settings.language || "en-US")} ${catCountXml}<text:bookmark-end text:name="${node.attrs!.id as string}"/>`
                     }
                 }
                 if (caption.length) {
@@ -784,10 +785,13 @@ export class ODTExporterRichtext {
                     this.styles.checkParStyle(options.section)
                     start += `<text:p text:style-name="${options.section}">${caption}</text:p>`
                 }
-                const columns = node.content[1].content[0].content.length
+                const rowNode = node.content![1]
+                const firstRow = rowNode && rowNode.content ? rowNode.content[0] : undefined
+                const firstRowContent = firstRow && firstRow.content ? firstRow.content : undefined
+                const columns = firstRowContent ? firstRowContent.length : 0
                 const styleId = this.styles.getTableStyleId(
-                    node.attrs.aligned,
-                    node.attrs.width
+                    node.attrs!.aligned as string,
+                    node.attrs!.width as string
                 )
                 start += `<table:table table:name="Table${styleId}" table:style-name="Table${styleId}">`
                 start += `<table:table-column table:number-columns-repeated="${columns}" />`
@@ -806,14 +810,14 @@ export class ODTExporterRichtext {
                 break
             case "table_cell":
             case "table_header":
-                if (node.attrs.rowspan && node.attrs.colspan) {
+                if (node.attrs!.rowspan && node.attrs!.colspan) {
                     start += `<table:table-cell${
-                        node.attrs.rowspan > 1
-                            ? ` table:number-rows-spanned="${node.attrs.rowspan}"`
+                        Number(node.attrs!.rowspan) > 1
+                            ? ` table:number-rows-spanned="${node.attrs!.rowspan}"`
                             : ""
                     }${
-                        node.attrs.colspan > 1
-                            ? ` table:number-columns-spanned="${node.attrs.colspan}"`
+                        Number(node.attrs!.colspan) > 1
+                            ? ` table:number-columns-spanned="${node.attrs!.colspan}"`
                             : ""
                     } office:value-type="string">`
                     end = "</table:table-cell>" + end
@@ -822,7 +826,7 @@ export class ODTExporterRichtext {
                 }
                 break
             case "equation": {
-                const latex = node.attrs.equation
+                const latex = node.attrs!.equation as string
                 const objectNumber = this.math.addMath(latex)
                 const styleId = this.styles.getGraphicStyleId("Formula")
                 content += `<draw:frame draw:style-name="${styleId}" draw:name="Object${objectNumber}" text:anchor-type="as-char" draw:z-index="${this.zIndex++}">
@@ -832,8 +836,8 @@ export class ODTExporterRichtext {
                 break
             }
             case "cross_reference": {
-                const title = node.attrs.title
-                const id = node.attrs.id
+                const title = node.attrs!.title as string
+                const id = node.attrs!.id as string
                 if (title) {
                     start += `<text:bookmark-ref text:reference-format="text" text:ref-name="${id}">`
                     end = "</text:bookmark-ref>" + end
@@ -867,8 +871,8 @@ export class ODTExporterRichtext {
                 end = "<text:line-break/>" + end
                 break
             case "cslentry":
-                this.styles.checkParStyle(options.section)
-                start += `<text:p text:style-name="${options.section}">`
+                this.styles.checkParStyle(options.section || "Standard")
+                start += `<text:p text:style-name="${options.section || "Standard"}">`
                 end = "</text:p>" + end
                 break
             case "cslinline":
@@ -879,7 +883,7 @@ export class ODTExporterRichtext {
         }
 
         if (node.content) {
-            for (let i = 0; i < node.content.length; i++) {
+            for (let i = 0; i < node.content!.length; i++) {
                 content += this.transformRichtext(
                     node.content[i],
                     options,

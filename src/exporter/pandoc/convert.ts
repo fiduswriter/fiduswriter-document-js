@@ -1,14 +1,17 @@
-import type {BibDB, BibDBEntry, DocSettings, ExportDoc, FidusNode, ImageDB, NodeAttrs} from "../../types.js"
+import type {BibDB, BibDBEntry, DocSettings, ExportDoc, FidusMark, FidusNode, ImageDB, NodeAttrs} from "../../types.js"
 import type {CitationReference} from "../../schema/common/citation.js"
 import type {PandocExporterCitations} from "./citations.js"
 import {getImageDBEntryFilename} from "../tools/file.js"
 import {convertContributor, convertText} from "./tools.js"
 import type {
     PandocAttr,
+    PandocCite,
     PandocElement,
+    PandocHeader,
     PandocJson,
     PandocMetaInlines,
     PandocMetaValue,
+    PandocTable,
     PandocCitation
 } from "./types.js"
 
@@ -17,12 +20,21 @@ interface ConvertOptions {
     inCode: boolean
 }
 
+// Local view of a FidusNode with the fields this exporter always relies on.
+type FN = {
+    type: string
+    attrs: NodeAttrs
+    content: FidusNode[]
+    marks?: FidusMark[]
+    text?: string
+}
+
 interface PandocExporterLike {
     citations: PandocExporterCitations
     doc: ExportDoc
 }
 
-interface PandocConversion {
+export interface PandocConversion {
     json: PandocJson
     imageIds: string[]
     usedBibDB: Record<string, BibDBEntry>
@@ -58,17 +70,17 @@ export class PandocExporterConvert {
     }
 
     init(doc: FidusNode): PandocConversion {
-        this.preWalkJson(doc)
+        this.preWalkJson(doc as FN)
         const meta: Record<string, PandocMetaValue> = {
             lang: {
                 t: "MetaInlines",
-                c: [{t: "Str", c: this.settings.language.split("-")[0]}]
+                c: [{t: "Str", c: (this.settings.language || "en").split("-")[0]}]
             }
         }
         const json: PandocJson = {
             "pandoc-api-version": [1, 23, 1],
             meta,
-            blocks: this.convertContent(doc.content, meta)
+            blocks: this.convertContent((doc as FN).content, meta)
         }
         const returnObject = {
             json,
@@ -80,20 +92,21 @@ export class PandocExporterConvert {
 
     // Find information for meta tags in header
     preWalkJson(node: FidusNode): void {
-        switch (node.type) {
+        const fn = node as FN
+        switch (fn.type) {
             case "heading1":
             case "heading2":
             case "heading3":
             case "heading4":
             case "heading5":
             case "heading6": {
-                const level = Number.parseInt(node.type.slice(-1))
+                const level = Number.parseInt(fn.type.slice(-1))
                 this.metaData.toc.push({
                     t: "Header",
                     c: [
                         level,
-                        [node.attrs.id || "", [], []],
-                        this.convertContent(node.content || [], {})
+                        [fn.attrs.id || "", [], []],
+                        this.convertContent(fn.content || [], {})
                     ]
                 })
                 break
@@ -101,8 +114,8 @@ export class PandocExporterConvert {
             default:
                 break
         }
-        if (node.content) {
-            node.content.forEach(child => this.preWalkJson(child))
+        if (fn.content) {
+            fn.content.forEach(child => this.preWalkJson(child))
         }
     }
 
@@ -114,14 +127,15 @@ export class PandocExporterConvert {
     ): PandocElement[] {
         const pandocContent: PandocElement[] = []
         for (const node of docContent) {
-            switch (node.type) {
+            const fn = node as FN
+            switch (fn.type) {
                 case "doc":
                     // We only handle doc children
                     break
                 case "blockquote": {
                     pandocContent.push({
                         t: "BlockQuote",
-                        c: this.convertContent(node.content, meta, options)
+                        c: this.convertContent(fn.content, meta, options)
                     })
                     break
                 }
@@ -131,8 +145,8 @@ export class PandocExporterConvert {
                         t: "BulletList",
                         c
                     })
-                    if (node.content) {
-                        node.content.forEach(listItem =>
+                    if (fn.content) {
+                        fn.content.forEach(listItem =>
                             c.push(
                                 this.convertContent(
                                     listItem.content || [],
@@ -154,7 +168,7 @@ export class PandocExporterConvert {
                         break
                     }
 
-                    const references = (node.attrs?.references || []) as CitationReference[]
+                    const references = (fn.attrs?.references || []) as CitationReference[]
                     const pandocReferences = references
                         .map((reference): PandocCitation | false => {
                             const bibDBEntry = this.bibDB.db[String(reference.id)]
@@ -177,7 +191,7 @@ export class PandocExporterConvert {
 
                             return {
                                 citationId:
-                                    this.usedBibDB[String(reference.id)].entry_key,
+                                    this.usedBibDB[String(reference.id)].entry_key!,
                                 citationPrefix: convertText(
                                     reference.prefix || ""
                                 ),
@@ -186,7 +200,7 @@ export class PandocExporterConvert {
                                 ),
                                 citationMode: {
                                     t:
-                                        node.attrs.format === "textcite"
+                                        fn.attrs.format === "textcite"
                                             ? "AuthorInText"
                                             : "NormalCitation"
                                 },
@@ -196,7 +210,7 @@ export class PandocExporterConvert {
                         })
                         .filter((reference): reference is PandocCitation =>
                             Boolean(reference)
-                        )
+                        ) as PandocCitation[]
                     if (!pandocReferences.length) {
                         break
                     }
@@ -207,11 +221,11 @@ export class PandocExporterConvert {
                     )
                     const pandocElement: PandocCite = {
                         t: "Cite",
-                        c: [pandocReferences, pandocRendering]
+                        c: [pandocReferences, pandocRendering as PandocElement[]]
                     }
-                    if (node.content) {
+                    if (fn.content) {
                         this.convertContent(
-                            node.content,
+                            fn.content,
                             meta,
                             options
                         ).forEach(el => pandocElement.c[1].push(el))
@@ -222,30 +236,36 @@ export class PandocExporterConvert {
                 case "code_block": {
                     options = Object.assign({}, options)
                     options.inCode = true
-                    const classes = node.attrs.language
-                        ? [node.attrs.language]
+                    const classes = fn.attrs.language as string[]
+                        ? [fn.attrs.language]
                         : []
                     const keyValuePairs: [string, string][] = []
 
                     // Add caption if title is present
-                    if (node.attrs.title) {
-                        keyValuePairs.push(["caption", node.attrs.title])
+                    if (fn.attrs.title) {
+                        keyValuePairs.push([
+                            "caption",
+                            String(fn.attrs.title)
+                        ])
                     }
 
                     // Add category as custom attribute for round-trip fidelity
-                    if (node.attrs.category) {
-                        keyValuePairs.push(["category", node.attrs.category])
+                    if (fn.attrs.category) {
+                        keyValuePairs.push([
+                            "category",
+                            String(fn.attrs.category)
+                        ])
                     }
 
                     // Use id if present, otherwise empty string
-                    const id = node.attrs.id || ""
-                    const attrs = [id, classes, keyValuePairs]
+                    const id = fn.attrs.id || ""
+                    const attrs = [id, classes, keyValuePairs] as PandocAttr
 
                     pandocContent.push({
                         t: "CodeBlock",
                         c: [
                             attrs,
-                            this.convertContent(node.content, meta, options)
+                            this.convertContent(fn.content, meta, options)
                                 .map(item => {
                                     if (item.t === "Str") {
                                         return item.c
@@ -268,39 +288,36 @@ export class PandocExporterConvert {
                     // dealt with in contributors_part
                     break
                 case "contributors_part": {
-                    if (!node.content || !node.content.length) {
+                    if (!fn.content || !fn.content.length) {
                         break
                     }
-                    if (node.attrs?.metadata === "authors") {
+                    if (fn.attrs?.metadata === "authors") {
                         if (!meta.author) {
                             meta.author = {t: "MetaList", c: []}
                         }
-                        const convertedContributors = node.content
+                        const convertedContributors = fn.content
                             .map(contributor =>
                                 convertContributor(
                                     contributor.attrs as unknown as Record<string, string>
                                 )
                             )
-                            .filter(
-                                (convertedContributor): convertedContributor is PandocMetaInlines =>
-                                    Boolean(convertedContributor)
-                            )
+                            .filter(Boolean) as PandocMetaInlines[]
                         convertedContributors.forEach(contributor =>
-                            meta.author!.c.push(contributor)
+                            (meta.author!.c as PandocMetaValue[]).push(contributor)
                         )
                     } else {
                         pandocContent.push({
                             t: "Div",
                             c: [
                                 [
-                                    node.attrs?.id || "",
+                                    fn.attrs?.id || "",
                                     [
                                         "doc-part",
                                         "doc-contributors",
-                                        node.attrs?.id
-                                            ? `doc-${node.attrs.id}`
+                                        fn.attrs?.id
+                                            ? `doc-${fn.attrs.id}`
                                             : "doc-div",
-                                        `doc-${node.attrs?.metadata || "other"}`
+                                        `doc-${fn.attrs?.metadata || "other"}`
                                     ],
                                     []
                                 ],
@@ -308,7 +325,7 @@ export class PandocExporterConvert {
                                     {
                                         t: "Para",
                                         c: convertText(
-                                            node.content
+                                            fn.content
                                                 .map(
                                                     contributor =>
                                                         `${contributor.attrs?.firstname || ""} ${contributor.attrs?.lastname || ""}, ${contributor.attrs?.institution || ""}, ${contributor.attrs?.email || ""}`
@@ -328,22 +345,22 @@ export class PandocExporterConvert {
                         t: "Link",
                         c: [
                             ["", ["reference"], []],
-                            convertText(String(node.attrs?.title || "MISSING TARGET")),
-                            [`#${node.attrs?.id || ""}`, ""]
+                            convertText(String(fn.attrs?.title || "MISSING TARGET")),
+                            [`#${fn.attrs?.id || ""}`, ""]
                         ]
                     })
                     break
                 }
                 case "heading_part": {
-                    if (!node.content || !node.content.length) {
+                    if (!fn.content || !fn.content.length) {
                         break
                     }
-                    if (node.attrs?.metadata === "subtitle" && !meta.subtitle) {
-                        if (node.content?.length && node.content[0].content) {
+                    if (fn.attrs?.metadata === "subtitle" && !meta.subtitle) {
+                        if (fn.content?.length && fn.content[0].content) {
                             meta.subtitle = {
                                 t: "MetaInlines",
                                 c: this.convertContent(
-                                    node.content[0].content,
+                                    fn.content[0].content,
                                     meta,
                                     options
                                 )
@@ -352,11 +369,11 @@ export class PandocExporterConvert {
                     } else {
                         const pandocElement: PandocHeader = {
                             t: "Header",
-                            c: [2, [String(node.attrs?.metadata || ""), [], []]]
+                            c: [2, [String(fn.attrs?.metadata || ""), [], []], []]
                         }
-                        if (node.content) {
+                        if (fn.content) {
                             this.convertContent(
-                                node.content,
+                                fn.content,
                                 meta,
                                 options
                             ).forEach(el => pandocElement.c[2].push(el))
@@ -365,14 +382,14 @@ export class PandocExporterConvert {
                             t: "Div",
                             c: [
                                 [
-                                    node.attrs?.id || "",
+                                    fn.attrs?.id || "",
                                     [
                                         "doc-part",
                                         "doc-heading",
-                                        node.attrs?.id
-                                            ? `doc-${node.attrs.id}`
+                                        fn.attrs?.id
+                                            ? `doc-${fn.attrs.id}`
                                             : "doc-div",
-                                        `doc-${node.attrs?.metadata || "other"}`
+                                        `doc-${fn.attrs?.metadata || "other"}`
                                     ],
                                     []
                                 ],
@@ -390,7 +407,7 @@ export class PandocExporterConvert {
                             [
                                 {
                                     t: "Math",
-                                    c: [{t: "InlineMath"}, node.attrs.equation]
+                                    c: [{t: "InlineMath"}, fn.attrs.equation as string]
                                 }
                             ]
                         ]
@@ -399,14 +416,14 @@ export class PandocExporterConvert {
                 }
                 case "figure": {
                     const image =
-                        (node.content.find(child => child.type === "image")
+                        (fn.content.find(child => child.type === "image")
                             ?.attrs?.image as string | undefined) || false
-                    const caption = node.attrs?.caption
-                        ? (node.content.find(
+                    const caption = fn.attrs?.caption
+                        ? (fn.content.find(
                               child => child.type === "figure_caption"
                           )?.content || [])
                         : []
-                    const equation = node.content.find(
+                    const equation = fn.content.find(
                         child => child.type === "figure_equation"
                     )?.attrs?.equation as string | undefined
                     if (image !== false) {
@@ -418,7 +435,7 @@ export class PandocExporterConvert {
                             image
                         )
                         if (
-                            node.attrs?.category === "none" &&
+                            fn.attrs?.category === "none" &&
                             imageFilename &&
                             !caption.length &&
                             (!copyright || !(copyright.holder as string))
@@ -430,16 +447,16 @@ export class PandocExporterConvert {
                                         t: "Image",
                                         c: [
                                             [
-                                                node.attrs?.id || "",
+                                                fn.attrs?.id || "",
                                                 [],
                                                 [
                                                     [
                                                         "data-width",
-                                                        String(node.attrs?.width)
+                                                        String(fn.attrs?.width)
                                                     ],
                                                     [
                                                         "width",
-                                                        `${String(node.attrs?.width)}%`
+                                                        `${String(fn.attrs?.width)}%`
                                                     ]
                                                 ]
                                             ],
@@ -454,19 +471,19 @@ export class PandocExporterConvert {
                                 t: "Figure",
                                 c: [
                                     [
-                                        node.attrs?.id || "",
+                                        fn.attrs?.id || "",
                                         [
-                                            `aligned-${String(node.attrs?.aligned)}`,
-                                            `image-width-${String(node.attrs?.width)}`
+                                            `aligned-${String(fn.attrs?.aligned)}`,
+                                            `image-width-${String(fn.attrs?.width)}`
                                         ],
                                         [
-                                            ["aligned", String(node.attrs?.aligned)],
+                                            ["aligned", String(fn.attrs?.aligned)],
                                             [
                                                 "data-width",
-                                                String(node.attrs?.width)
+                                                String(fn.attrs?.width)
                                             ],
-                                            ["width", `${String(node.attrs?.width)}%`],
-                                            ["category", String(node.attrs?.category)]
+                                            ["width", `${String(fn.attrs?.width)}%`],
+                                            ["category", String(fn.attrs?.category)]
                                         ]
                                     ],
                                     [
@@ -497,7 +514,7 @@ export class PandocExporterConvert {
                                                             [
                                                                 [
                                                                     "width",
-                                                                    `${String(node.attrs?.width)}%`
+                                                                    `${String(fn.attrs?.width)}%`
                                                                 ]
                                                             ]
                                                         ],
@@ -516,19 +533,19 @@ export class PandocExporterConvert {
                             t: "Figure",
                             c: [
                                 [
-                                    node.attrs?.id || "",
+                                    fn.attrs?.id || "",
                                     [
-                                        `aligned-${String(node.attrs?.aligned)}`,
-                                        `image-width-${String(node.attrs?.width)}`
+                                        `aligned-${String(fn.attrs?.aligned)}`,
+                                        `image-width-${String(fn.attrs?.width)}`
                                     ],
                                     [
-                                        ["aligned", String(node.attrs?.aligned)],
+                                        ["aligned", String(fn.attrs?.aligned)],
                                         [
                                             "data-width",
-                                            String(node.attrs?.width)
+                                            String(fn.attrs?.width)
                                         ],
-                                        ["width", `${String(node.attrs?.width)}%`],
-                                        ["category", String(node.attrs?.category)]
+                                        ["width", `${String(fn.attrs?.width)}%`],
+                                        ["category", String(fn.attrs?.category)]
                                     ]
                                 ],
                                 [
@@ -571,7 +588,7 @@ export class PandocExporterConvert {
                     pandocContent.push({
                         t: "Note",
                         c: this.convertContent(
-                            node.attrs.footnote,
+                            fn.attrs.footnote as FidusNode[],
                             meta,
                             options
                         )
@@ -590,14 +607,14 @@ export class PandocExporterConvert {
                 case "heading4":
                 case "heading5":
                 case "heading6": {
-                    const level = Number.parseInt(node.type.slice(-1))
+                    const level = Number.parseInt(fn.type.slice(-1))
                     pandocContent.push({
                         t: "Header",
                         c: [
                             level,
-                            [node.attrs.id || "", [], []],
+                            [fn.attrs.id || "", [], []],
                             this.convertContent(
-                                node.content || [],
+                                fn.content || [],
                                 meta,
                                 options
                             )
@@ -617,7 +634,7 @@ export class PandocExporterConvert {
                         t: "OrderedList",
                         c: [
                             [
-                                Number(node.attrs?.order) || 1,
+                                Number(fn.attrs?.order) || 1,
                                 {t: "DefaultStyle"},
                                 {t: "DefaultDelim"}
                             ], // list attributes
@@ -625,8 +642,8 @@ export class PandocExporterConvert {
                         ]
                     })
 
-                    if (node.content) {
-                        node.content.forEach(listItem =>
+                    if (fn.content) {
+                        fn.content.forEach(listItem =>
                             c.push(
                                 this.convertContent(
                                     listItem.content || [],
@@ -641,21 +658,21 @@ export class PandocExporterConvert {
                 case "paragraph": {
                     pandocContent.push({
                         t: "Para",
-                        c: node.content
-                            ? this.convertContent(node.content, meta, options)
+                        c: fn.content
+                            ? this.convertContent(fn.content, meta, options)
                             : []
                     })
                     break
                 }
                 case "richtext_part": {
-                    if (!node.content || !node.content.length) {
+                    if (!fn.content || !fn.content.length) {
                         break
                     }
-                    if (node.attrs?.metadata === "abstract" && !meta.abstract) {
+                    if (fn.attrs?.metadata === "abstract" && !meta.abstract) {
                         meta.abstract = {
                             t: "MetaBlocks",
                             c: this.convertContent(
-                                node.content,
+                                fn.content,
                                 meta,
                                 options
                             )
@@ -665,19 +682,19 @@ export class PandocExporterConvert {
                             t: "Div",
                             c: [
                                 [
-                                    node.attrs.id || "",
+                                    fn.attrs.id || "",
                                     [
                                         "doc-part",
                                         "doc-richtext",
-                                        node.attrs.id
-                                            ? `doc-${node.attrs.id}`
+                                        fn.attrs.id
+                                            ? `doc-${fn.attrs.id}`
                                             : "doc-div",
-                                        `doc-${node.attrs.metadata || "other"}`
+                                        `doc-${fn.attrs.metadata || "other"}`
                                     ],
                                     []
                                 ],
                                 this.convertContent(
-                                    node.content,
+                                    fn.content,
                                     meta,
                                     options
                                 )
@@ -691,14 +708,14 @@ export class PandocExporterConvert {
                         t: "HorizontalRule",
                         c: [
                             [
-                                node.attrs.id || "",
+                                fn.attrs.id || "",
                                 [
                                     "doc-part",
                                     "doc-separator",
-                                    node.attrs.id
-                                        ? `doc-${node.attrs.id}`
+                                    fn.attrs.id
+                                        ? `doc-${fn.attrs.id}`
                                         : "doc-hr",
-                                    `doc-${node.attrs.metadata || "other"}`
+                                    `doc-${fn.attrs.metadata || "other"}`
                                 ],
                                 []
                             ],
@@ -710,21 +727,21 @@ export class PandocExporterConvert {
                     // Handled by tags_part
                     break
                 case "tags_part": {
-                    if (!node.content || !node.content.length) {
+                    if (!fn.content || !fn.content.length) {
                         break
                     }
                     pandocContent.push({
                         t: "Div",
                         c: [
                             [
-                                node.attrs?.id || "",
+                                fn.attrs?.id || "",
                                 [
                                     "doc-part",
                                     "doc-tags",
-                                    node.attrs?.id
-                                        ? `doc-${node.attrs.id}`
+                                    fn.attrs?.id
+                                        ? `doc-${fn.attrs.id}`
                                         : "doc-div",
-                                    `doc-${node.attrs?.metadata || "other"}`
+                                    `doc-${fn.attrs?.metadata || "other"}`
                                 ],
                                 []
                             ],
@@ -732,7 +749,7 @@ export class PandocExporterConvert {
                                 {
                                     t: "Para",
                                     c: convertText(
-                                        node.content
+                                        fn.content
                                             .map(tag => String(tag.attrs?.tag))
                                             .join("; ")
                                     )
@@ -745,12 +762,12 @@ export class PandocExporterConvert {
                 case "table": {
                     // Tables seem to have this structure in pandoc json:
                     // If table has no rows with content, skip.
-                    const tableBodyNode = node.content.find(
+                    const tableBodyNode = fn.content.find(
                         childNode =>
                             childNode.type === "table_body" &&
-                            childNode.content &&
-                            childNode.content.length
-                    )
+                            (childNode as FN).content &&
+                            (childNode as FN).content.length
+                    ) as FN | undefined
                     const tableFirstRow = tableBodyNode
                         ? tableBodyNode.content.find(
                               childNode =>
@@ -770,22 +787,22 @@ export class PandocExporterConvert {
                     })
                     // child 0: attributes of the table.
                     c.push([
-                        node.attrs?.id || "",
+                        fn.attrs?.id || "",
                         [
-                            `table-${String(node.attrs?.width)}`,
-                            `table-${String(node.attrs?.aligned)}`,
-                            `table-${String(node.attrs?.layout)}`
+                            `table-${String(fn.attrs?.width)}`,
+                            `table-${String(fn.attrs?.aligned)}`,
+                            `table-${String(fn.attrs?.layout)}`
                         ],
                         [
-                            ["data-width", String(node.attrs?.width)],
-                            ["width", `${String(node.attrs?.width)}%`],
-                            ["aligned", String(node.attrs?.aligned)],
-                            ["layout", String(node.attrs?.layout)],
-                            ["category", String(node.attrs?.category)]
+                            ["data-width", String(fn.attrs?.width)],
+                            ["width", `${String(fn.attrs?.width)}%`],
+                            ["aligned", String(fn.attrs?.aligned)],
+                            ["layout", String(fn.attrs?.layout)],
+                            ["category", String(fn.attrs?.category)]
                         ]
                     ])
                     // child 1: table caption
-                    const tableCaptionNode = node.content.find(
+                    const tableCaptionNode = fn.content.find(
                         childNode =>
                             childNode.type === "table_caption" &&
                             childNode.content &&
@@ -798,7 +815,7 @@ export class PandocExporterConvert {
                                 {
                                     t: "Plain",
                                     c: this.convertContent(
-                                        tableCaptionNode.content,
+                                        tableCaptionNode.content || [],
                                         meta,
                                         options
                                     )
@@ -810,7 +827,7 @@ export class PandocExporterConvert {
                     }
                     // child 2: settings for each column
                     c.push(
-                        tableFirstRow.content.map(_column => [
+                        (tableFirstRow as FN).content.map(_column => [
                             {t: "AlignDefault"},
                             {t: "ColWidthDefault"}
                         ])
@@ -831,7 +848,7 @@ export class PandocExporterConvert {
                         if (
                             currentTablePart === tableHead &&
                             tableBodyNode!.content[index].content?.find(
-                                cell => cell.type === "table_cell"
+                                cell => (cell as FN).type === "table_cell"
                             )
                         ) {
                             // If at least one regular table cell is found in the row, we assume the table header hs finished.
@@ -851,14 +868,14 @@ export class PandocExporterConvert {
                     break
                 case "table_cell":
                 case "table_header": {
-                    if (node.content) {
+                    if (fn.content) {
                         pandocContent.push([
                             ["", [], []],
                             {t: "AlignDefault"},
-                            node.attrs?.rowspan || 1,
-                            node.attrs?.colspan || 1,
-                            this.convertContent(node.content, meta, options)
-                        ])
+                            fn.attrs?.rowspan || 1,
+                            fn.attrs?.colspan || 1,
+                            this.convertContent(fn.content, meta, options)
+                        ] as unknown as PandocElement)
                     }
                     break
                 }
@@ -867,18 +884,18 @@ export class PandocExporterConvert {
                         t: "Div",
                         c: [
                             [
-                                node.attrs.id || "",
+                                fn.attrs.id || "",
                                 [
                                     "doc-part",
                                     "doc-table",
-                                    node.attrs.id
-                                        ? `doc-${node.attrs.id}`
+                                    fn.attrs.id
+                                        ? `doc-${fn.attrs.id}`
                                         : "doc-div",
-                                    `doc-${node.attrs.metadata || "other"}`
+                                    `doc-${fn.attrs.metadata || "other"}`
                                 ],
                                 []
                             ],
-                            this.convertContent(node.content, meta, options)
+                            this.convertContent(fn.content, meta, options)
                         ]
                     })
                     break
@@ -887,40 +904,43 @@ export class PandocExporterConvert {
                         t: "Div",
                         c: [
                             [
-                                node.attrs.id || "",
+                                fn.attrs.id || "",
                                 [
                                     "doc-part",
                                     "doc-table-of-contents",
-                                    node.attrs.id
-                                        ? `doc-${node.attrs.id}`
+                                    fn.attrs.id
+                                        ? `doc-${fn.attrs.id}`
                                         : "doc-div",
-                                    `doc-${node.attrs.metadata || "other"}`
+                                    `doc-${fn.attrs.metadata || "other"}`
                                 ],
                                 []
                             ],
-                            [
+                            ([
                                 {
                                     t: "Header",
                                     c: [
                                         1,
                                         ["", ["toc"], []],
-                                        convertText(node.attrs.title)
+                                        convertText(fn.attrs.title as string) as PandocElement[]
                                     ]
                                 }
-                            ].concat(this.metaData.toc)
+                            ] as PandocElement[]).concat(this.metaData.toc as PandocElement[])
                         ]
                     })
                     break
                 }
                 case "table_row": {
-                    pandocContent.push([
-                        ["", [], []],
-                        this.convertContent(node.content, meta, options)
-                    ])
+                    pandocContent.push({
+                        t: "TableRow",
+                        c: [
+                            ["", [], []],
+                            this.convertContent(fn.content, meta, options)
+                        ]
+                    } as unknown as PandocElement)
                     break
                 }
                 case "text": {
-                    if (node.text) {
+                    if (fn.text) {
                         let containerContent: PandocElement[] = pandocContent
                         let strong: FidusMark | undefined,
                             em: FidusMark | undefined,
@@ -930,23 +950,23 @@ export class PandocExporterConvert {
                             sup: FidusMark | undefined,
                             sub: FidusMark | undefined,
                             code: FidusMark | undefined
-                        if (node.marks) {
-                            strong = node.marks.find(
+                        if (fn.marks) {
+                            strong = fn.marks.find(
                                 mark => mark.type === "strong"
                             )
-                            em = node.marks.find(mark => mark.type === "em")
-                            underline = node.marks.find(
+                            em = fn.marks.find(mark => mark.type === "em")
+                            underline = fn.marks.find(
                                 mark => mark.type === "underline"
                             )
-                            hyperlink = node.marks.find(
+                            hyperlink = fn.marks.find(
                                 mark => mark.type === "link"
                             )
-                            anchor = node.marks.find(
+                            anchor = fn.marks.find(
                                 mark => mark.type === "anchor"
                             )
-                            sup = node.marks.find(mark => mark.type === "sup")
-                            sub = node.marks.find(mark => mark.type === "sub")
-                            code = node.marks.find(mark => mark.type === "code")
+                            sup = fn.marks.find(mark => mark.type === "sup")
+                            sub = fn.marks.find(mark => mark.type === "sub")
+                            code = fn.marks.find(mark => mark.type === "code")
                         }
                         if (em) {
                             const c: PandocElement[] = []
@@ -991,7 +1011,7 @@ export class PandocExporterConvert {
                         if (code && !options.inCode) {
                             containerContent.push({
                                 t: "Code",
-                                c: [["", [], []], node.text]
+                                c: [["", [], []], fn.text]
                             })
                             break
                         }
@@ -1015,33 +1035,33 @@ export class PandocExporterConvert {
                         if (options.inCode) {
                             containerContent.push({
                                 t: "Code",
-                                c: [["", [], []], node.text]
+                                c: [["", [], []], fn.text]
                             })
                         } else {
                             containerContent.push(
-                                ...convertText(node.text || "")
+                                ...convertText(fn.text || "")
                             )
                         }
                     }
                     break
                 }
                 case "title": {
-                    if (!node.content || !node.content.length) {
+                    if (!fn.content || !fn.content.length) {
                         break
                     }
                     if (!meta.title) {
                         meta.title = {
                             t: "MetaInlines",
-                            c: this.convertContent(node.content, meta, options)
+                            c: this.convertContent(fn.content, meta, options)
                         }
                     } else {
                         const pandocElement: PandocHeader = {
                             t: "Header",
-                            c: [1, ["title", [], []]]
+                            c: [1, ["title", [], []], []]
                         }
-                        if (node.content) {
+                        if (fn.content) {
                             this.convertContent(
-                                node.content,
+                                fn.content,
                                 meta,
                                 options
                             ).forEach(el => pandocElement.c[2].push(el))
@@ -1051,7 +1071,7 @@ export class PandocExporterConvert {
                     break
                 }
                 default: {
-                    console.warn(`Not handled: ${node.type}`, {node})
+                    console.warn(`Not handled: ${fn.type}`, {node})
                     break
                 }
             }

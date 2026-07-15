@@ -1,6 +1,6 @@
 import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
-import type {Contributor, DocSettings, FidusNode, Track} from "../../types.js"
+import type {Contributor, DocSettings, FidusNode} from "../../types.js"
 import {textContent} from "../tools/doc_content.js"
 import {xmlDOM} from "../tools/xml.js"
 import type {XMLElement} from "../tools/xml.js"
@@ -9,7 +9,7 @@ import type {ODTExporterCitations} from "./citations.js"
 import type {ODTExporterRichtext} from "./richtext.js"
 
 interface Tag {
-    title: string
+    title?: string
     content?: unknown[]
     block?: XMLElement
 }
@@ -69,7 +69,7 @@ export class ODTExporterRender {
 
     parseStructuredTags(block: XMLElement, tag: Tag): void {
         let blockText = block.textContent
-        const tagName = tag.title
+        const tagName = tag.title || ""
 
         // Check for BEGIN...END loops (with optional limit)
         const beginStartRegex = new RegExp(
@@ -100,7 +100,7 @@ export class ODTExporterRender {
             const templateXml = blockText.slice(beginEnd, endPos)
             const replacementXml = this.processLoop(
                 templateXml,
-                tag.content,
+                tag.content || [],
                 tagName,
                 limit
             )
@@ -354,19 +354,19 @@ export class ODTExporterRender {
             switch (node.type) {
                 case "title":
                     tag.title = "title"
-                    tag.content = textContent(node)
+                    tag.content = [textContent(node)]
                     break
                 case "heading_part":
-                    tag.title = node.attrs.id
-                    tag.content = textContent(node)
+                    tag.title = node.attrs!.id
+                    tag.content = [textContent(node)]
                     break
                 case "table_part":
                 case "richtext_part":
-                    tag.title = `@${node.attrs.id}`
+                    tag.title = `@${node.attrs!.id}`
                     tag.content = node.content
                     break
                 case "contributors_part":
-                    tag.title = node.attrs.id
+                    tag.title = node.attrs!.id
                     // Return array of structured objects for format with delimiter support
                     tag.content = node.content
                         ? node.content.map((node: FidusNode) => {
@@ -383,7 +383,7 @@ export class ODTExporterRender {
                         : []
                     break
                 case "tags_part":
-                    tag.title = node.attrs.id
+                    tag.title = node.attrs!.id
                     // Return array of tag strings for format with delimiter support
                     tag.content = node.content
                         ? node.content.map((node: FidusNode) => (node.attrs!.tag as string))
@@ -487,7 +487,7 @@ export class ODTExporterRender {
                 if (!tag.title || !tag.content || !Array.isArray(tag.content)) {
                     continue
                 }
-                const tagName = tag.title
+        const tagName = tag.title || ""
                 const beginRegex = new RegExp(
                     `\\{BEGIN_${tagName}(?::limit=(\\d+))?\\}`
                 )
@@ -557,7 +557,7 @@ export class ODTExporterRender {
         tag: Tag,
         limit: number | null
     ): void {
-        const tagName = tag.title
+        const tagName = tag.title || ""
         const beginBlock = blocks[beginIndex]
 
         // Concatenate all blocks from begin to end
@@ -587,7 +587,7 @@ export class ODTExporterRender {
         const decodedTemplateXml = templateXml.replace(/&gt;/g, ">")
         const replacementXml = this.processLoop(
             decodedTemplateXml,
-            tag.content,
+            tag.content || [],
             tagName,
             limit
         )
@@ -707,10 +707,12 @@ export class ODTExporterRender {
                     text.includes(`{IF(ctx.`)
                 if (hasInlineTag || hasBeginTag || hasIfTag) {
                     tag.block = block
-                    if (hasInlineTag && tag.title[0] === "@") {
-                        this.blockRender(tag, richtext, citations)
-                    } else if (hasInlineTag && tag.title[0] !== "@") {
-                        this.inlineRender(tag)
+                    if (tag.title) {
+                        if (hasInlineTag && tag.title[0] === "@") {
+                            this.blockRender(tag, richtext, citations)
+                        } else if (hasInlineTag && tag.title[0] !== "@") {
+                            this.inlineRender(tag)
+                        }
                     }
                 }
             })
@@ -828,7 +830,7 @@ export class ODTExporterRender {
             "<text:line-break/>"
         )
 
-        tag.block.innerXML = fullText.replace(/^\s+|\s+$/g, match =>
+        tag.block!.innerXML = fullText.replace(/^\s+|\s+$/g, match =>
             "<text:s/>".repeat(match.length)
         )
     }
@@ -844,9 +846,11 @@ export class ODTExporterRender {
                       richtext.run(
                           content as FidusNode,
                           {
-                              citationType: citations.citFm?.citationType || "",
+                              citationType: citations.citFm
+                                  ? citations.citFm.citationType
+                                  : "",
                               section,
-                              tag: tag.title.slice(1)
+                              tag: (tag.title || "").slice(1)
                           },
                           tag as unknown as FidusNode,
                           contentIndex
@@ -858,15 +862,15 @@ export class ODTExporterRender {
         if (!outXML.length) {
             // If there is no content, we need to put in a space to prevent the
             // tag from being removed by LibreOffice.
-            tag.block.innerXML = "<text:s/>"
+            tag.block!.innerXML = "<text:s/>"
             return
         }
-        const parentElement = tag.block.parentElement
+        const parentElement = tag.block!.parentElement
         const dom = xmlDOM(outXML)
         const domPars =
             (dom.node["#document"] as XMLElement[] | undefined)?.slice() || [dom]
-        domPars.forEach(node => parentElement!.insertBefore(node, tag.block))
+        domPars.forEach(node => parentElement!.insertBefore(node, tag.block!))
 
-        parentElement!.removeChild(tag.block)
+        parentElement!.removeChild(tag.block!)
     }
 }

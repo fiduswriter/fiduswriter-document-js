@@ -7,7 +7,7 @@ import {DOCXExporterImages} from "./images.js"
 import {DOCXExporterLists} from "./lists.js"
 import type {DOCXExporterMath} from "./math.js"
 import {DOCXExporterRels} from "./rels.js"
-import type {DOCXExporterRichtext} from "./richtext.js"
+import {DOCXExporterRichtext} from "./richtext.js"
 import type {DOCXExporterTables} from "./tables.js"
 
 const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -84,7 +84,7 @@ export class DOCXExporterFootnotes {
     ctFilePath: string
     settingsFilePath: string
     styleFilePath: string
-    richtext: DOCXExporterRichtext
+    richtext!: DOCXExporterRichtext
 
     constructor(
         doc: ExportDoc,
@@ -245,6 +245,15 @@ export class DOCXExporterFootnotes {
     }
 
     createXml(): Promise<void> {
+        if (
+            !this.fnRels ||
+            !this.augmentedCitations ||
+            !this.fnPmJSON ||
+            !this.images
+        ) {
+            // createXml is only reached after init() has populated these.
+            return Promise.resolve()
+        }
         this.richtext = new DOCXExporterRichtext(
             this.doc,
             this.settings,

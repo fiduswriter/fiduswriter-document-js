@@ -185,16 +185,16 @@ export class DocxConvert {
             ]
         })
         title.containerNodes.forEach((node: XMLElement) => {
-            node.parentElement.removeChild(node)
+            node.parentElement?.removeChild(node)
         })
         document.attrs.title =
-            title.content.map((node: XMLElement) => node.textContent).join("") ||
+            title.content.map((node: FidusNode) => node.text || "").join("") ||
             gettext("Untitled")
         // Extract metadata sections
         const metadata = this.extractMetadata(body)
         metadata.forEach(({type, content}: MetadataItem) => {
             const templatePart = templateParts.find(
-                (part: FidusNode) => part.attrs.metadata === type
+                (part: FidusNode) => part.attrs?.metadata === type
             )
             const attrs: Record<string, unknown> = {}
             if (templatePart) {
@@ -227,10 +227,10 @@ export class DocxConvert {
                 document.content.push({
                     type: "richtext_part",
                     attrs: {
-                        title: templatePart.attrs.title,
-                        id: templatePart.attrs.id,
-                        metadata: templatePart.attrs.metadata || undefined,
-                        marks: templatePart.attrs.marks || [
+                        title: templatePart.attrs?.title,
+                        id: templatePart.attrs?.id,
+                        metadata: templatePart.attrs?.metadata || undefined,
+                        marks: templatePart.attrs?.marks || [
                             "strong",
                             "em",
                             "link"
@@ -251,7 +251,7 @@ export class DocxConvert {
 
         if (unassignedContent.length) {
             const bodyTemplatePart = templateParts.find(
-                (part: FidusNode) => !part.attrs.metadata && part.type === "richtext_part"
+                (part: FidusNode) => !part.attrs?.metadata && part.type === "richtext_part"
             )
 
             document.content.push({
@@ -349,8 +349,10 @@ export class DocxConvert {
                     }
                 }
             }
+            const contributor = contributors[num - 1]!
+            const contributorAttrs = contributor.attrs!
             if (field === "role") {
-                contributors[num - 1].attrs.role = value
+                contributorAttrs.role = value
             } else if (
                 [
                     "firstname",
@@ -361,7 +363,7 @@ export class DocxConvert {
                     "id_value"
                 ].includes(field)
             ) {
-                contributors[num - 1].attrs[field] = value
+                contributorAttrs[field] = value
             }
         })
 
@@ -370,7 +372,7 @@ export class DocxConvert {
             if (!contributor) {
                 return
             }
-            const role = contributor.attrs.role || "authors"
+            const role = String(contributor.attrs?.role || "authors")
             if (!byRole[role]) {
                 byRole[role] = []
             }
@@ -387,7 +389,7 @@ export class DocxConvert {
         const authorNodes = body
             .queryAll("w:pStyle", {"w:val": "Author"})
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
         authorNodes.forEach((authorNode: XMLElement) => {
             const authorText = this.getTextContent(authorNode)
             const [firstname = "", lastname = ""] = authorText.split(" ", 2)
@@ -436,24 +438,28 @@ export class DocxConvert {
         const abstractNodes = body
             .queryAll("w:pStyle", {"w:val": "Abstract"})
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
         if (abstractNodes.length) {
             return {
-                content: abstractNodes.map((abstractNode: XMLElement) =>
-                    this.convertBlock(abstractNode)
-                ),
+                content: abstractNodes
+                    .map((abstractNode: XMLElement) =>
+                        this.convertBlock(abstractNode)
+                    )
+                    .filter((b): b is FidusNode => b !== null),
                 containerNodes: abstractNodes
             }
         }
         const extractedPart = this.extractPartOnTitle(body, ["Abstract"])
         if (extractedPart.content.length) {
             return {
-                content: extractedPart.content.map((abstractNode: XMLElement) =>
-                    this.convertBlock(abstractNode)
-                ),
-                containerNodes: extractedPart.content.concat([
-                    extractedPart.header
-                ])
+                content: extractedPart.content
+                    .map((abstractNode: XMLElement) =>
+                        this.convertBlock(abstractNode)
+                    )
+                    .filter((b): b is FidusNode => b !== null),
+                containerNodes: extractedPart.content.concat(
+                    extractedPart.header ? [extractedPart.header] : []
+                )
             }
         }
         return {content: [], containerNodes: []}
@@ -465,7 +471,7 @@ export class DocxConvert {
         let keywordNodes = body
             .queryAll("w:pStyle", {"w:val": "Keywords"})
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
 
         if (!keywordNodes.length) {
             // If no keywords section is found, look for a title called "Keywords"
@@ -501,7 +507,11 @@ export class DocxConvert {
         return {content: [], containerNodes: []}
     }
 
-    extractPartOnTitle(body: XMLElement, titleWords: string[], maxPars: number | false = false) {
+    extractPartOnTitle(
+        body: XMLElement,
+        titleWords: string[],
+        maxPars: number | false = false
+    ): {header: XMLElement | undefined; content: XMLElement[]} {
         // Fall back to heading starting with TITLEWORD in text
         if (typeof titleWords === "string") {
             titleWords = [titleWords]
@@ -521,11 +531,11 @@ export class DocxConvert {
                 ]
             })
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
-        const header = headingPars.find((p: XMLElement | null) =>
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
+        const header = headingPars.find((p: XMLElement) =>
             titleWords.includes(this.getTextContent(p).trim())
         )
-        const content: FidusNode[] = []
+        const content: XMLElement[] = []
         if (header && header.nextSibling) {
             //const content = []
             //const containerNodes = [sectionHeader]
@@ -539,7 +549,7 @@ export class DocxConvert {
             ) {
                 searchPar = searchPar.nextSibling
                 const paraStyle = this.getParaStyle(searchPar)
-                if (paraStyle.isHeading && paraStyle.level <= headerLevel) {
+                if (paraStyle.isHeading && (paraStyle.level ?? 0) <= (headerLevel ?? 0)) {
                     break
                 }
                 content.push(searchPar)
@@ -558,7 +568,9 @@ export class DocxConvert {
 
         const skippedBlocks: XMLElement[] = []
 
-        body.children.forEach((node: XMLElement) => {
+        body.children
+            .filter((node): node is XMLElement => typeof node !== "string")
+            .forEach((node: XMLElement) => {
             if (skippedBlocks.includes(node)) {
                 return
             }
@@ -597,7 +609,7 @@ export class DocxConvert {
         }
 
         // For headings, use text content as section title
-        if (style.isHeading && style.level <= 4) {
+        if (style.isHeading && (style.level ?? 0) <= 4) {
             return this.getTextContent(node)
         }
 
@@ -621,8 +633,8 @@ export class DocxConvert {
         let matchingPart = templateParts.find(
             (part: FidusNode) =>
                 part.type === "richtext_part" &&
-                !part.attrs.metadata &&
-                part.attrs.title.toLowerCase() === sectionTitle.toLowerCase()
+                !part.attrs?.metadata &&
+                String(part.attrs?.title ?? "").toLowerCase() === sectionTitle.toLowerCase()
         )
 
         if (!matchingPart) {
@@ -630,8 +642,8 @@ export class DocxConvert {
             matchingPart = templateParts.find(
                 (part: FidusNode) =>
                     part.type === "richtext_part" &&
-                    !part.attrs.metadata &&
-                    this.isSimilarTitle(part.attrs.title, sectionTitle)
+                    !part.attrs?.metadata &&
+                    this.isSimilarTitle(String(part.attrs?.title ?? ""), sectionTitle)
             )
         }
 
@@ -660,7 +672,7 @@ export class DocxConvert {
         const titlePars = body
             .queryAll("w:pStyle", {"w:val": "Title"})
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
 
         if (titlePars.length) {
             return {
@@ -685,7 +697,7 @@ export class DocxConvert {
                 ]
             })
             .map((pStyle: XMLElement) => pStyle.closest("w:p"))
-            .filter((p: XMLElement | null) => p)
+            .filter((p: XMLElement | null): p is XMLElement => p !== null)
         if (headingPars.length) {
             return {
                 content: this.convertInline(headingPars[0]),
@@ -724,12 +736,12 @@ export class DocxConvert {
         return false
     }
 
-    convertBlock(node: XMLElement, skippedBlocks: XMLElement[] = []) {
+    convertBlock(node: XMLElement, skippedBlocks: XMLElement[] = []): FidusNode | null {
         if (node.tagName !== "w:p") {
             return null
         }
         const inBibliography = this.inBibliography(node)
-        let converted
+        let converted: FidusNode | null
         const style = this.getParaStyle(node)
         if (style.isHeading) {
             converted = this.convertHeading(node, style)
@@ -768,7 +780,7 @@ export class DocxConvert {
         return this.wrapTrackChanges(node, converted)
     }
 
-    wrapTrackChanges(node: XMLElement, content: FidusNode[]) {
+    wrapTrackChanges(node: XMLElement, content: FidusNode | null): FidusNode | null {
         if (!content || !node.previousSibling) {
             return content
         }
@@ -818,7 +830,7 @@ export class DocxConvert {
         return tracks
     }
 
-    getParaStyle(node: XMLElement) {
+    getParaStyle(node: XMLElement): ParaStyle {
         const pStyle = node.query("w:pStyle")
         const styleId = attr(pStyle, "w:val")
         const style = this.parser.styles[styleId] || {}
@@ -882,6 +894,9 @@ export class DocxConvert {
 
     convertListItem(node: XMLElement, style: ParaStyle) {
         const numbering = style.numbering
+        if (!numbering) {
+            return this.convertParagraph(node)
+        }
         const level = numbering.definition?.levels[numbering.level]
 
         return {
@@ -923,7 +938,7 @@ export class DocxConvert {
             return null
         }
 
-        const imagePath = rel.target.split("/").pop()
+        const imagePath = rel.target.split("/").pop() || rel.target
         const imageBlob = this.parser.images[imagePath]
 
         if (!imageBlob) {
@@ -954,14 +969,14 @@ export class DocxConvert {
             height
         }
 
-        const image: Record<string, unknown> = {
+        const image: FidusNode = {
             type: "image",
             attrs: {
                 image: imageId
             }
         }
 
-        const caption: Record<string, unknown> = {
+        const caption: FidusNode = {
             type: "figure_caption",
             content: captionBlock?.content || []
         }
@@ -985,7 +1000,9 @@ export class DocxConvert {
         const content: FidusNode[] = []
 
         // We'll process all inline nodes in document order
-        node.children.forEach((child: XMLElement) => {
+        node.children
+            .filter((child): child is XMLElement => typeof child !== "string")
+            .forEach((child: XMLElement) => {
             let contentReceiver = content
             const currentField =
                 this.currentFields[this.currentFields.length - 1]
@@ -1006,13 +1023,13 @@ export class DocxConvert {
                 // A run
                 const fieldChar = child.query("w:fldChar")
                 if (fieldChar) {
-                    let currentField
+                    let currentField: FieldState | undefined
                     let rendercurrentField = false
                     const type = attr(fieldChar, "w:fldCharType")
                     if (type === "begin") {
                         currentField = {
                             status: "instruction",
-                            display: [],
+                            display: [] as FidusNode[],
                             instructions: "",
                             data: null
                         }
@@ -1042,7 +1059,7 @@ export class DocxConvert {
                     }
 
                     if (rendercurrentField && currentField) {
-                        this.renderField(currentField).forEach((node: XMLElement) =>
+                        this.renderField(currentField).forEach((node: FidusNode) =>
                             contentReceiver.push(node)
                         )
                     }
@@ -1244,11 +1261,11 @@ export class DocxConvert {
 
         // Convert the footnote content to our document model
         const content: FidusNode[] = []
-        footnoteContent.forEach((block: XMLElement) => {
+        footnoteContent.forEach((block: FidusNode) => {
             if (block.type === "paragraph") {
                 content.push({
                     type: "paragraph",
-                    content: block.content.map((node: XMLElement) => {
+                    content: (block.content || []).map((node: FidusNode) => {
                         if (node.type === "text") {
                             return {
                                 type: "text",
@@ -1286,16 +1303,18 @@ export class DocxConvert {
         // This is a very basic conversion - in a real implementation you would
         // use a library like MathML-to-LaTeX or implement a more complete converter
 
+        const xml = omml.outerXML
+
         // Extract text content as a fallback
-        const textContent = omml
+        const textContent = xml
             .replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
             .trim()
 
         // If the OMML contains a fraction
-        if (omml.includes("<m:f>")) {
-            const numMatch = omml.match(/<m:num>(.*?)<\/m:num>/s)
-            const denMatch = omml.match(/<m:den>(.*?)<\/m:den>/s)
+        if (xml.includes("<m:f>")) {
+            const numMatch = xml.match(/<m:num>(.*?)<\/m:num>/s)
+            const denMatch = xml.match(/<m:den>(.*?)<\/m:den>/s)
 
             if (numMatch && denMatch) {
                 const num = numMatch[1].replace(/<[^>]+>/g, "").trim()
@@ -1305,9 +1324,9 @@ export class DocxConvert {
         }
 
         // If it contains a superscript
-        if (omml.includes("<m:sup>")) {
-            const baseMatch = omml.match(/<m:e>(.*?)<\/m:e>/s)
-            const supMatch = omml.match(/<m:sup>(.*?)<\/m:sup>/s)
+        if (xml.includes("<m:sup>")) {
+            const baseMatch = xml.match(/<m:e>(.*?)<\/m:e>/s)
+            const supMatch = xml.match(/<m:sup>(.*?)<\/m:sup>/s)
 
             if (baseMatch && supMatch) {
                 const base = baseMatch[1].replace(/<[^>]+>/g, "").trim()
@@ -1317,9 +1336,9 @@ export class DocxConvert {
         }
 
         // If it contains a subscript
-        if (omml.includes("<m:sub>")) {
-            const baseMatch = omml.match(/<m:e>(.*?)<\/m:e>/s)
-            const subMatch = omml.match(/<m:sub>(.*?)<\/m:sub>/s)
+        if (xml.includes("<m:sub>")) {
+            const baseMatch = xml.match(/<m:e>(.*?)<\/m:e>/s)
+            const subMatch = xml.match(/<m:sub>(.*?)<\/m:sub>/s)
 
             if (baseMatch && subMatch) {
                 const base = baseMatch[1].replace(/<[^>]+>/g, "").trim()
@@ -1332,7 +1351,7 @@ export class DocxConvert {
         return textContent || "x^2" // Default fallback
     }
 
-    renderField(field: FieldState) {
+    renderField(field: FieldState): FidusNode[] {
         const instr = field.instructions.trim()
 
         // Handle REF fields (cross-references)
@@ -1342,9 +1361,9 @@ export class DocxConvert {
             if (parts.length > 0) {
                 const target = parts[0]
                 const text = field.display.reduce(
-                    (accumulator: string, currentValue: XMLElement) => {
+                    (accumulator: string, currentValue: FidusNode) => {
                         if (currentValue.type === "text") {
-                            return accumulator + currentValue.text
+                            return accumulator + (currentValue.text || "")
                         }
                         return accumulator
                     },
@@ -1352,6 +1371,7 @@ export class DocxConvert {
                 )
                 return [this.convertCrossReference(target, text)]
             }
+            return field.display || []
         }
         // Handle SEQ fields (figure/table/equation number cross-references)
         else if (instr.startsWith("SEQ ")) {
@@ -1362,7 +1382,7 @@ export class DocxConvert {
                 const _seqName = seqMatch[1]
                 const text = field.display.reduce((acc: string, curr: FidusNode) => {
                     if (curr.type === "text") {
-                        return acc + curr.text
+                        return acc + (curr.text || "")
                     }
                     return acc
                 }, "")
@@ -1378,17 +1398,17 @@ export class DocxConvert {
                 }
                 return []
             }
+            return field.display || []
         }
         // Handle citation fields
         else if (isDocxCitationField(instr)) {
-            return [
-                parseDocxFieldCitation(
-                    instr,
-                    field.data,
-                    this.sourcesXml,
-                    this.bibliography
-                )
-            ]
+            const cite = parseDocxFieldCitation(
+                instr,
+                field.data,
+                this.sourcesXml,
+                this.bibliography
+            )
+            return cite ? [cite] : []
         } else if (isDocxBibliographyField(instr)) {
             // We don't render the contents of bibliography fields
             return []
@@ -1423,7 +1443,7 @@ export class DocxConvert {
         }
     }
 
-    createMarksFromFormatting(formatting: Record<string, unknown>, insertion: TrackMark | null = null, deletion: TrackMark | null = null) {
+    createMarksFromFormatting(formatting: RunProperties, insertion: XMLElement | null = null, deletion: XMLElement | null = null) {
         const marks: FidusMark[] = []
         if (formatting.bold) {
             marks.push({type: "strong"})
@@ -1458,7 +1478,7 @@ export class DocxConvert {
                 /^droid sans mono/i
             ]
             const isMonospace = monospacePatterns.some((pattern: RegExp) =>
-                pattern.test(formatting.fontFamily)
+                pattern.test(String(formatting.fontFamily))
             )
             if (isMonospace) {
                 marks.push({type: "code"})
@@ -1493,9 +1513,9 @@ export class DocxConvert {
     }
 
     getCurrentMarks(
-        formatting: Record<string, unknown>,
-    insertion: TrackMark | null = null,
-    deletion: TrackMark | null = null
+        formatting: RunProperties,
+    insertion: XMLElement | null = null,
+    deletion: XMLElement | null = null
 ): FidusMark[] {
         const marks = this.createMarksFromFormatting(
             formatting,
@@ -1504,11 +1524,12 @@ export class DocxConvert {
         )
         // Add comment marks for any active comment IDs
         this.currentCommentIds.forEach((commentId: string) => {
+            const commentAttrs: Record<string, unknown> = {
+                id: Number.parseInt(commentId)
+            }
             marks.push({
                 type: "comment",
-                attrs: {
-                    id: Number.parseInt(commentId)
-                }
+                attrs: commentAttrs
             })
         })
         return marks

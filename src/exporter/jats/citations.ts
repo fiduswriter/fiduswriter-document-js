@@ -1,9 +1,10 @@
 import {CSLExporter} from "bibliojson"
+import type {BibDB as BibliojsonBibDB} from "bibliojson"
 
 import {FormatCitations} from "../../citations/format.js"
 import type {CitationInfo} from "../../citations/format.js"
 
-import type {BibDB, CSL, ExportDoc} from "../../types.js"
+import type {BibDB, CSL, CSLNode, ExportDoc} from "../../types.js"
 import {jatsBib} from "./bibliography.js"
 import type {CSLItem} from "./bibliography.js"
 
@@ -75,7 +76,7 @@ export class JATSExporterCitations {
                 const citFm = new FormatCitations(
                     this.csl,
                     this.citInfos as unknown as CitationInfo[],
-                    modStyle as object,
+                    modStyle as unknown as CSLNode,
                     "",
                     this.bibDB,
                     false,
@@ -102,7 +103,7 @@ export class JATSExporterCitations {
                 }
                 const entryIds = bibliography[0].entry_ids.map(id => String(id))
                 const cslItems = new CSLExporter(
-                    this.bibDB.db as Record<string, Record<string, unknown>>,
+                    this.bibDB.db as unknown as BibliojsonBibDB,
                     entryIds
                 ).parse() as Record<string, Record<string, unknown>>
                 bibliography[0].entry_ids.forEach((id, index) => {

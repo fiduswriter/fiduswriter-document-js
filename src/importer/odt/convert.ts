@@ -116,6 +116,16 @@ interface Section {
     content: FidusNode[]
 }
 
+/** A metadata section grouped by semantic type. */
+interface MetadataItem {
+    type: string
+    attrs?: Record<string, unknown>
+    content: ExtractedContent
+}
+
+/** Result of converting an ODT block node: a single node, an array, or null. */
+type ConvertResult = FidusNode | FidusNode[] | null
+
 function attr(node: XMLElement | undefined, name: string): string {
     if (!node) {
         return ""
@@ -182,7 +192,9 @@ export class OdtConvert {
         this.parseStyles()
         this.parseComments()
 
-        this.collectReferenceableObjects(this.contentDoc)
+        if (this.contentDoc) {
+            this.collectReferenceableObjects(this.contentDoc)
+        }
         const content = this.convert()
         return {
             content,
@@ -493,7 +505,7 @@ export class OdtConvert {
                     .replace(/\D/g, "")
                     .slice(0, 9)
                 if (parentId && this.comments[parentId]) {
-                    this.comments[parentId].answers.push({
+                    this.comments[parentId].answers!.push({
                         id: randomCommentId(),
                         user: 0,
                         username,
@@ -600,7 +612,7 @@ export class OdtConvert {
         })
 
         ;(document.attrs as Record<string, unknown>).title =
-            title.content.map((node: XMLElement) => node.textContent).join("") ||
+            title.content.map((node: FidusNode) => node.text || "").join("") ||
             gettext("Untitled")
 
         // Get all content sections from the ODT
@@ -613,7 +625,7 @@ export class OdtConvert {
         const metadataContent = this.extractMetadata()
         metadataContent.forEach(({type, attrs, content}: MetadataItem) => {
             const templatePart = templateParts.find(
-                (part: FidusNode) => part.attrs.metadata === type
+                (part: FidusNode) => part.attrs?.metadata === type
             )
             if (templatePart) {
                 document.content.push({
@@ -635,7 +647,7 @@ export class OdtConvert {
         const sections = this.groupContentIntoSections(body)
 
         // Map ODT sections to template parts
-        sections.forEach((section: DocxSection) => {
+        sections.forEach((section: Section) => {
             // Find matching template part
             const templatePart = this.findMatchingTemplatePart(
                 section.title,
@@ -647,10 +659,10 @@ export class OdtConvert {
                 document.content.push({
                     type: "richtext_part",
                     attrs: {
-                        title: templatePart.attrs.title,
-                        id: templatePart.attrs.id,
-                        metadata: templatePart.attrs.metadata || undefined,
-                        marks: templatePart.attrs.marks || [
+                        title: templatePart.attrs?.title,
+                        id: templatePart.attrs?.id,
+                        metadata: templatePart.attrs?.metadata || undefined,
+                        marks: templatePart.attrs?.marks || [
                             "strong",
                             "em",
                             "link"
@@ -664,15 +676,15 @@ export class OdtConvert {
         // Add remaining content to body section
         const unassignedContent = sections
             .filter(
-                (section: DocxSection) =>
+                (section: Section) =>
                     !this.findMatchingTemplatePart(section.title, templateParts)
             )
-            .flatMap((section: DocxSection) => section.content)
+            .flatMap((section: Section) => section.content)
 
         if (unassignedContent.length) {
             // Find default body template part
             const bodyTemplatePart = templateParts.find(
-                (part: FidusNode) => !part.attrs.metadata && part.type === "richtext_part"
+                (part: FidusNode) => !part.attrs?.metadata && part.type === "richtext_part"
             )
 
             document.content.push({
@@ -770,8 +782,10 @@ export class OdtConvert {
                     }
                 }
             }
+            const contributor = contributors[num - 1]!
+            const contributorAttrs = contributor.attrs!
             if (field === "role") {
-                contributors[num - 1].attrs.role = value
+                contributorAttrs.role = value
             } else if (
                 [
                     "firstname",
@@ -782,7 +796,7 @@ export class OdtConvert {
                     "id_value"
                 ].includes(field)
             ) {
-                contributors[num - 1].attrs[field] = value
+                contributorAttrs[field] = value
             }
         })
 
@@ -791,7 +805,7 @@ export class OdtConvert {
             if (!contributor) {
                 return
             }
-            const role = contributor.attrs.role || "authors"
+            const role = String(contributor.attrs?.role || "authors")
             if (!byRole[role]) {
                 byRole[role] = []
             }
@@ -808,8 +822,8 @@ export class OdtConvert {
         const metaAuthors = this.contentDoc!.queryAll("meta:user-defined", {
             "meta:name": "author"
         })
-        metaAuthors.forEach((authorMeta: Record<string, unknown>) => {
-            const authorText = authorMeta.textContent
+        metaAuthors.forEach((authorMeta: XMLElement) => {
+            const authorText = authorMeta.textContent || ""
             const [firstname = "", lastname = ""] = authorText.split(" ", 2)
             authors.push({
                 type: "contributor",
@@ -908,8 +922,8 @@ export class OdtConvert {
         let matchingPart = templateParts.find(
             (part: FidusNode) =>
                 part.type === "richtext_part" &&
-                !part.attrs.metadata &&
-                part.attrs.title.toLowerCase() === sectionTitle.toLowerCase()
+                !part.attrs?.metadata &&
+                String(part.attrs?.title ?? "").toLowerCase() === sectionTitle.toLowerCase()
         )
 
         if (!matchingPart) {
@@ -917,8 +931,8 @@ export class OdtConvert {
             matchingPart = templateParts.find(
                 (part: FidusNode) =>
                     part.type === "richtext_part" &&
-                    !part.attrs.metadata &&
-                    this.isSimilarTitle(part.attrs.title, sectionTitle)
+                    !part.attrs?.metadata &&
+                    this.isSimilarTitle(String(part.attrs?.title ?? ""), sectionTitle)
             )
         }
 
@@ -950,7 +964,7 @@ export class OdtConvert {
         })
         if (titleParagraph) {
             return {
-                content: this.convertBlockNode(titleParagraph)?.content || [],
+                content: (this.convertBlockNode(titleParagraph) as FidusNode | null)?.content || [],
                 containerNodes: [titleParagraph]
             }
         }
@@ -961,7 +975,7 @@ export class OdtConvert {
         })
         if (titleHeading) {
             return {
-                content: this.convertBlockNode(titleHeading)?.content || [],
+                content: (this.convertBlockNode(titleHeading) as FidusNode | null)?.content || [],
                 containerNodes: [titleHeading]
             }
         }
@@ -979,7 +993,7 @@ export class OdtConvert {
             })
             if (titleElement) {
                 return {
-                    content: this.convertBlockNode(titleElement)?.content || [],
+                    content: (this.convertBlockNode(titleElement) as FidusNode | null)?.content || [],
                     containerNodes: [titleElement]
                 }
             }
@@ -995,7 +1009,7 @@ export class OdtConvert {
                 // Remove this node from the document so it's not processed again
                 return {
                     content:
-                        this.convertBlockNode(firstParagraph)?.content || [],
+                        (this.convertBlockNode(firstParagraph) as FidusNode | null)?.content || [],
                     containerNodes: [firstParagraph]
                 }
             }
@@ -1022,7 +1036,7 @@ export class OdtConvert {
         const textProps = style.textProperties
         if (textProps) {
             // Title usually has larger font size and/or bold weight
-            if (textProps.fontSize > 14 || textProps.bold) {
+            if ((textProps.fontSize ?? 0) > 14 || textProps.bold) {
                 return true
             }
         }
@@ -1033,7 +1047,7 @@ export class OdtConvert {
             // Titles are often centered and have larger margins
             if (
                 paraProps.textAlign === "center" ||
-                (paraProps.marginTop > 0.5 && paraProps.marginBottom > 0.5)
+                (                (paraProps.marginTop ?? 0) > 0.5 && (paraProps.marginBottom ?? 0) > 0.5)
             ) {
                 return true
             }
@@ -1117,13 +1131,15 @@ export class OdtConvert {
     }
 
     groupContentIntoSections(body: XMLElement) {
-        const sections: DocxSection[] = []
+        const sections: Section[] = []
         let currentSection: {title: string | null; content: FidusNode[]} = {
             title: null,
             content: []
         }
 
-        body.children.forEach((node: XMLElement) => {
+        body.children
+            .filter(isElement)
+            .forEach((node: XMLElement) => {
             const styleName = attr(node, "text:style-name")
             const title = this.getSectionTitle(node, styleName)
 
@@ -1139,9 +1155,9 @@ export class OdtConvert {
             }
 
             const converted = [this.convertBlockNode(node)]
-                .filter((node: XMLElement) => node)
+                .filter((node): node is FidusNode | FidusNode[] => node !== null)
                 .flat()
-            converted.forEach((node: XMLElement) => currentSection.content.push(node))
+            converted.forEach((node: FidusNode) => currentSection.content.push(node))
         })
 
         // Add final section
@@ -1176,7 +1192,7 @@ export class OdtConvert {
         // Check text properties for monospace fonts
         if (style?.textProperties?.fontFamily) {
             const fontFamily = style.textProperties.fontFamily.toLowerCase()
-            const monospacePatterns: RegExp[] = [
+            const monospacePatterns: string[] = [
                 "courier",
                 "consolas",
                 "monaco",
@@ -1188,7 +1204,7 @@ export class OdtConvert {
                 "source code pro",
                 "fira code"
             ]
-            return monospacePatterns.some((pattern: RegExp) =>
+            return monospacePatterns.some((pattern: string) =>
                 fontFamily.includes(pattern)
             )
         }
@@ -1207,7 +1223,7 @@ export class OdtConvert {
         }
 
         // Check multiple indicators that this might be a heading style
-        return (
+        return Boolean(
             // Direct heading indicators
             style.isHeading ||
             styleName.toLowerCase().includes("heading") ||
@@ -1215,19 +1231,20 @@ export class OdtConvert {
             // Check outline level property
             Boolean(style.outlineLevel) ||
             // Check if it's derived from a heading style
-            (style.parentStyleName &&
-                this.isHeadingStyle(style.parentStyleName)) ||
+            (style.parentStyleName
+                ? this.isHeadingStyle(style.parentStyleName)
+                : false) ||
             // Check specific formatting that's typical for headings
             (style.paragraphProperties &&
                 // Larger margins than normal paragraphs
-                (style.paragraphProperties.marginTop > 0.3 ||
-                    style.paragraphProperties.marginBottom > 0.3 ||
+                ((style.paragraphProperties.marginTop ?? 0) > 0.3 ||
+                    (style.paragraphProperties.marginBottom ?? 0) > 0.3 ||
                     // Different alignment
                     style.paragraphProperties.textAlign === "center")) ||
             // Check text properties typical for headings
             (style.textProperties &&
                 // Larger font size
-                (style.textProperties.fontSize > 12 ||
+                ((style.textProperties.fontSize ?? 0) > 12 ||
                     // Bold text
                     style.textProperties.bold ||
                     // Different font family
@@ -1235,14 +1252,15 @@ export class OdtConvert {
         )
     }
 
-    convertContainer(container: XMLElement) {
+    convertContainer(container: XMLElement): FidusNode[] {
         return container.children
+            .filter(isElement)
             .map((node: XMLElement) => this.convertBlockNode(node))
-            .filter((node: XMLElement) => node)
+            .filter((node): node is FidusNode | FidusNode[] => node !== null)
             .flat()
     }
 
-    convertBlockNode(node: XMLElement) {
+    convertBlockNode(node: XMLElement): ConvertResult {
         const track = this.currentTracks.map((track: TrackMark) => ({
             type: track.type,
             user: track.attrs.user,
@@ -1253,15 +1271,18 @@ export class OdtConvert {
         const attrs = track.length ? {track} : {}
 
         switch (node.tagName) {
-            case "text:p":
+            case "text:p": {
+                const firstChild = node.children[0]
                 if (
                     node.children.length === 1 &&
-                    node.children[0].tagName === "draw:frame"
+                    typeof firstChild !== "string" &&
+                    firstChild.tagName === "draw:frame"
                 ) {
                     // Paragraph consists of only one figure/image.
-                    return this.convertImage(node.children[0], attrs)
+                    return this.convertImage(firstChild, attrs)
                 }
                 return this.convertParagraph(node, attrs)
+            }
             case "text:h":
                 return this.convertHeading(node, attrs)
             case "text:list":
@@ -1298,7 +1319,7 @@ export class OdtConvert {
         }
     }
 
-    convertParagraph(node: XMLElement, attrs: Record<string, unknown> = {}) {
+    convertParagraph(node: XMLElement, attrs: Record<string, unknown> = {}): FidusNode {
         const styleName = attr(node, "text:style-name")
         const style = this.styles[styleName]
 
@@ -1373,11 +1394,12 @@ export class OdtConvert {
         }
     }
 
-    convertNodeChildren(node: XMLElement, currentStyleMarks: FidusMark[] = []) {
+    convertNodeChildren(node: XMLElement, currentStyleMarks: FidusMark[] = []): FidusNode[] {
         let insideCitationReferenceMark = false
         let insideBibliographyReferenceMark = false
 
         return node.children
+            .filter(isElement)
             .map((child: XMLElement) => {
                 if (insideBibliographyReferenceMark) {
                     // Swallow all rendered bibliography content until the
@@ -1408,7 +1430,7 @@ export class OdtConvert {
                         const changeId = attr(child, "text:change-id")
                         const track = this.tracks[changeId]
                         if (track) {
-                            const trackMark: Record<string, unknown> = {
+                            const trackMark: TrackMark = {
                                 type: track.type,
                                 attrs: {
                                     user: track.user,
@@ -1428,7 +1450,7 @@ export class OdtConvert {
                         const track = this.tracks[changeId]
                         if (track) {
                             this.currentTracks = this.currentTracks.filter(
-                                (mark: XMLElement) => mark.type !== track.type
+                                (mark: TrackMark) => mark.type !== track.type
                             )
                         }
                         return null
@@ -1478,9 +1500,10 @@ export class OdtConvert {
                         console.warn(
                             `Unsupported inline node: ${child.tagName}`
                         )
+                        return null
                 }
             })
-            .filter((node: XMLElement) => node)
+            .filter((node): node is FidusNode | FidusNode[] => node !== null)
             .flat()
     }
 
@@ -1498,8 +1521,8 @@ export class OdtConvert {
         return [...currentStyleMarks, ...this.currentTracks, ...commentMarks]
     }
 
-    convertText(text: string, currentStyleMarks: FidusMark[]) {
-        const textNode: Record<string, unknown> = {
+    convertText(text: string, currentStyleMarks: FidusMark[]): FidusNode {
+        const textNode: FidusNode = {
             type: "text",
             text
         }
@@ -1510,7 +1533,7 @@ export class OdtConvert {
         return textNode
     }
 
-    convertSpan(node: XMLElement, currentStyleMarks: FidusMark[]) {
+    convertSpan(node: XMLElement, currentStyleMarks: FidusMark[]): FidusNode[] {
         const styleName = attr(node, "text:style-name")
         const style = this.styles[styleName]
         if (style?.textProperties?.bold) {
@@ -1531,7 +1554,7 @@ export class OdtConvert {
         // Handle inline code (monospace fonts)
         if (style?.textProperties?.fontFamily) {
             const fontFamily = style.textProperties.fontFamily.toLowerCase()
-            const monospacePatterns: RegExp[] = [
+            const monospacePatterns: string[] = [
                 "courier",
                 "consolas",
                 "monaco",
@@ -1546,7 +1569,7 @@ export class OdtConvert {
                 "droid sans mono",
                 "monospace"
             ]
-            const isMonospace = monospacePatterns.some((pattern: RegExp) =>
+            const isMonospace = monospacePatterns.some((pattern: string) =>
                 fontFamily.includes(pattern)
             )
             if (isMonospace) {
@@ -1556,7 +1579,7 @@ export class OdtConvert {
         return this.convertNodeChildren(node, currentStyleMarks)
     }
 
-    convertFootnote(node: XMLElement, currentStyleMarks: FidusMark[]) {
+    convertFootnote(node: XMLElement, currentStyleMarks: FidusMark[]): FidusNode | null {
         const noteBody = node.query("text:note-body")
         if (!noteBody) {
             return null
@@ -1581,7 +1604,7 @@ export class OdtConvert {
             markName &&
             isOdtCitationMark(markName) &&
             // Check that there's no content outside the reference marks
-            firstParagraph.children.every(
+            firstParagraph.children.filter(isElement).every(
                 (child: XMLElement) =>
                     child.tagName === "text:reference-mark-start" ||
                     child.tagName === "text:reference-mark-end" ||
@@ -1752,7 +1775,7 @@ export class OdtConvert {
         const width = this.convertLength(attr(node, "svg:width"))
         const height = this.convertLength(attr(node, "svg:height"))
 
-        const title = href.split("/").pop()
+        const title = href.split("/").pop() || href
         this.images[imageId] = {
             id: imageId,
             title,
@@ -1793,7 +1816,7 @@ export class OdtConvert {
             attrs
         )
 
-        const figureCaption: Record<string, unknown> = {type: "figure_caption"}
+        const figureCaption: FidusNode = {type: "figure_caption"}
         if (captionContent.length) {
             figureCaption.content = captionContent
         }
@@ -1814,7 +1837,7 @@ export class OdtConvert {
     }
 
     getImageFileType(filename: string) {
-        const ext = filename.split(".").pop().toLowerCase()
+        const ext = filename.split(".").pop()?.toLowerCase() || ""
         switch (ext) {
             case "avif":
             case "avifs":
@@ -1870,12 +1893,12 @@ export class OdtConvert {
         }
     }
 
-    convertTable(node: XMLElement, attrs: Record<string, unknown>) {
+    convertTable(node: XMLElement, attrs: Record<string, unknown>): FidusNode {
         const width =
             attr(node, "style:rel-width")?.replace("%", "") || "100"
         const styleName = attr(node, "table:style-name")
         const style = this.styles[styleName]
-        const aligned = style?.tableProperties.align || "center"
+        const aligned = style?.tableProperties?.align || "center"
 
         attrs = Object.assign(
             {
@@ -1904,36 +1927,38 @@ export class OdtConvert {
         }
     }
 
-    convertTableRow(row: XMLElement) {
+    convertTableRow(row: XMLElement): FidusNode {
         return {
             type: "table_row",
             content: row
                 .queryAll(["table:table-cell", "table:covered-table-cell"])
                 .map((cell: XMLElement) => this.convertTableCell(cell))
+                .filter((cell): cell is FidusNode => cell !== null)
         }
     }
 
-    convertTableCell(node: XMLElement) {
+    convertTableCell(node: XMLElement): FidusNode | null {
         if (node.tagName === "table:covered-table-cell") {
             return null
         }
+        const cellAttrs: Record<string, unknown> = {
+            colspan:
+                parseInt(
+                    attr(node, "table:number-columns-spanned")
+                ) || 1,
+            rowspan:
+                parseInt(attr(node, "table:number-rows-spanned")) ||
+                1,
+            track: parseTracks(attr(node, "text:change-id"))
+        }
         return {
             type: "table_cell",
-            attrs: {
-                colspan:
-                    parseInt(
-                        attr(node, "table:number-columns-spanned")
-                    ) || 1,
-                rowspan:
-                    parseInt(attr(node, "table:number-rows-spanned")) ||
-                    1,
-                track: parseTracks(attr(node, "text:change-id"))
-            },
+            attrs: cellAttrs,
             content: this.convertContainer(node)
         }
     }
 
-    convertLink(node: XMLElement, currentStyleMarks: FidusMark[]) {
+    convertLink(node: XMLElement, currentStyleMarks: FidusMark[]): FidusNode[] {
         const href = attr(node, "xlink:href")
         currentStyleMarks = currentStyleMarks.concat([
             {type: "link", attrs: {href}}

@@ -1,9 +1,11 @@
 /* Connects Fidus Writer citation system with citeproc */
 import {CSLExporter} from "bibliojson"
+import type {BibDB as BibliojsonBibDB} from "bibliojson"
 
-import type {BibDB} from "../types.js"
+import type {BibDB, CslSys} from "../types.js"
 
-export class citeprocSys {
+export class citeprocSys implements CslSys {
+    [key: string]: unknown
     bibDB: BibDB
     abbreviations: Record<string, Record<string, Record<string, string>>>
     abbrevsname: string
@@ -25,7 +27,7 @@ export class citeprocSys {
         if (!this.items[id]) {
             if (this.bibDB.db[id]) {
                 const cslGetter = new CSLExporter(
-                    this.bibDB.db as Record<string, Record<string, unknown>>,
+                    this.bibDB.db as unknown as BibliojsonBibDB,
                     [id]
                 )
                 const cslOutput = cslGetter.parse() as Record<

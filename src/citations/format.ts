@@ -4,7 +4,9 @@ import type {
     BibDB,
     BibliographyResult,
     CiteprocInstance,
-    CSL
+    CiteprocEngine,
+    CSL,
+    CSLNode
 } from "../types.js"
 import {citeprocSys} from "./citeproc_sys.js"
 
@@ -19,7 +21,7 @@ export interface CitationInfo {
 export class FormatCitations {
     csl: CSL
     allCitationInfos: CitationInfo[]
-    citationStyle: string
+    citationStyle: string | CSLNode
     bibliographyHeader: string
     bibDB: BibDB
     synchronous: boolean
@@ -34,7 +36,7 @@ export class FormatCitations {
     constructor(
         csl: CSL,
         allCitationInfos: CitationInfo[],
-        citationStyle: string | object,
+        citationStyle: string | CSLNode,
         bibliographyHeader: string,
         bibDB: BibDB,
         synchronous = false,
@@ -169,7 +171,8 @@ export class FormatCitations {
         }
     }
 
-    process(citeprocInstance: CiteprocInstance): void {
+    process(citeprocInstanceRaw: CiteprocEngine): void {
+        const citeprocInstance = citeprocInstanceRaw as unknown as CiteprocInstance
         const allIds: string[] = []
         this.citations.forEach(cit =>
             cit.citationItems.forEach(item => allIds.push(String((item as {id: number}).id)))
