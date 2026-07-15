@@ -2,13 +2,49 @@ import {convertLatexToMathMl} from "mathlive"
 
 import {escapeText} from "fwtoolkit"
 import {getCat} from "../../schema/i18n.js"
-import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {
+    BibDB,
+    CSL,
+    Contributor,
+    ExportDoc,
+    FidusNode,
+    ImageDB,
+    NodeAttrs
+} from "../../types.js"
 import {FormatCitations} from "../../citations/format.js"
 import {removeHidden} from "../tools/doc_content.js"
 import {getImageDBEntryFilename} from "../tools/file.js"
 
 import {JATSExporterCitations} from "./citations.js"
 import {convertText} from "./text.js"
+
+function getStringAttr(
+    attrs: NodeAttrs | undefined,
+    key: string
+): string | undefined {
+    const value = attrs?.[key]
+    return typeof value === "string" ? value : undefined
+}
+
+function getNumberAttr(
+    attrs: NodeAttrs | undefined,
+    key: string
+): number | undefined {
+    const value = attrs?.[key]
+    return typeof value === "number" ? value : undefined
+}
+
+function getBooleanAttr(attrs: NodeAttrs | undefined, key: string): boolean {
+    return !!attrs?.[key]
+}
+
+function getNodeArrayAttr(
+    attrs: NodeAttrs | undefined,
+    key: string
+): FidusNode[] | undefined {
+    const value = attrs?.[key]
+    return Array.isArray(value) ? (value as FidusNode[]) : undefined
+}
 
 interface License {
     url?: string
@@ -66,7 +102,13 @@ export class JATSExporterConverter {
     citationCount: number
     citations: JATSExporterCitations
 
-    constructor(type: string, doc: ExportDoc, csl: CSL, imageDB: ImageDB, bibDB: BibDB) {
+    constructor(
+        type: string,
+        doc: ExportDoc,
+        csl: CSL,
+        imageDB: ImageDB,
+        bibDB: BibDB
+    ) {
         this.type = type
         this.doc = doc
         this.csl = csl
@@ -103,7 +145,12 @@ export class JATSExporterConverter {
         )
     }
 
-    init(): Promise<{front: string; body: string; back: string; imageIds: string[]}> {
+    init(): Promise<{
+        front: string
+        body: string
+        back: string
+        imageIds: string[]
+    }> {
         const docContent = removeHidden(this.doc.content) as FidusNode
         this.preWalkJson(docContent)
         this.findAllCitations(docContent)
@@ -126,94 +173,113 @@ export class JATSExporterConverter {
     // Remove items from the body that should be in the front.
     preWalkJson(node: FidusNode, parentNode: FidusNode | false = false): void {
         switch (node.type) {
-            case "doc":
-                if (node.attrs.copyright) {
-                    this.frontMatter.copyright = node.attrs.copyright as Copyright
+            case "doc": {
+                const copyright = node.attrs?.copyright
+                if (copyright) {
+                    this.frontMatter.copyright = copyright as Copyright
                 }
                 break
+            }
             case "title":
                 this.frontMatter.title["default"] = node
-                parentNode.content = parentNode.content.filter(
-                (child: FidusNode) => child !== node
-            )
-            break
-        case "heading_part":
+                if (parentNode && parentNode.content) {
+                    parentNode.content = parentNode.content.filter(
+                        (child: FidusNode) => child !== node
+                    )
+                }
+                break
+            case "heading_part": {
+                const metadata = getStringAttr(node.attrs, "metadata")
+                const language = getStringAttr(node.attrs, "language") || "default"
                 if (
-                    ["title", "subtitle"].includes(node.attrs.metadata) &&
-                    !this.frontMatter[node.attrs.metadata][
-                        node.attrs.language || "default"
-                    ] &&
+                    metadata &&
+                    (metadata === "title" || metadata === "subtitle") &&
+                    !this.frontMatter[metadata][language] &&
                     node.content &&
                     node.content.length
                 ) {
+                    const firstChild = node.content[0]
+                    const firstChildId = getStringAttr(firstChild.attrs, "id")
                     // We only take the first instance of title/subtitle per language
-                    this.frontMatter[node.attrs.metadata][
-                        node.attrs.language || "default"
-                    ] = {
-                        type: node.attrs.language
-                            ? `trans_${node.attrs.metadata}`
-                            : node.attrs.metadata,
+                    this.frontMatter[metadata][language] = {
+                        type: getStringAttr(node.attrs, "language")
+                            ? `trans_${metadata}`
+                            : metadata,
                         attrs: {
-                            id: node.content[0].attrs.id,
-                            language: node.attrs.language
+                            id: firstChildId,
+                            language: getStringAttr(node.attrs, "language")
                         },
-                        content: node.content[0].content
+                        content: firstChild.content
                     }
-                    parentNode.content = parentNode.content.filter(
-                        (child: FidusNode) => child !== node
-                    )
+                    if (parentNode && parentNode.content) {
+                        parentNode.content = parentNode.content.filter(
+                            (child: FidusNode) => child !== node
+                        )
+                    }
                 }
                 break
-            case "richtext_part":
+            }
+            case "richtext_part": {
+                const metadata = getStringAttr(node.attrs, "metadata")
+                const language = getStringAttr(node.attrs, "language") || "default"
                 if (
-                    node.attrs.metadata === "abstract" &&
-                    !this.frontMatter.abstract[node.attrs.language || "default"]
+                    metadata === "abstract" &&
+                    !this.frontMatter.abstract[language]
                 ) {
                     // We only take the first instance of abstract per language
-                    this.frontMatter.abstract[
-                        node.attrs.language || "default"
-                    ] = {
-                        type: node.attrs.language
+                    this.frontMatter.abstract[language] = {
+                        type: getStringAttr(node.attrs, "language")
                             ? "trans_abstract"
                             : "abstract",
                         attrs: {
-                            id: node.attrs.id,
-                            language: node.attrs.language
+                            id: getStringAttr(node.attrs, "id"),
+                            language: getStringAttr(node.attrs, "language")
                         },
                         content: node.content
                     }
-                    parentNode.content = parentNode.content.filter(
-                        (child: FidusNode) => child !== node
-                    )
+                    if (parentNode && parentNode.content) {
+                        parentNode.content = parentNode.content.filter(
+                            (child: FidusNode) => child !== node
+                        )
+                    }
                 }
                 break
-            case "tags_part":
-                if (node.attrs.metadata === "keywords" && node.content) {
+            }
+            case "tags_part": {
+                const metadata = getStringAttr(node.attrs, "metadata")
+                if (metadata === "keywords" && node.content) {
                     this.frontMatter.keywords.push({
                         type: "keywords",
                         attrs: {
-                            language: node.attrs.language
+                            language: getStringAttr(node.attrs, "language")
                         },
                         content: node.content
                     })
                 } else {
                     this.frontMatter.tags.push(node)
                 }
-                parentNode.content = parentNode.content.filter(
-                    (child: FidusNode) => child !== node
-                )
+                if (parentNode && parentNode.content) {
+                    parentNode.content = parentNode.content.filter(
+                        (child: FidusNode) => child !== node
+                    )
+                }
                 break
+            }
             case "contributors_part":
                 this.frontMatter.contributors.push(node)
-                parentNode.content = parentNode.content.filter(
-                    (child: FidusNode) => child !== node
-                )
+                if (parentNode && parentNode.content) {
+                    parentNode.content = parentNode.content.filter(
+                        (child: FidusNode) => child !== node
+                    )
+                }
                 break
             default:
                 break
         }
         if (node.content) {
-            node.content.forEach((child: FidusNode) => this.preWalkJson(child, node))
+            node.content.forEach((child: FidusNode) =>
+                this.preWalkJson(child, node)
+            )
         }
     }
 
@@ -247,9 +313,11 @@ export class JATSExporterConverter {
             case "citation":
                 this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
                 break
-            case "footnote":
-                (node.attrs?.footnote as FidusNode[] | undefined)?.forEach((child: FidusNode) => this.findCitations(child))
+            case "footnote": {
+                const footnote = getNodeArrayAttr(node.attrs, "footnote")
+                footnote?.forEach((child: FidusNode) => this.findCitations(child))
                 break
+            }
             default:
                 break
         }
@@ -298,7 +366,7 @@ export class JATSExporterConverter {
         })
         Object.entries(this.affiliations).forEach(
             ([institution, index]) =>
-                (front += `<aff id="aff${index}"><institution>${escapeText(institution as string)}</institution></aff>`)
+                (front += `<aff id="aff${index}"><institution>${escapeText(institution)}</institution></aff>`)
         )
         // https://validator.jats4r.org/ requires a <permissions> element here, but is OK with it being empty.
         if (this.frontMatter.copyright.holder) {
@@ -375,7 +443,7 @@ export class JATSExporterConverter {
         })
         Object.entries(this.affiliations).forEach(
             ([institution, index]) =>
-                (front += `<aff id="aff${index}"><institution>${escapeText(institution as string)}</institution></aff>`)
+                (front += `<aff id="aff${index}"><institution>${escapeText(institution)}</institution></aff>`)
         )
         // https://validator.jats4r.org/ requires a <permissions> element here, but is OK with it being empty.
         if (this.frontMatter.copyright.holder) {
@@ -470,15 +538,18 @@ export class JATSExporterConverter {
                         reviewers: "reviewer",
                         contributors: "contributor"
                     }
+                    const metadata = getStringAttr(node.attrs, "metadata")
                     const contributorType =
-                        contributorTypes[node.attrs.metadata] || "other"
+                        (metadata && contributorTypes[metadata]) || "other"
                     start += `<contrib-group content-type="${contributorType}">`
                     end = "</contrib-group>" + end
-                    const contributorTypeId = node.attrs.id
+                    const contributorTypeId = getStringAttr(node.attrs, "id")
                     let counter = 1
                     node.content.forEach((childNode: FidusNode) => {
-                        const contributor = childNode.attrs
-                        if (contributor.firstname || contributor.lastname) {
+                        const contributor = childNode.attrs as
+                            | Contributor
+                            | undefined
+                        if (contributor?.firstname || contributor?.lastname) {
                             content += `<contrib id="${contributorTypeId}-${counter++}" contrib-type="person">`
                             content += "<name>"
                             if (contributor.lastname) {
@@ -490,9 +561,7 @@ export class JATSExporterConverter {
                             content += "</name>"
                             if (contributor.institution) {
                                 let affNumber
-                                if (
-                                    this.affiliations[contributor.institution]
-                                ) {
+                                if (this.affiliations[contributor.institution]) {
                                     affNumber =
                                         this.affiliations[
                                             contributor.institution
@@ -511,7 +580,7 @@ export class JATSExporterConverter {
                                 content += `<contrib-id contrib-id-type="${idType}">${escapeText(contributor.id_value)}</contrib-id>`
                             }
                             content += "</contrib>"
-                        } else if (contributor.institution) {
+                        } else if (contributor?.institution) {
                             // There is an affiliation but no first/last name. We take this
                             // as a group collaboration.
                             content += `<contrib id="${contributorTypeId}-${counter++}" contrib-type="group">`
@@ -529,25 +598,30 @@ export class JATSExporterConverter {
                 break
             case "tags_part":
                 if (node.content) {
-                    start += `<subj-group subj-group-type="${node.attrs.id}"${node.attrs.language ? ` xml:lang="${node.attrs.language}"` : ""}>`
+                    const attrsId = getStringAttr(node.attrs, "id")
+                    const language = getStringAttr(node.attrs, "language")
+                    start += `<subj-group subj-group-type="${attrsId}"${language ? ` xml:lang="${language}"` : ""}>`
                     end = "</subj-group>" + end
                 }
                 break
             case "keywords":
                 if (node.content) {
-                    start += `<kwd-group${node.attrs.language ? ` xml:lang="${node.attrs.language}"` : ""}>`
+                    const language = getStringAttr(node.attrs, "language")
+                    start += `<kwd-group${language ? ` xml:lang="${language}"` : ""}>`
                     end = "</kwd-group>" + end
                     options = Object.assign({}, options)
                     options.inKeywords = true
                 }
                 break
-            case "tag":
+            case "tag": {
+                const tag = getStringAttr(node.attrs, "tag")
                 if (options.inKeywords) {
-                    content += `<kwd>${node.attrs.tag}</kwd>`
+                    content += `<kwd>${tag}</kwd>`
                 } else {
-                    content += `<subject>${node.attrs.tag}</subject>`
+                    content += `<subject>${tag}</subject>`
                 }
                 break
+            }
             case "abstract":
                 if (node.content) {
                     start += "<abstract>"
@@ -556,16 +630,19 @@ export class JATSExporterConverter {
                 break
             case "trans_abstract":
                 if (node.content) {
-                    start += `<trans-abstract xml:lang="${node.attrs.language}">`
+                    const language = getStringAttr(node.attrs, "language")
+                    start += `<trans-abstract xml:lang="${language}">`
                     end = "</trans-abstract>" + end
                 }
                 break
-            case "richtext_part":
-                if (node.attrs.metadata) {
+            case "richtext_part": {
+                const metadata = getStringAttr(node.attrs, "metadata")
+                if (metadata) {
                     options = Object.assign({}, options)
-                    options.partMetadata = node.attrs.metadata
+                    options.partMetadata = metadata
                 }
                 break
+            }
             case "table_of_contents":
                 // TODO: Not sure what to use here.
                 break
@@ -604,7 +681,8 @@ export class JATSExporterConverter {
                 while (this.currentSectionLevel < level) {
                     this.currentSectionLevel++
                     if (this.currentSectionLevel === level) {
-                        start += `<sec id="${node.attrs.id}"${metadata ? ` sec-type="${metadata}"` : ""}>`
+                        const nodeId = getStringAttr(node.attrs, "id")
+                        start += `<sec id="${nodeId}"${metadata ? ` sec-type="${metadata}"` : ""}>`
                     } else {
                         start += `<sec id="h-${++this.headingCounter}">`
                     }
@@ -634,7 +712,9 @@ export class JATSExporterConverter {
                     // only allows <p> block level elements https://jats.nlm.nih.gov/archiving/tag-library/1.2/element/fn.html
                     break
                 }
-                const continuedListEndNumber = node.attrs.order - 1
+                const order = getNumberAttr(node.attrs, "order")
+                const continuedListEndNumber =
+                    order !== undefined ? order - 1 : 0
                 let lastListIndex
                 // TODO: deal with lists that have an order number other than 1 that do not continue previous lists. Currently not possible in JATS
                 if (continuedListEndNumber) {
@@ -687,23 +767,29 @@ export class JATSExporterConverter {
                                 id: `fn-${this.fnCounter}`,
                                 label: this.fnCounter // Note: it's unclear whether the footnote number is required as a label
                             },
-                            content: node.attrs.footnote
+                            content: getNodeArrayAttr(node.attrs, "footnote") || []
                         },
                         options
                     )
                 )
                 break
-            case "footnotecontainer":
-                start += `<fn id="${node.attrs.id}"><label>${node.attrs.label}</label>`
+            case "footnotecontainer": {
+                const nodeId = getStringAttr(node.attrs, "id")
+                const label = getStringAttr(node.attrs, "label")
+                start += `<fn id="${nodeId}"><label>${label}</label>`
                 end = "</fn>" + end
                 break
+            }
             case "text": {
                 content += convertText(node)
                 break
             }
             case "cross_reference": {
-                start += `<xref rid="${node.attrs.id}">`
-                content += escapeText(node.attrs.title || "MISSING TARGET")
+                const nodeId = getStringAttr(node.attrs, "id")
+                const title =
+                    getStringAttr(node.attrs, "title") || "MISSING TARGET"
+                start += `<xref rid="${nodeId}">`
+                content += escapeText(title)
                 end = "</xref>" + end
                 break
             }
@@ -730,49 +816,53 @@ export class JATSExporterConverter {
                     // only allows <p> block level elements https://jats.nlm.nih.gov/archiving/tag-library/1.2/element/fn.html
                     break
                 }
-                let imageFilename: string | undefined, copyright: Copyright | undefined
+                let imageFilename: string | undefined,
+                    copyright: Copyright | undefined
                 const image =
-                    node.content.find((node: FidusNode) => node.type === "image")?.attrs
-                        ?.image || false
-                if (image !== false) {
+                    node.content?.find(
+                        (node: FidusNode) => node.type === "image"
+                    )?.attrs?.image || false
+                if (image !== false && typeof image === "string") {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image]
                     copyright = imageDBEntry.copyright as Copyright | undefined
                     imageFilename = getImageDBEntryFilename(imageDBEntry, image)
                 }
-                const caption = node.attrs.caption
-                    ? node.content.find((node: FidusNode) => node.type === "figure_caption")
-                          ?.content || []
+                const caption = getBooleanAttr(node.attrs, "caption")
+                    ? node.content?.find(
+                          (node: FidusNode) => node.type === "figure_caption"
+                      )?.content || []
                     : []
+                const category = getStringAttr(node.attrs, "category")
+                const nodeId = getStringAttr(node.attrs, "id")
                 if (
-                    node.attrs.category === "none" &&
+                    category === "none" &&
                     imageFilename &&
                     !caption.length &&
                     (!copyright || !copyright.holder)
                 ) {
-                    content += `<graphic id="${node.attrs.id}" position="anchor" xlink:href="${imageFilename}">`
+                    content += `<graphic id="${nodeId}" position="anchor" xlink:href="${imageFilename}">`
                     content += `<alt-text>${escapeText(caption.map((node: FidusNode) => node.text || "").join("") || imageFilename)}</alt-text>`
                     content += "</graphic>"
                 } else {
-                    start += `<fig id="${node.attrs.id}">`
+                    start += `<fig id="${nodeId}">`
                     end = "</fig>" + end
 
-                    const category = node.attrs.category
-                    if (category !== "none") {
-                        if (!this.categoryCounter[category as string]) {
-                            this.categoryCounter[category as string] = 0
+                    if (category !== "none" && category) {
+                        if (!this.categoryCounter[category]) {
+                            this.categoryCounter[category] = 0
                         }
-                        const catCount = ++this.categoryCounter[category as string]
-                        const catLabel = `${getCat(category as string, this.doc.settings.language || "en-US")} ${catCount}`
+                        const catCount = ++this.categoryCounter[category]
+                        const catLabel = `${getCat(category, this.doc.settings.language || "en-US")} ${catCount}`
                         start += `<label>${escapeText(catLabel)}</label>`
                     }
                     if (caption.length) {
                         start += `<caption><p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p></caption>`
                     }
-                    const equation = node.content.find(
+                    const equation = node.content?.find(
                         (node: FidusNode) => node.type === "figure_equation"
                     )?.attrs?.equation
-                    if (equation) {
+                    if (typeof equation === "string") {
                         start += "<disp-formula>"
                         end = "</disp-formula>" + end
                         const equationML = convertLatexToMathMl(equation)
@@ -825,10 +915,11 @@ export class JATSExporterConverter {
                     // only allows <p> block level elements https://jats.nlm.nih.gov/archiving/tag-library/1.2/element/fn.html
                     break
                 }
-                start += `<table-wrap id="${node.attrs.id}">`
+                const nodeId = getStringAttr(node.attrs, "id")
+                start += `<table-wrap id="${nodeId}">`
                 end = "</table-wrap>" + end
-                const category = node.attrs.category as string
-                if (category !== "none") {
+                const category = getStringAttr(node.attrs, "category")
+                if (category && category !== "none") {
                     if (!this.categoryCounter[category]) {
                         this.categoryCounter[category] = 0
                     }
@@ -836,13 +927,14 @@ export class JATSExporterConverter {
                     const catLabel = `${getCat(category, this.doc.settings.language || "en-US")} ${catCount}`
                     start += `<label>${escapeText(catLabel)}</label>`
                 }
-                const caption = node.attrs.caption
-                    ? node.content[0].content || []
+                const caption = getBooleanAttr(node.attrs, "caption")
+                    ? node.content?.[0].content || []
                     : []
                 if (caption.length) {
                     start += `<caption><p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p></caption>`
                 }
-                start += `<table width="${node.attrs.width}%"><tbody>`
+                const width = getNumberAttr(node.attrs, "width")
+                start += `<table width="${width}%"><tbody>`
                 end = "</tbody></table>" + end
                 break
             }
@@ -856,21 +948,31 @@ export class JATSExporterConverter {
                 start += "<tr>"
                 end = "</tr>" + end
                 break
-            case "table_cell":
-                start += `<td${node.attrs.colspan === 1 ? "" : ` colspan="${node.attrs.colspan}"`}${node.attrs.rowspan === 1 ? "" : ` rowspan="${node.attrs.rowspan}"`}>`
+            case "table_cell": {
+                const colspan = getNumberAttr(node.attrs, "colspan")
+                const rowspan = getNumberAttr(node.attrs, "rowspan")
+                start += `<td${colspan === 1 ? "" : ` colspan="${colspan}"`}${rowspan === 1 ? "" : ` rowspan="${rowspan}"`}>`
                 end = "</td>" + end
                 break
-            case "table_header":
-                start += `<th${node.attrs.colspan === 1 ? "" : ` colspan="${node.attrs.colspan}"`}${node.attrs.rowspan === 1 ? "" : ` rowspan="${node.attrs.rowspan}"`}>`
+            }
+            case "table_header": {
+                const colspan = getNumberAttr(node.attrs, "colspan")
+                const rowspan = getNumberAttr(node.attrs, "rowspan")
+                start += `<th${colspan === 1 ? "" : ` colspan="${colspan}"`}${rowspan === 1 ? "" : ` rowspan="${rowspan}"`}>`
                 end = "</th>" + end
                 break
+            }
             case "equation": {
+                const equation = getStringAttr(node.attrs, "equation")
+                if (!equation) {
+                    break
+                }
                 start += "<inline-formula>"
                 end = "</inline-formula>" + end
-                const equationML = convertLatexToMathMl(node.attrs.equation)
+                const equationML = convertLatexToMathMl(equation)
                 content = `
                     <alternatives>
-                        <tex-math><![CDATA[${node.attrs.equation}]]></tex-math>
+                        <tex-math><![CDATA[${equation}]]></tex-math>
                         <mml:math>${equationML}</mml:math>
                     </alternatives>
                 `
