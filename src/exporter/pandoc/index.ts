@@ -11,6 +11,8 @@ import {PandocExporterCitations} from "./citations.js"
 import {PandocExporterConvert} from "./convert.js"
 import {readMe} from "./readme.js"
 
+import type {PandocConversion} from "./convert.js"
+
 /*
  Exporter to Pandoc JSON
 */
@@ -21,9 +23,9 @@ export class PandocExporter {
     bibDB: BibDB
     imageDB: ImageDB
     csl: CSL
-    updated: any
+    updated: Date
 
-    docContent: any
+    docContent: FidusNode | false
     zipFileName: string
     textFiles: Array<{filename: string; contents: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
@@ -35,7 +37,7 @@ export class PandocExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: any,
+        updated: Date,
         progressCallback?: ProgressCallback
     ) {
         this.doc = doc
@@ -107,7 +109,7 @@ export class PandocExporter {
         })
     }
 
-    conversion: any
+    conversion!: PandocConversion
 
     createExport(): Promise<void> {
         // Override this function if adding a conversion-through-pandoc step.

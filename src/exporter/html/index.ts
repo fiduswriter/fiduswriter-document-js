@@ -10,6 +10,8 @@ import type {ProgressCallback} from "../tools/progress.js"
 import {HTMLExporterConvert} from "./convert.js"
 import {htmlExportTemplate} from "./templates.js"
 
+import type {HTMLExporterConvert} from "./convert.js"
+
 /*
  Exporter to HTML
 */
@@ -19,7 +21,7 @@ export class HTMLExporter {
     bibDB: BibDB
     imageDB: ImageDB
     csl: CSL
-    updated: any
+    updated: Date
     documentStyles: Array<{
         slug: string
         contents: string
@@ -28,12 +30,12 @@ export class HTMLExporter {
     converterOptions: Record<string, unknown>
 
     docTitle: string
-    docContent: any
+    docContent: FidusNode | false
     zipFileName: string | false
     textFiles: Array<{filename: string; contents?: string; url?: string}>
     httpFiles: Array<{filename: string; url: string; blob?: Blob}>
     includeZips: Array<{directory: string; url: string}>
-    metaData: any
+    metaData: Record<string, unknown>
     htmlExportTemplate: typeof htmlExportTemplate
     contentFileName: string
     fileEnding: string
@@ -46,7 +48,7 @@ export class HTMLExporter {
         bibDB: BibDB,
         imageDB: ImageDB,
         csl: CSL,
-        updated: any,
+        updated: Date,
         documentStyles: Array<{
             slug: string
             contents: string
@@ -133,13 +135,22 @@ export class HTMLExporter {
         await this.addDoc(html)
         this.addImages(imageIds)
         await Promise.all(
-            extraStyleSheets.map(async (sheet: any) => await this.loadStyle(sheet))
+            extraStyleSheets.map(
+                async (sheet: {filename?: string | null; contents?: string}) =>
+                    await this.loadStyle(sheet)
+            )
         )
     }
 
-    converter: any
+    converter!: HTMLExporterConvert
 
-    getProcessedFiles(): any {
+    getProcessedFiles(): {
+        textFiles: Array<{filename: string; contents?: string; url?: string}>
+        httpFiles: Array<{filename: string; url: string; blob?: Blob}>
+        includeZips: Array<{directory: string; url: string}>
+        metaData: Record<string, unknown>
+        converter: HTMLExporterConvert
+    } {
         // Return the processed files and metadata. Used when using the
         // exporter in a different context than creating a zip file.
         return {
@@ -210,7 +221,7 @@ export class HTMLExporter {
 
     async loadStyle(
         sheet: {url?: string; filename?: string; contents?: string}
-    ): Promise<any> {
+    ): Promise<{url?: string; filename?: string; contents?: string}> {
         if (sheet.url) {
             // Use simple fetch without X-Requested-With header and credentials
             // to avoid CORS preflight redirect issues with CDNs

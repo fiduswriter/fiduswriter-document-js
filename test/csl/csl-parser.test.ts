@@ -28,9 +28,12 @@ describe("parseCSL", () => {
             xmlns: "http://purl.org/net/xbiblio/csl",
             version: "1.0"
         })
-        const citation = (style.children as any[]).find(
-            child => child.name === "citation"
-        )
+        const citation = (
+            style.children as Array<{
+                name: string
+                children: Array<{name: string; attrs: Record<string, string>}>
+            }>
+        ).find(child => child.name === "citation")
         expect(citation).toBeDefined()
         const layout = citation.children.find(
             child => child.name === "layout"

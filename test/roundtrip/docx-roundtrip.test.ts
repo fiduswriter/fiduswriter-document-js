@@ -4,6 +4,7 @@ import {fileURLToPath} from "node:url"
 import {describe, expect, it, jest} from "@jest/globals"
 import {Window} from "happy-dom"
 import JSZip from "jszip"
+import type {FidusNode} from "../../src/types.js"
 
 const window = new Window({url: "http://localhost"})
 global.window = window as unknown as Window & typeof globalThis
@@ -95,7 +96,7 @@ describe("DOCX round-trip", () => {
             {}
         )
         const imported = (await importer.init()) as {
-            content: {type: string; content: any[]}
+            content: {type: string; content: FidusNode[]}
             settings: Record<string, unknown>
             comments: Record<string, unknown>
         }

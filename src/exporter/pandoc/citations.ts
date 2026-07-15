@@ -1,7 +1,7 @@
 import {DOMParser, DOMSerializer} from "prosemirror-model"
 
 import {cslBibSchema} from "@fiduswriter/bibliography-manager/schema/csl_bib"
-import {FormatCitations} from "../../citations/format.js"
+import {FormatCitations, CitationInfo} from "../../citations/format.js"
 import {fnSchema} from "../../schema/footnotes.js"
 import type {BibDB, CSL, ExportDoc, FidusNode} from "../../types.js"
 import {descendantNodes} from "../tools/doc_content.js"
@@ -54,7 +54,7 @@ export class PandocExporterCitations {
         })
         const citFm = new FormatCitations(
             this.csl,
-            this.citInfos as any,
+            this.citInfos as CitationInfo[],
             this.exporter.doc.settings.citationstyle || "",
             "",
             this.bibDB,

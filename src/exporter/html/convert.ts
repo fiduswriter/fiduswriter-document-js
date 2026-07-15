@@ -13,11 +13,11 @@ export class HTMLExporterConvert {
     docTitle: string
     docSettings: DocSettings
     docContent: FidusNode
-    htmlExportTemplate: any
-    imageDB: any
+    htmlExportTemplate: typeof htmlExportTemplate
+    imageDB: ImageDB
     bibDB: BibDB
     csl: CSL
-    styleSheets: any[]
+    styleSheets: Array<{filename?: string | null; contents?: string}>
     xhtml: boolean
     epub: boolean
     relativeUrls: boolean
@@ -36,23 +36,29 @@ export class HTMLExporterConvert {
     footnotes: string[]
     fnCounter: number
     affCounter: number
-    metaData: any
+    metaData: Record<string, unknown>
     features: {math: boolean; bibliography: boolean}
-    citations: any
-    citInfos: any[]
+    citations: {
+        type: string
+        bibCSS: string
+        bibHTML: string
+        citationTexts: string[]
+        citationType?: string
+    }
+    citInfos: Array<Record<string, unknown>>
     citationCount: number
-    extraStyleSheets: any[]
+    extraStyleSheets: Array<{filename?: string | null; contents?: string}>
     idPrefix: string
 
     constructor(
         docTitle: string,
         docSettings: DocSettings,
         docContent: FidusNode,
-        htmlExportTemplate: any,
-        imageDB: any,
+        htmlExportTemplate: typeof htmlExportTemplate,
+        imageDB: ImageDB,
         bibDB: BibDB,
         csl: CSL,
-        styleSheets: any[],
+        styleSheets: Array<{filename?: string | null; contents?: string}>,
         {
             xhtml = false,
             epub = false,
@@ -63,7 +69,7 @@ export class HTMLExporterConvert {
             footnoteOffset = 0,
             affiliationOffset = 0,
             figureOffset = {}
-        }: any = {}
+        }: Record<string, unknown> = {}
     ) {
         this.docTitle = docTitle
         this.docSettings = docSettings
@@ -118,7 +124,12 @@ export class HTMLExporterConvert {
         this.categoryCounter = Object.assign({}, figureOffset)
     }
 
-    init(): Promise<any> {
+    init(): Promise<{
+        html: string
+        imageIds: string[]
+        extraStyleSheets: Array<{filename?: string | null; contents?: string}>
+        metaData: Record<string, unknown>
+    }> {
         this.analyze(this.docContent)
         return this.process()
     }
@@ -133,7 +144,12 @@ export class HTMLExporterConvert {
         this.citations = citations
     }
 
-    async process(): Promise<any> {
+    async process(): Promise<{
+        html: string
+        imageIds: string[]
+        extraStyleSheets: Array<{filename?: string | null; contents?: string}>
+        metaData: Record<string, unknown>
+    }> {
         if (this.citInfos.length) {
             await this.processCitInfos()
         }
@@ -172,14 +188,14 @@ export class HTMLExporterConvert {
     }
 
     // Find information for meta tags in header
-    analyze(node: any): void {
+    analyze(node: FidusNode): void {
         switch (node.type) {
             case "citation":
                 this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
                 break
             case "contributors_part":
                 if (node.attrs.metadata === "authors" && node.content) {
-                    node.content.forEach((author: any) => {
+                    node.content.forEach((author: FidusNode) => {
                         this.metaData.authors.push(author)
                     })
                 }
@@ -200,7 +216,7 @@ export class HTMLExporterConvert {
                     level,
                     id: node.attrs.id,
                     title: (node.content || [])
-                        .map((subNode: any) => this.walkJson(subNode))
+                        .map((subNode: FidusNode) => this.walkJson(subNode))
                         .join("")
                 })
                 break
@@ -210,7 +226,7 @@ export class HTMLExporterConvert {
                 this.features.math = true
                 break
             case "footnote":
-                node.attrs.footnote.forEach((child: any) => this.analyze(child))
+                node.attrs.footnote.forEach((child: FidusNode) => this.analyze(child))
                 break
             case "richtext_part":
                 if (
@@ -223,7 +239,7 @@ export class HTMLExporterConvert {
                 break
             case "tags_part":
                 if (node.attrs.metadata === "keywords" && node.content) {
-                    node.content.forEach((tag: any) => {
+                    node.content.forEach((tag: FidusNode) => {
                         this.metaData.keywords.push(tag.attrs.tag)
                     })
                 }
@@ -246,7 +262,7 @@ export class HTMLExporterConvert {
                 break
         }
         if (node.content) {
-            node.content.forEach((child: any) => this.analyze(child))
+            node.content.forEach((child: FidusNode) => this.analyze(child))
         }
     }
 
@@ -254,7 +270,7 @@ export class HTMLExporterConvert {
         let head = `<title>${escapeText(this.metaData.title)}</title>`
         if (this.metaData.authors.length) {
             const authorString = this.metaData.authors
-                .map((author: any) => {
+                .map((author: FidusNode) => {
                     if (author.firstname || author.lastname) {
                         const nameParts: string[] = []
                         if (author.firstname) {
@@ -284,7 +300,7 @@ export class HTMLExporterConvert {
 
             head += this.metaData.copyright.licenses
                 .map(
-                    (license: any) =>
+                    (license: Record<string, unknown>) =>
                         `<link rel="license" href="${escapeText(license.url)}"${this.endSlash}>` // TODO: Add this.metaData.copyright.license.start info if present
                 )
                 .join("")
@@ -302,7 +318,7 @@ export class HTMLExporterConvert {
         }
         head += this.styleSheets
             .concat(this.extraStyleSheets)
-            .map((sheet: any) => {
+            .map((sheet: {filename?: string | null; contents?: string}) => {
                 if (!sheet.filename && !sheet.contents) {
                     console.warn(
                         "No filename or contents for stylesheet.",
@@ -319,19 +335,19 @@ export class HTMLExporterConvert {
     }
 
     // Only allow for text output
-    textWalkJson(node: any): string {
+    textWalkJson(node: FidusNode): string {
         let content = ""
         if (node.type === "text") {
             content += escapeText(node.text).normalize("NFC")
         } else if (node.content) {
-            node.content.forEach((child: any) => {
+            node.content.forEach((child: FidusNode) => {
                 content += this.textWalkJson(child)
             })
         }
         return content
     }
 
-    walkJson(node: any, options: any = {}): string {
+    walkJson(node: FidusNode, options: Record<string, unknown> = {}): string {
         let start = "",
             content = "",
             end = ""
@@ -355,7 +371,7 @@ export class HTMLExporterConvert {
                     end = "</div>" + end
                     let counter = 0
                     const contributorOutputs: string[] = []
-                    node.content.forEach((childNode: any) => {
+                    node.content.forEach((childNode: FidusNode) => {
                         const contributor = childNode.attrs
                         let output = ""
                         if (contributor.firstname || contributor.lastname) {
@@ -429,7 +445,7 @@ export class HTMLExporterConvert {
                 start += `<div class="doc-part table-of-contents"><h1>${escapeText(node.attrs.title)}</h1>`
                 content += this.metaData.toc
                     .map(
-                        (item: any) =>
+                        (item: {level: number; id: string; title: string; docTitle?: boolean}) =>
                             `<h${item.level}><a href="#${item.id}">${item.title}</a></h${item.level}>`
                     )
                     .join("")
@@ -563,32 +579,32 @@ export class HTMLExporterConvert {
                 end = "</aside>" + end
                 break
             case "text": {
-                let strong: any,
-                    em: any,
-                    underline: any,
-                    hyperlink: any,
-                    anchor: any,
-                    sup: any,
-                    sub: any,
-                    code: any
+                let strong: FidusMark | undefined,
+                    em: FidusMark | undefined,
+                    underline: FidusMark | undefined,
+                    hyperlink: FidusMark | undefined,
+                    anchor: FidusMark | undefined,
+                    sup: FidusMark | undefined,
+                    sub: FidusMark | undefined,
+                    code: FidusMark | undefined
                 // Check for hyperlink, bold/strong, italic/em and underline
                 if (node.marks) {
                     strong = node.marks.find(
-                        (mark: any) => mark.type === "strong"
+                        (mark: FidusMark) => mark.type === "strong"
                     )
-                    em = node.marks.find((mark: any) => mark.type === "em")
+                    em = node.marks.find((mark: FidusMark) => mark.type === "em")
                     underline = node.marks.find(
-                        (mark: any) => mark.type === "underline"
+                        (mark: FidusMark) => mark.type === "underline"
                     )
                     hyperlink = node.marks.find(
-                        (mark: any) => mark.type === "link"
+                        (mark: FidusMark) => mark.type === "link"
                     )
                     anchor = node.marks.find(
-                        (mark: any) => mark.type === "anchor"
+                        (mark: FidusMark) => mark.type === "anchor"
                     )
-                    sup = node.marks.find((mark: any) => mark.type === "sup")
-                    sub = node.marks.find((mark: any) => mark.type === "sub")
-                    code = node.marks.find((mark: any) => mark.type === "code")
+                    sup = node.marks.find((mark: FidusMark) => mark.type === "sup")
+                    sub = node.marks.find((mark: FidusMark) => mark.type === "sub")
+                    code = node.marks.find((mark: FidusMark) => mark.type === "code")
                 }
                 if (em) {
                     start += "<em>"
@@ -657,10 +673,11 @@ export class HTMLExporterConvert {
                 break
             }
             case "figure": {
-                let imageUrl: string | undefined, copyright: any
+                let imageUrl: string | undefined,
+                    copyright: Record<string, unknown> | undefined
                 const image =
-                    node.content.find((node: any) => node.type === "image")?.attrs
-                        .image || false
+                    node.content.find((node: FidusNode) => node.type === "image")
+                        ?.attrs?.image || false
                 if (image !== false) {
                     this.imageIds.push(image)
                     const imageDBEntry = this.imageDB.db[image]
@@ -673,8 +690,9 @@ export class HTMLExporterConvert {
                           : undefined
                 }
                 const caption = node.attrs.caption
-                    ? node.content.find((node: any) => node.type === "figure_caption")
-                          ?.content || []
+                    ? node.content.find(
+                          (node: FidusNode) => node.type === "figure_caption"
+                      )?.content || []
                     : []
                 if (
                     node.attrs.category === "none" &&
@@ -694,8 +712,8 @@ export class HTMLExporterConvert {
                     end = "</figure>" + end
 
                     const equation = node.content.find(
-                        (node: any) => node.type === "figure_equation"
-                    )?.attrs.equation
+                        (node: FidusNode) => node.type === "figure_equation"
+                    )?.attrs?.equation
 
                     if (image && copyright?.holder) {
                         let figureFooter = `<footer class="copyright ${copyright.freeToRead ? "free-to-read" : "not-free-to-read"}"><small>`
@@ -707,7 +725,7 @@ export class HTMLExporterConvert {
                         figureFooter += `<span class="copyright-holder">${escapeText(copyright.holder)}</span> `
                         figureFooter += copyright.licenses
                             .map(
-                                (license: any) =>
+                                (license: Record<string, unknown>) =>
                                     `<span class="license"><a rel="license"${license.start ? ` data-start="${license.start}"` : ""}>${escapeText(license.url)}</a></span>`
                             )
                             .join("")
@@ -727,7 +745,7 @@ export class HTMLExporterConvert {
                             figcaption += `<label>${escapeText(catLabel)}</label>`
                         }
                         if (caption.length) {
-                            figcaption += `<p>${caption.map((node: any) => this.walkJson(node)).join("")}</p>`
+                            figcaption += `<p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p>`
                         }
                         figcaption += "</figcaption>"
                         if (category === "table") {
@@ -783,7 +801,7 @@ export class HTMLExporterConvert {
                     ? node.content[0].content || []
                     : []
                 if (caption.length) {
-                    start += `<caption><p>${caption.map((node: any) => this.walkJson(node)).join("")}</p></caption>`
+                    start += `<caption><p>${caption.map((node: FidusNode) => this.walkJson(node)).join("")}</p></caption>`
                 }
                 start += "<tbody>"
                 end = "</tbody>" + end
@@ -820,7 +838,7 @@ export class HTMLExporterConvert {
         }
 
         if (!content.length && node.content) {
-            node.content.forEach((child: any) => {
+            node.content.forEach((child: FidusNode) => {
                 content += this.walkJson(child, options)
             })
         }

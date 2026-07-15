@@ -513,10 +513,10 @@ export class OdtConvert {
         })
     }
 
-    collectReferenceableObjects(node: any) {
+    collectReferenceableObjects(node: XMLElement) {
         // Handle heading bookmarks
         const bookmarkStarts = node.queryAll("text:bookmark-start")
-        bookmarkStarts.forEach((mark: any) => {
+        bookmarkStarts.forEach((mark: XMLElement) => {
             const refName = attr(mark, "text:name")
             if (!refName) {
                 return
@@ -540,7 +540,7 @@ export class OdtConvert {
 
         // Handle figure sequences
         const sequences = node.queryAll("text:sequence")
-        sequences.forEach((sequence: any) => {
+        sequences.forEach((sequence: XMLElement) => {
             const refName = attr(sequence, "text:ref-name")
             if (!refName) {
                 return
@@ -567,7 +567,7 @@ export class OdtConvert {
         const templateParts = this.template.content.content.slice()
         templateParts.shift()
 
-        const document: any = {
+        const document: {type: string; attrs: Record<string, unknown>; content: FidusNode[]} = {
             type: "doc",
             attrs: {
                 import_id: this.importId
@@ -595,12 +595,12 @@ export class OdtConvert {
                 ]
             })
         }
-        title.containerNodes.forEach((node: any) => {
+        title.containerNodes.forEach((node: XMLElement) => {
             node.parentElement!.removeChild(node)
         })
 
-        ;(document.attrs as any).title =
-            title.content.map((node: any) => node.textContent).join("") ||
+        ;(document.attrs as Record<string, unknown>).title =
+            title.content.map((node: XMLElement) => node.textContent).join("") ||
             gettext("Untitled")
 
         // Get all content sections from the ODT
@@ -611,9 +611,9 @@ export class OdtConvert {
 
         // Look for metadata sections first (author, abstract, etc.)
         const metadataContent = this.extractMetadata()
-        metadataContent.forEach(({type, attrs, content}: any) => {
+        metadataContent.forEach(({type, attrs, content}: MetadataItem) => {
             const templatePart = templateParts.find(
-                (part: any) => part.attrs.metadata === type
+                (part: FidusNode) => part.attrs.metadata === type
             )
             if (templatePart) {
                 document.content.push({
@@ -625,7 +625,7 @@ export class OdtConvert {
                     content: content.content
                 })
                 // Remove paragraphs from content so they are not added to body
-                content.containerNodes.forEach((node: any) => {
+                content.containerNodes.forEach((node: XMLElement) => {
                     node.parentElement!.removeChild(node)
                 })
             }
@@ -635,7 +635,7 @@ export class OdtConvert {
         const sections = this.groupContentIntoSections(body)
 
         // Map ODT sections to template parts
-        sections.forEach((section: any) => {
+        sections.forEach((section: DocxSection) => {
             // Find matching template part
             const templatePart = this.findMatchingTemplatePart(
                 section.title,
@@ -664,15 +664,15 @@ export class OdtConvert {
         // Add remaining content to body section
         const unassignedContent = sections
             .filter(
-                (section: any) =>
+                (section: DocxSection) =>
                     !this.findMatchingTemplatePart(section.title, templateParts)
             )
-            .flatMap((section: any) => section.content)
+            .flatMap((section: DocxSection) => section.content)
 
         if (unassignedContent.length) {
             // Find default body template part
             const bodyTemplatePart = templateParts.find(
-                (part: any) => !part.attrs.metadata && part.type === "richtext_part"
+                (part: FidusNode) => !part.attrs.metadata && part.type === "richtext_part"
             )
 
             document.content.push({
@@ -690,13 +690,13 @@ export class OdtConvert {
     }
 
     extractMetadata() {
-        const metadata: any[] = []
+        const metadata: MetadataItem[] = []
 
         // Try structured contributor data from meta.xml first
         const contributorsByRole = this.extractContributorsFromMeta()
         if (Object.keys(contributorsByRole).length) {
             Object.entries(contributorsByRole).forEach(
-                ([role, contributors]: any) => {
+                ([role, contributors]: [string, FidusNode[]]) => {
                     metadata.push({
                         type: role,
                         content: {content: contributors, containerNodes: []}
@@ -741,9 +741,9 @@ export class OdtConvert {
         }
 
         const userDefined = this.metaDoc.queryAll("meta:user-defined")
-        const contributors: any[] = []
+        const contributors: FidusNode[] = []
 
-        userDefined.forEach((prop: any) => {
+        userDefined.forEach((prop: XMLElement) => {
             const name = attr(prop, "meta:name")
             if (!name || !name.startsWith("fidus_contributor_")) {
                 return
@@ -786,8 +786,8 @@ export class OdtConvert {
             }
         })
 
-        const byRole: Record<string, any> = {}
-        contributors.forEach((contributor: any) => {
+        const byRole: Record<string, FidusNode[]> = {}
+        contributors.forEach((contributor: FidusNode) => {
             if (!contributor) {
                 return
             }
@@ -802,13 +802,13 @@ export class OdtConvert {
     }
 
     extractAuthors() {
-        const authors: any[] = []
+        const authors: FidusNode[] = []
 
         // Try to find author information in metadata
         const metaAuthors = this.contentDoc!.queryAll("meta:user-defined", {
             "meta:name": "author"
         })
-        metaAuthors.forEach((authorMeta: any) => {
+        metaAuthors.forEach((authorMeta: Record<string, unknown>) => {
             const authorText = authorMeta.textContent
             const [firstname = "", lastname = ""] = authorText.split(" ", 2)
             authors.push({
@@ -899,14 +899,14 @@ export class OdtConvert {
         return {content: [], containerNodes: []}
     }
 
-    findMatchingTemplatePart(sectionTitle: any, templateParts: any) {
+    findMatchingTemplatePart(sectionTitle: string | null, templateParts: FidusNode[]) {
         if (!sectionTitle) {
             return null
         }
 
         // Try exact match first
         let matchingPart = templateParts.find(
-            (part: any) =>
+            (part: FidusNode) =>
                 part.type === "richtext_part" &&
                 !part.attrs.metadata &&
                 part.attrs.title.toLowerCase() === sectionTitle.toLowerCase()
@@ -915,7 +915,7 @@ export class OdtConvert {
         if (!matchingPart) {
             // Try fuzzy matching if exact match fails
             matchingPart = templateParts.find(
-                (part: any) =>
+                (part: FidusNode) =>
                     part.type === "richtext_part" &&
                     !part.attrs.metadata &&
                     this.isSimilarTitle(part.attrs.title, sectionTitle)
@@ -925,9 +925,9 @@ export class OdtConvert {
         return matchingPart
     }
 
-    isSimilarTitle(title1: any, title2: any) {
+    isSimilarTitle(title1: string, title2: string) {
         // Remove special characters and extra spaces
-        const normalize = (str: any) =>
+        const normalize = (str: string) =>
             str
                 .toLowerCase()
                 .replace(/[^a-z0-9]/g, "")
@@ -967,7 +967,7 @@ export class OdtConvert {
         }
 
         // Check for other common title style names
-        const commonTitleStyles: any[] = [
+        const commonTitleStyles: string[] = [
             "title",
             "doctitle",
             "document-title",
@@ -1007,7 +1007,7 @@ export class OdtConvert {
         }
     }
 
-    isTitleStyle(style: any): boolean {
+    isTitleStyle(style: StyleProperties): boolean {
         // Check if style or its parent has characteristics of a title style
         if (!style) {
             return false
@@ -1048,7 +1048,7 @@ export class OdtConvert {
         return false
     }
 
-    getSectionTitle(node: any, styleName: any) {
+    getSectionTitle(node: XMLElement, styleName: string) {
         if (!node || !styleName) {
             return null
         }
@@ -1099,7 +1099,7 @@ export class OdtConvert {
         return null
     }
 
-    formatSectionName(name: any) {
+    formatSectionName(name: string) {
         // Remove common suffixes
         name = name.replace(/_?(section|part|chapter)$/i, "")
 
@@ -1109,21 +1109,21 @@ export class OdtConvert {
         // Capitalize first letter of each word and join
         return words
             .map(
-                (word: any) =>
+                (word: string) =>
                     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
             )
             .join(" ")
             .trim()
     }
 
-    groupContentIntoSections(body: any) {
-        const sections: any[] = []
-        let currentSection: Record<string, any> = {
+    groupContentIntoSections(body: XMLElement) {
+        const sections: DocxSection[] = []
+        let currentSection: {title: string | null; content: FidusNode[]} = {
             title: null,
             content: []
         }
 
-        body.children.forEach((node: any) => {
+        body.children.forEach((node: XMLElement) => {
             const styleName = attr(node, "text:style-name")
             const title = this.getSectionTitle(node, styleName)
 
@@ -1139,9 +1139,9 @@ export class OdtConvert {
             }
 
             const converted = [this.convertBlockNode(node)]
-                .filter((node: any) => node)
+                .filter((node: XMLElement) => node)
                 .flat()
-            converted.forEach((node: any) => currentSection.content.push(node))
+            converted.forEach((node: XMLElement) => currentSection.content.push(node))
         })
 
         // Add final section
@@ -1152,7 +1152,7 @@ export class OdtConvert {
         return sections
     }
 
-    isCodeBlockStyle(styleName: any, style: any): boolean {
+    isCodeBlockStyle(styleName: string, style: StyleProperties): boolean {
         if (!styleName) {
             return false
         }
@@ -1176,7 +1176,7 @@ export class OdtConvert {
         // Check text properties for monospace fonts
         if (style?.textProperties?.fontFamily) {
             const fontFamily = style.textProperties.fontFamily.toLowerCase()
-            const monospacePatterns: any[] = [
+            const monospacePatterns: RegExp[] = [
                 "courier",
                 "consolas",
                 "monaco",
@@ -1188,7 +1188,7 @@ export class OdtConvert {
                 "source code pro",
                 "fira code"
             ]
-            return monospacePatterns.some((pattern: any) =>
+            return monospacePatterns.some((pattern: RegExp) =>
                 fontFamily.includes(pattern)
             )
         }
@@ -1196,7 +1196,7 @@ export class OdtConvert {
         return false
     }
 
-    isHeadingStyle(styleName: any): boolean {
+    isHeadingStyle(styleName: string): boolean {
         if (!styleName) {
             return false
         }
@@ -1235,15 +1235,15 @@ export class OdtConvert {
         )
     }
 
-    convertContainer(container: any) {
+    convertContainer(container: XMLElement) {
         return container.children
-            .map((node: any) => this.convertBlockNode(node))
-            .filter((node: any) => node)
+            .map((node: XMLElement) => this.convertBlockNode(node))
+            .filter((node: XMLElement) => node)
             .flat()
     }
 
-    convertBlockNode(node: any) {
-        const track = this.currentTracks.map((track: any) => ({
+    convertBlockNode(node: XMLElement) {
+        const track = this.currentTracks.map((track: TrackMark) => ({
             type: track.type,
             user: track.attrs.user,
             username: track.attrs.username,
@@ -1298,7 +1298,7 @@ export class OdtConvert {
         }
     }
 
-    convertParagraph(node: any, attrs: any = {}) {
+    convertParagraph(node: XMLElement, attrs: Record<string, unknown> = {}) {
         const styleName = attr(node, "text:style-name")
         const style = this.styles[styleName]
 
@@ -1347,7 +1347,7 @@ export class OdtConvert {
         }
     }
 
-    convertHeading(node: any, attrs: any = {}) {
+    convertHeading(node: XMLElement, attrs: Record<string, unknown> = {}) {
         const level =
             parseInt(attr(node, "text:outline-level") || "1") || 1
 
@@ -1373,12 +1373,12 @@ export class OdtConvert {
         }
     }
 
-    convertNodeChildren(node: any, currentStyleMarks: any = []) {
+    convertNodeChildren(node: XMLElement, currentStyleMarks: FidusMark[] = []) {
         let insideCitationReferenceMark = false
         let insideBibliographyReferenceMark = false
 
         return node.children
-            .map((child: any) => {
+            .map((child: XMLElement) => {
                 if (insideBibliographyReferenceMark) {
                     // Swallow all rendered bibliography content until the
                     // closing mark — we have our own bibliography system.
@@ -1408,7 +1408,7 @@ export class OdtConvert {
                         const changeId = attr(child, "text:change-id")
                         const track = this.tracks[changeId]
                         if (track) {
-                            const trackMark: Record<string, any> = {
+                            const trackMark: Record<string, unknown> = {
                                 type: track.type,
                                 attrs: {
                                     user: track.user,
@@ -1428,7 +1428,7 @@ export class OdtConvert {
                         const track = this.tracks[changeId]
                         if (track) {
                             this.currentTracks = this.currentTracks.filter(
-                                (mark: any) => mark.type !== track.type
+                                (mark: XMLElement) => mark.type !== track.type
                             )
                         }
                         return null
@@ -1480,14 +1480,14 @@ export class OdtConvert {
                         )
                 }
             })
-            .filter((node: any) => node)
+            .filter((node: XMLElement) => node)
             .flat()
     }
 
-    getCurrentMarks(currentStyleMarks: any = []) {
-        const commentMarks: any[] = []
+    getCurrentMarks(currentStyleMarks: FidusMark[] = []) {
+        const commentMarks: FidusMark[] = []
         // Add comment marks for any active comment IDs
-        this.currentCommentIds.forEach((commentId: any) => {
+        this.currentCommentIds.forEach((commentId: string) => {
             commentMarks.push({
                 type: "comment",
                 attrs: {
@@ -1498,8 +1498,8 @@ export class OdtConvert {
         return [...currentStyleMarks, ...this.currentTracks, ...commentMarks]
     }
 
-    convertText(text: any, currentStyleMarks: any) {
-        const textNode: Record<string, any> = {
+    convertText(text: string, currentStyleMarks: FidusMark[]) {
+        const textNode: Record<string, unknown> = {
             type: "text",
             text
         }
@@ -1510,7 +1510,7 @@ export class OdtConvert {
         return textNode
     }
 
-    convertSpan(node: any, currentStyleMarks: any) {
+    convertSpan(node: XMLElement, currentStyleMarks: FidusMark[]) {
         const styleName = attr(node, "text:style-name")
         const style = this.styles[styleName]
         if (style?.textProperties?.bold) {
@@ -1531,7 +1531,7 @@ export class OdtConvert {
         // Handle inline code (monospace fonts)
         if (style?.textProperties?.fontFamily) {
             const fontFamily = style.textProperties.fontFamily.toLowerCase()
-            const monospacePatterns: any[] = [
+            const monospacePatterns: RegExp[] = [
                 "courier",
                 "consolas",
                 "monaco",
@@ -1546,7 +1546,7 @@ export class OdtConvert {
                 "droid sans mono",
                 "monospace"
             ]
-            const isMonospace = monospacePatterns.some((pattern: any) =>
+            const isMonospace = monospacePatterns.some((pattern: RegExp) =>
                 fontFamily.includes(pattern)
             )
             if (isMonospace) {
@@ -1556,7 +1556,7 @@ export class OdtConvert {
         return this.convertNodeChildren(node, currentStyleMarks)
     }
 
-    convertFootnote(node: any, currentStyleMarks: any) {
+    convertFootnote(node: XMLElement, currentStyleMarks: FidusMark[]) {
         const noteBody = node.query("text:note-body")
         if (!noteBody) {
             return null
@@ -1582,7 +1582,7 @@ export class OdtConvert {
             isOdtCitationMark(markName) &&
             // Check that there's no content outside the reference marks
             firstParagraph.children.every(
-                (child: any) =>
+                (child: XMLElement) =>
                     child.tagName === "text:reference-mark-start" ||
                     child.tagName === "text:reference-mark-end" ||
                     (child.tagName === "text:span" &&
@@ -1606,7 +1606,7 @@ export class OdtConvert {
         }
     }
 
-    convertCitation(markName: any, currentStyleMarks: any) {
+    convertCitation(markName: string, currentStyleMarks: FidusMark[]) {
         const citationNode = parseOdtReferenceMark(
             markName,
             this.bibliography,
@@ -1619,7 +1619,7 @@ export class OdtConvert {
         return null
     }
 
-    convertBibliographyMark(bibMarkNode: any, currentStyleMarks: any) {
+    convertBibliographyMark(bibMarkNode: XMLElement, currentStyleMarks: FidusMark[]) {
         const citationNode = parseOdtBibliographyMark(
             bibMarkNode,
             this.bibliography
@@ -1631,7 +1631,7 @@ export class OdtConvert {
         return null
     }
 
-    convertList(node: any, attrs: any) {
+    convertList(node: XMLElement, attrs: Record<string, unknown>) {
         const listStyle = attr(node, "text:style-name")
         const isOrdered = this.isOrderedList(listStyle)
 
@@ -1649,14 +1649,14 @@ export class OdtConvert {
         return {
             type: isOrdered ? "ordered_list" : "bullet_list",
             attrs,
-            content: node.queryAll("text:list-item").map((item: any) => ({
+            content: node.queryAll("text:list-item").map((item: XMLElement) => ({
                 type: "list_item",
                 content: this.convertContainer(item)
             }))
         }
     }
 
-    convertAnnotationStart(node: any) {
+    convertAnnotationStart(node: XMLElement) {
         const commentId = (attr(node, "office:name") || "")
             .replace(/\D/g, "")
             .slice(0, 9)
@@ -1666,7 +1666,7 @@ export class OdtConvert {
         return null
     }
 
-    convertAnnotationEnd(node: any) {
+    convertAnnotationEnd(node: XMLElement) {
         const commentId = (attr(node, "office:name") || "")
             .replace(/\D/g, "")
             .slice(0, 9)
@@ -1679,7 +1679,7 @@ export class OdtConvert {
         return null
     }
 
-    convertHeadingReference(node: any) {
+    convertHeadingReference(node: XMLElement) {
         const refName = attr(node, "text:ref-name")
         if (!refName || !this.referenceableObjects[refName]) {
             return null
@@ -1699,7 +1699,7 @@ export class OdtConvert {
         }
     }
 
-    convertFigureReference(node: any) {
+    convertFigureReference(node: XMLElement) {
         const refName = attr(node, "text:ref-name")
         if (!refName || !this.referenceableObjects[refName]) {
             return null
@@ -1722,7 +1722,7 @@ export class OdtConvert {
         }
     }
 
-    isOrderedList(styleName: any) {
+    isOrderedList(styleName: string) {
         if (!this.stylesDoc) {
             return false
         }
@@ -1732,7 +1732,7 @@ export class OdtConvert {
         return listStyle?.query("text:list-level-style-number") !== null
     }
 
-    convertImage(node: any, attrs: any = {}) {
+    convertImage(node: XMLElement, attrs: Record<string, unknown> = {}) {
         const imageElement = node.query("draw:image")
         if (!imageElement) {
             return null
@@ -1793,7 +1793,7 @@ export class OdtConvert {
             attrs
         )
 
-        const figureCaption: Record<string, any> = {type: "figure_caption"}
+        const figureCaption: Record<string, unknown> = {type: "figure_caption"}
         if (captionContent.length) {
             figureCaption.content = captionContent
         }
@@ -1813,7 +1813,7 @@ export class OdtConvert {
         }
     }
 
-    getImageFileType(filename: any) {
+    getImageFileType(filename: string) {
         const ext = filename.split(".").pop().toLowerCase()
         switch (ext) {
             case "avif":
@@ -1835,7 +1835,7 @@ export class OdtConvert {
         }
     }
 
-    convertLength(length: any) {
+    convertLength(length: string) {
         if (!length) {
             return 0
         }
@@ -1870,7 +1870,7 @@ export class OdtConvert {
         }
     }
 
-    convertTable(node: any, attrs: any) {
+    convertTable(node: XMLElement, attrs: Record<string, unknown>) {
         const width =
             attr(node, "style:rel-width")?.replace("%", "") || "100"
         const styleName = attr(node, "table:style-name")
@@ -1898,22 +1898,22 @@ export class OdtConvert {
                     type: "table_body",
                     content: node
                         .queryAll("table:table-row")
-                        .map((row: any) => this.convertTableRow(row))
+                        .map((row: XMLElement) => this.convertTableRow(row))
                 }
             ]
         }
     }
 
-    convertTableRow(row: any) {
+    convertTableRow(row: XMLElement) {
         return {
             type: "table_row",
             content: row
                 .queryAll(["table:table-cell", "table:covered-table-cell"])
-                .map((cell: any) => this.convertTableCell(cell))
+                .map((cell: XMLElement) => this.convertTableCell(cell))
         }
     }
 
-    convertTableCell(node: any) {
+    convertTableCell(node: XMLElement) {
         if (node.tagName === "table:covered-table-cell") {
             return null
         }
@@ -1933,7 +1933,7 @@ export class OdtConvert {
         }
     }
 
-    convertLink(node: any, currentStyleMarks: any) {
+    convertLink(node: XMLElement, currentStyleMarks: FidusMark[]) {
         const href = attr(node, "xlink:href")
         currentStyleMarks = currentStyleMarks.concat([
             {type: "link", attrs: {href}}

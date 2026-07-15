@@ -184,19 +184,19 @@ export class DocxConvert {
                 {type: "text", text: gettext("Untitled")}
             ]
         })
-        title.containerNodes.forEach((node: any) => {
+        title.containerNodes.forEach((node: XMLElement) => {
             node.parentElement.removeChild(node)
         })
         document.attrs.title =
-            title.content.map((node: any) => node.textContent).join("") ||
+            title.content.map((node: XMLElement) => node.textContent).join("") ||
             gettext("Untitled")
         // Extract metadata sections
         const metadata = this.extractMetadata(body)
-        metadata.forEach(({type, content}: any) => {
+        metadata.forEach(({type, content}: MetadataItem) => {
             const templatePart = templateParts.find(
-                (part: any) => part.attrs.metadata === type
+                (part: FidusNode) => part.attrs.metadata === type
             )
-            const attrs: Record<string, any> = {}
+            const attrs: Record<string, unknown> = {}
             if (templatePart) {
                 if (templatePart.attrs?.hidden) {
                     attrs.hidden = false
@@ -210,7 +210,7 @@ export class DocxConvert {
                     content: content.content
                 })
                 // Remove paragraphs from content so they are not added to body
-                content.containerNodes.forEach((node: any) => {
+                content.containerNodes.forEach((node: XMLElement) => {
                     node.parentElement?.removeChild(node)
                 })
             }
@@ -218,7 +218,7 @@ export class DocxConvert {
         // Extract main content sections
         const sections = this.groupContentIntoSections(body)
         // Map sections to template parts
-        sections.forEach((section: any) => {
+        sections.forEach((section: DocxSection) => {
             const templatePart = this.findMatchingTemplatePart(
                 section.title,
                 templateParts
@@ -244,14 +244,14 @@ export class DocxConvert {
         // Add remaining content to body section
         const unassignedContent = sections
             .filter(
-                (section: any) =>
+                (section: DocxSection) =>
                     !this.findMatchingTemplatePart(section.title, templateParts)
             )
-            .flatMap((section: any) => section.content)
+            .flatMap((section: DocxSection) => section.content)
 
         if (unassignedContent.length) {
             const bodyTemplatePart = templateParts.find(
-                (part: any) => !part.attrs.metadata && part.type === "richtext_part"
+                (part: FidusNode) => !part.attrs.metadata && part.type === "richtext_part"
             )
 
             document.content.push({
@@ -268,14 +268,14 @@ export class DocxConvert {
         return document as FidusDoc
     }
 
-    extractMetadata(body: any) {
-        const metadata: any[] = []
+    extractMetadata(body: XMLElement) {
+        const metadata: MetadataItem[] = []
 
         // Try structured contributor data from custom properties first
         const contributorsByRole = this.extractContributorsFromCustomProps()
         if (Object.keys(contributorsByRole).length) {
             Object.entries(contributorsByRole).forEach(
-                ([role, contributors]: any) => {
+                ([role, contributors]: [string, FidusNode[]]) => {
                     metadata.push({
                         type: role,
                         content: {content: contributors, containerNodes: []}
@@ -319,9 +319,9 @@ export class DocxConvert {
         }
 
         const properties = this.parser.customDoc.queryAll("property")
-        const contributors: any[] = []
+        const contributors: FidusNode[] = []
 
-        properties.forEach((prop: any) => {
+        properties.forEach((prop: XMLElement) => {
             const name = attr(prop, "name")
             if (!name || !name.startsWith("fidus_contributor_")) {
                 return
@@ -365,8 +365,8 @@ export class DocxConvert {
             }
         })
 
-        const byRole: Record<string, any> = {}
-        contributors.forEach((contributor: any) => {
+        const byRole: Record<string, FidusNode[]> = {}
+        contributors.forEach((contributor: FidusNode) => {
             if (!contributor) {
                 return
             }
@@ -380,15 +380,15 @@ export class DocxConvert {
         return byRole
     }
 
-    extractAuthors(body: any) {
-        const authors: any[] = []
+    extractAuthors(body: XMLElement) {
+        const authors: FidusNode[] = []
 
         // Try to find author information in metadata
         const authorNodes = body
             .queryAll("w:pStyle", {"w:val": "Author"})
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
-        authorNodes.forEach((authorNode: any) => {
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
+        authorNodes.forEach((authorNode: XMLElement) => {
             const authorText = this.getTextContent(authorNode)
             const [firstname = "", lastname = ""] = authorText.split(" ", 2)
             authors.push({
@@ -431,15 +431,15 @@ export class DocxConvert {
         return {content: [], containerNodes: []}
     }
 
-    extractAbstract(body: any) {
+    extractAbstract(body: XMLElement) {
         // Look for section with Abstract style or heading
         const abstractNodes = body
             .queryAll("w:pStyle", {"w:val": "Abstract"})
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
         if (abstractNodes.length) {
             return {
-                content: abstractNodes.map((abstractNode: any) =>
+                content: abstractNodes.map((abstractNode: XMLElement) =>
                     this.convertBlock(abstractNode)
                 ),
                 containerNodes: abstractNodes
@@ -448,7 +448,7 @@ export class DocxConvert {
         const extractedPart = this.extractPartOnTitle(body, ["Abstract"])
         if (extractedPart.content.length) {
             return {
-                content: extractedPart.content.map((abstractNode: any) =>
+                content: extractedPart.content.map((abstractNode: XMLElement) =>
                     this.convertBlock(abstractNode)
                 ),
                 containerNodes: extractedPart.content.concat([
@@ -459,13 +459,13 @@ export class DocxConvert {
         return {content: [], containerNodes: []}
     }
 
-    extractKeywords(body: any) {
-        let extraNodes: any[] = []
+    extractKeywords(body: XMLElement) {
+        let extraNodes: XMLElement[] = []
         // Look for keywords section or metadata
         let keywordNodes = body
             .queryAll("w:pStyle", {"w:val": "Keywords"})
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
 
         if (!keywordNodes.length) {
             // If no keywords section is found, look for a title called "Keywords"
@@ -484,11 +484,11 @@ export class DocxConvert {
         if (keywordNodes) {
             return {
                 content: keywordNodes
-                    .map((keywordsNode: any) => this.getTextContent(keywordsNode))
-                    .flatMap((str: any) => str.split(/[,;|:]+/)) // Split on multiple separators
-                    .map((keyword: any) => keyword.trim()) // Trim whitespace
-                    .filter((keyword: any) => keyword.length > 0)
-                    .map((keyword: any) => ({
+                    .map((keywordsNode: XMLElement) => this.getTextContent(keywordsNode))
+                    .flatMap((str: string) => str.split(/[,;|:]+/)) // Split on multiple separators
+                    .map((keyword: string) => keyword.trim()) // Trim whitespace
+                    .filter((keyword: string) => keyword.length > 0)
+                    .map((keyword: string) => ({
                         type: "tag",
                         attrs: {
                             tag: keyword
@@ -501,7 +501,7 @@ export class DocxConvert {
         return {content: [], containerNodes: []}
     }
 
-    extractPartOnTitle(body: any, titleWords: any, maxPars: any = false) {
+    extractPartOnTitle(body: XMLElement, titleWords: string[], maxPars: number | false = false) {
         // Fall back to heading starting with TITLEWORD in text
         if (typeof titleWords === "string") {
             titleWords = [titleWords]
@@ -520,12 +520,12 @@ export class DocxConvert {
                     "Heading9"
                 ]
             })
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
-        const header = headingPars.find((p: any) =>
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
+        const header = headingPars.find((p: XMLElement | null) =>
             titleWords.includes(this.getTextContent(p).trim())
         )
-        const content: any[] = []
+        const content: FidusNode[] = []
         if (header && header.nextSibling) {
             //const content = []
             //const containerNodes = [sectionHeader]
@@ -549,16 +549,16 @@ export class DocxConvert {
         return {header, content}
     }
 
-    groupContentIntoSections(body: any) {
-        const sections: any[] = []
-        let currentSection: Record<string, any> = {
+    groupContentIntoSections(body: XMLElement) {
+        const sections: DocxSection[] = []
+        let currentSection: {title: string | null; content: FidusNode[]} = {
             title: null,
             content: []
         }
 
-        const skippedBlocks: any[] = []
+        const skippedBlocks: XMLElement[] = []
 
-        body.children.forEach((node: any) => {
+        body.children.forEach((node: XMLElement) => {
             if (skippedBlocks.includes(node)) {
                 return
             }
@@ -591,7 +591,7 @@ export class DocxConvert {
         return sections
     }
 
-    getSectionTitle(node: any, style: any) {
+    getSectionTitle(node: XMLElement, style: ParaStyle) {
         if (!node || !style) {
             return null
         }
@@ -612,14 +612,14 @@ export class DocxConvert {
         return null
     }
 
-    findMatchingTemplatePart(sectionTitle: any, templateParts: any) {
+    findMatchingTemplatePart(sectionTitle: string | null, templateParts: FidusNode[]) {
         if (!sectionTitle) {
             return null
         }
 
         // Try exact match first
         let matchingPart = templateParts.find(
-            (part: any) =>
+            (part: FidusNode) =>
                 part.type === "richtext_part" &&
                 !part.attrs.metadata &&
                 part.attrs.title.toLowerCase() === sectionTitle.toLowerCase()
@@ -628,7 +628,7 @@ export class DocxConvert {
         if (!matchingPart) {
             // Try fuzzy matching
             matchingPart = templateParts.find(
-                (part: any) =>
+                (part: FidusNode) =>
                     part.type === "richtext_part" &&
                     !part.attrs.metadata &&
                     this.isSimilarTitle(part.attrs.title, sectionTitle)
@@ -638,7 +638,7 @@ export class DocxConvert {
         return matchingPart
     }
 
-    isSimilarTitle(title1: any, title2: any) {
+    isSimilarTitle(title1: string, title2: string) {
         const normalized1 = normalizeText(title1)
         const normalized2 = normalizeText(title2)
 
@@ -648,19 +648,19 @@ export class DocxConvert {
         )
     }
 
-    getTextContent(node: any) {
+    getTextContent(node: XMLElement) {
         return node
             .queryAll("w:t")
-            .map((t: any) => t.textContent)
+            .map((t: XMLElement) => t.textContent)
             .join("")
     }
 
-    extractTitle(body: any) {
+    extractTitle(body: XMLElement) {
         // First try to find paragraph with Title style
         const titlePars = body
             .queryAll("w:pStyle", {"w:val": "Title"})
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
 
         if (titlePars.length) {
             return {
@@ -684,8 +684,8 @@ export class DocxConvert {
                     "Heading9"
                 ]
             })
-            .map((pStyle: any) => pStyle.closest("w:p"))
-            .filter((p: any) => p)
+            .map((pStyle: XMLElement) => pStyle.closest("w:p"))
+            .filter((p: XMLElement | null) => p)
         if (headingPars.length) {
             return {
                 content: this.convertInline(headingPars[0]),
@@ -704,7 +704,7 @@ export class DocxConvert {
         }
     }
 
-    inBibliography(node: any) {
+    inBibliography(node: XMLElement) {
         // Check if we currently are in a field.
         const currentField = this.currentFields[this.currentFields.length - 1]
 
@@ -724,7 +724,7 @@ export class DocxConvert {
         return false
     }
 
-    convertBlock(node: any, skippedBlocks: any = []) {
+    convertBlock(node: XMLElement, skippedBlocks: XMLElement[] = []) {
         if (node.tagName !== "w:p") {
             return null
         }
@@ -768,7 +768,7 @@ export class DocxConvert {
         return this.wrapTrackChanges(node, converted)
     }
 
-    wrapTrackChanges(node: any, content: any) {
+    wrapTrackChanges(node: XMLElement, content: FidusNode[]) {
         if (!content || !node.previousSibling) {
             return content
         }
@@ -783,11 +783,11 @@ export class DocxConvert {
         }
     }
 
-    getTracksFromNode(node: any) {
+    getTracksFromNode(node: XMLElement) {
         const deletion = node.query("w:pPr")?.query("w:del")
         const insertion = node.query("w:pPr")?.query("w:ins")
 
-        const tracks: any[] = []
+        const tracks: Track[] = []
 
         if (insertion) {
             const date = new Date(attr(insertion, "w:date"))
@@ -818,7 +818,7 @@ export class DocxConvert {
         return tracks
     }
 
-    getParaStyle(node: any) {
+    getParaStyle(node: XMLElement) {
         const pStyle = node.query("w:pStyle")
         const styleId = attr(pStyle, "w:val")
         const style = this.parser.styles[styleId] || {}
@@ -841,7 +841,7 @@ export class DocxConvert {
         }
     }
 
-    convertParagraph(node: any) {
+    convertParagraph(node: XMLElement) {
         const pStyle = node.query("w:pStyle")
         const styleId = attr(pStyle, "w:val")
 
@@ -869,7 +869,7 @@ export class DocxConvert {
         }
     }
 
-    convertHeading(node: any, style: any) {
+    convertHeading(node: XMLElement, style: ParaStyle) {
         return {
             type: `heading${style.level}`,
             attrs: {
@@ -880,7 +880,7 @@ export class DocxConvert {
         }
     }
 
-    convertListItem(node: any, style: any) {
+    convertListItem(node: XMLElement, style: ParaStyle) {
         const numbering = style.numbering
         const level = numbering.definition?.levels[numbering.level]
 
@@ -900,7 +900,7 @@ export class DocxConvert {
         }
     }
 
-    convertFigure(node: any, captionNode: any = null) {
+    convertFigure(node: XMLElement, captionNode: XMLElement | null = null) {
         let captionBlock, captionOrder
         if (captionNode) {
             captionBlock = this.convertParagraph(captionNode)
@@ -954,14 +954,14 @@ export class DocxConvert {
             height
         }
 
-        const image: Record<string, any> = {
+        const image: Record<string, unknown> = {
             type: "image",
             attrs: {
                 image: imageId
             }
         }
 
-        const caption: Record<string, any> = {
+        const caption: Record<string, unknown> = {
             type: "figure_caption",
             content: captionBlock?.content || []
         }
@@ -981,11 +981,11 @@ export class DocxConvert {
         }
     }
 
-    convertInline(node: any) {
-        const content: any[] = []
+    convertInline(node: XMLElement) {
+        const content: FidusNode[] = []
 
         // We'll process all inline nodes in document order
-        node.children.forEach((child: any) => {
+        node.children.forEach((child: XMLElement) => {
             let contentReceiver = content
             const currentField =
                 this.currentFields[this.currentFields.length - 1]
@@ -1042,7 +1042,7 @@ export class DocxConvert {
                     }
 
                     if (rendercurrentField && currentField) {
-                        this.renderField(currentField).forEach((node: any) =>
+                        this.renderField(currentField).forEach((node: XMLElement) =>
                             contentReceiver.push(node)
                         )
                     }
@@ -1127,7 +1127,7 @@ export class DocxConvert {
                 if (href) {
                     const runs = child.queryAll("w:r")
                     const text = runs
-                        .map((run: any) => run.query("w:t")?.textContent || "")
+                        .map((run: XMLElement) => run.query("w:t")?.textContent || "")
                         .join("")
 
                     if (text) {
@@ -1196,11 +1196,11 @@ export class DocxConvert {
     }
 
     // Method to help process cross-references in documents
-    findReferenceTargets(document: any) {
-        const targets: Record<string, any> = {}
+    findReferenceTargets(document: XMLElement) {
+        const targets: Record<string, {id: string; type: string; text?: string}> = {}
 
         // Find bookmarks
-        document.queryAll("w:bookmarkStart").forEach((bookmark: any) => {
+        document.queryAll("w:bookmarkStart").forEach((bookmark: XMLElement) => {
             const id = attr(bookmark, "w:id")
             const name = attr(bookmark, "w:name")
             if (id && name) {
@@ -1212,7 +1212,7 @@ export class DocxConvert {
         })
 
         // Find headings (with styles like Heading1, Heading2, etc.)
-        document.queryAll("w:pStyle").forEach((pStyle: any) => {
+        document.queryAll("w:pStyle").forEach((pStyle: XMLElement) => {
             const val = attr(pStyle, "w:val")
             if (val && val.match(/^Heading\d+$/)) {
                 const paragraph = pStyle.closest("w:p")
@@ -1237,18 +1237,18 @@ export class DocxConvert {
         return targets
     }
 
-    convertFootnote(id: any, isEndnote: any = false) {
+    convertFootnote(id: string, isEndnote: boolean = false) {
         const footnoteContent = isEndnote
             ? this.parser.endnotes[id].content
             : this.parser.footnotes[id].content
 
         // Convert the footnote content to our document model
-        const content: any[] = []
-        footnoteContent.forEach((block: any) => {
+        const content: FidusNode[] = []
+        footnoteContent.forEach((block: XMLElement) => {
             if (block.type === "paragraph") {
                 content.push({
                     type: "paragraph",
-                    content: block.content.map((node: any) => {
+                    content: block.content.map((node: XMLElement) => {
                         if (node.type === "text") {
                             return {
                                 type: "text",
@@ -1270,7 +1270,7 @@ export class DocxConvert {
         }
     }
 
-    convertEquation(oMathNode: any) {
+    convertEquation(oMathNode: XMLElement) {
         // Extract OMML content and convert to MathML
         const mmlNode = omml2mathml(oMathNode)
         const latex = MathMLToLaTeX.convert(mmlNode.outerXML)
@@ -1282,7 +1282,7 @@ export class DocxConvert {
         }
     }
 
-    simplifiedOmmlToLatex(omml: any) {
+    simplifiedOmmlToLatex(omml: XMLElement) {
         // This is a very basic conversion - in a real implementation you would
         // use a library like MathML-to-LaTeX or implement a more complete converter
 
@@ -1332,7 +1332,7 @@ export class DocxConvert {
         return textContent || "x^2" // Default fallback
     }
 
-    renderField(field: any) {
+    renderField(field: FieldState) {
         const instr = field.instructions.trim()
 
         // Handle REF fields (cross-references)
@@ -1342,7 +1342,7 @@ export class DocxConvert {
             if (parts.length > 0) {
                 const target = parts[0]
                 const text = field.display.reduce(
-                    (accumulator: any, currentValue: any) => {
+                    (accumulator: string, currentValue: XMLElement) => {
                         if (currentValue.type === "text") {
                             return accumulator + currentValue.text
                         }
@@ -1360,7 +1360,7 @@ export class DocxConvert {
             const seqMatch = instr.match(/^SEQ\s+(\S+)/)
             if (seqMatch) {
                 const _seqName = seqMatch[1]
-                const text = field.display.reduce((acc: any, curr: any) => {
+                const text = field.display.reduce((acc: string, curr: FidusNode) => {
                     if (curr.type === "text") {
                         return acc + curr.text
                     }
@@ -1398,7 +1398,7 @@ export class DocxConvert {
         }
     }
 
-    convertCrossReference(targetId: any, displayText: any) {
+    convertCrossReference(targetId: string, displayText: string) {
         // Look up the target in our reference targets
         const target = this.referenceTargets[targetId]
 
@@ -1423,8 +1423,8 @@ export class DocxConvert {
         }
     }
 
-    createMarksFromFormatting(formatting: any, insertion: any = null, deletion: any = null) {
-        const marks: any[] = []
+    createMarksFromFormatting(formatting: Record<string, unknown>, insertion: TrackMark | null = null, deletion: TrackMark | null = null) {
+        const marks: FidusMark[] = []
         if (formatting.bold) {
             marks.push({type: "strong"})
         }
@@ -1443,7 +1443,7 @@ export class DocxConvert {
         }
         // Handle inline code (monospace fonts)
         if (formatting.fontFamily) {
-            const monospacePatterns: any[] = [
+            const monospacePatterns: RegExp[] = [
                 /^courier/i,
                 /^consolas/i,
                 /^monaco/i,
@@ -1457,7 +1457,7 @@ export class DocxConvert {
                 /^ubuntu mono/i,
                 /^droid sans mono/i
             ]
-            const isMonospace = monospacePatterns.some((pattern: any) =>
+            const isMonospace = monospacePatterns.some((pattern: RegExp) =>
                 pattern.test(formatting.fontFamily)
             )
             if (isMonospace) {
@@ -1493,17 +1493,17 @@ export class DocxConvert {
     }
 
     getCurrentMarks(
-        formatting: any,
-        insertion: any = null,
-        deletion: any = null
-    ): any[] {
+        formatting: Record<string, unknown>,
+    insertion: TrackMark | null = null,
+    deletion: TrackMark | null = null
+): FidusMark[] {
         const marks = this.createMarksFromFormatting(
             formatting,
             insertion,
             deletion
         )
         // Add comment marks for any active comment IDs
-        this.currentCommentIds.forEach((commentId: any) => {
+        this.currentCommentIds.forEach((commentId: string) => {
             marks.push({
                 type: "comment",
                 attrs: {
@@ -1514,11 +1514,11 @@ export class DocxConvert {
         return marks
     }
 
-    hasTrackedChanges(doc: any) {
+    hasTrackedChanges(doc: XMLElement) {
         return Boolean(doc.query("w:ins") || doc.query("w:del"))
     }
 
-    detectLanguage(doc: any) {
+    detectLanguage(doc: XMLElement) {
         return attr(doc.query("w:lang"), "w:val") || "en-US"
     }
 }
