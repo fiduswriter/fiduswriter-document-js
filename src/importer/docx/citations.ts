@@ -69,7 +69,7 @@ export function parseDocxFieldCitation(
     instrText: string,
     fldData: string | null | undefined,
     sourcesXml: string | null | undefined,
-    bibliography: Record<string, any>
+    bibliography: Record<string, unknown>
 ): FidusNode | null {
     if (!instrText) {
         return null
@@ -83,7 +83,7 @@ export function parseDocxFieldCitation(
         fldData || undefined,
         options
     )
-    return citationResultToNode(result as any, bibliography)
+    return citationResultToNode(result, bibliography)
 }
 
 /**
@@ -94,7 +94,7 @@ export function parseDocxFieldCitation(
  */
 export function parseDocxSdtCitation(
     sdtNode: XMLElement | null | undefined,
-    bibliography: Record<string, any>
+    bibliography: Record<string, unknown>
 ): FidusNode | null {
     if (!sdtNode) {
         return null
@@ -104,5 +104,5 @@ export function parseDocxSdtCitation(
         true, // retrieve
         true // retrieveMetadata
     )
-    return citationResultToNode(result as any, bibliography)
+    return citationResultToNode(result, bibliography)
 }

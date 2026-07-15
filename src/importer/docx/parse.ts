@@ -2,6 +2,73 @@ import {xmlDOM} from "../../exporter/tools/xml.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 import {randomCommentId} from "../../schema/common/index.js"
 import {gettext} from "fwtoolkit"
+import type JSZip from "jszip"
+import type {CommentData, FidusNode} from "../../types.js"
+
+interface ParagraphProperties {
+    indent?: {
+        left?: number
+        right?: number
+        hanging?: number
+        firstLine?: number
+    }
+    alignment?: string
+    numbering?: {id: string; level: number} | null
+    keepNext?: boolean
+}
+
+interface RunProperties {
+    bold?: boolean
+    italic?: boolean
+    underline?: string | false
+    strike?: boolean
+    smallCaps?: boolean
+    vertAlign?: string | false
+    fontSize?: number
+    color?: string | false
+    fontFamily?: string | false
+}
+
+interface DocxStyle {
+    id: string
+    type: string
+    name: string
+    isHeading: boolean
+    isCaption: boolean
+    level: number
+    basedOn: string
+    paragraphProps: ParagraphProperties
+    runProps: RunProperties
+}
+
+interface NumberingLevel {
+    level: string
+    format: string
+    text: string
+    start: number
+}
+
+interface NumberingOverride {
+    level: string
+    start: number
+}
+
+interface NumberingDefinition {
+    abstractId: string
+    levels: NumberingLevel[]
+    overrides: NumberingOverride[]
+}
+
+interface Footnote {
+    id: string
+    content: FidusNode[]
+}
+
+interface Relationship {
+    id: string
+    type: string
+    target: string
+}
 
 function attr(node: unknown, name: string): string {
     if (node && typeof node === "object" && "getAttribute" in node) {
@@ -15,19 +82,19 @@ const DEFAULT_STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes
 </w:styles>`
 
 export class DocxParser {
-    zip: any
-    styles: Record<string, any>
-    numbering: Record<string, any>
-    comments: Record<string, any>
-    footnotes: Record<string, any>
-    endnotes: Record<string, any>
-    relationships: Record<string, any>
+    zip: JSZip
+    styles: Record<string, DocxStyle>
+    numbering: Record<string, NumberingDefinition>
+    comments: Record<string, CommentData>
+    footnotes: Record<string, Footnote>
+    endnotes: Record<string, Footnote>
+    relationships: Record<string, Relationship>
     images: Record<string, File>
     coreDoc: XMLElement | null
     document: XMLElement | null
     customDoc: XMLElement | null
 
-    constructor(zip: any) {
+    constructor(zip: JSZip) {
         this.zip = zip
         this.styles = {}
         this.numbering = {}
@@ -64,7 +131,7 @@ export class DocxParser {
             const stylesDoc = xmlDOM(content || DEFAULT_STYLES_XML)
             const styles = stylesDoc.queryAll("w:style")
 
-            styles.forEach((style: any) => {
+            styles.forEach((style: XMLElement) => {
                 const id = attr(style, "w:styleId")
                 const type = attr(style, "w:type")
                 const name = attr(style.query("w:name"), "w:val")
@@ -91,9 +158,9 @@ export class DocxParser {
         }
     }
 
-    isCodeStyle(styleId: any) {
-        let current = styleId
-        const visited = new Set()
+    isCodeStyle(styleId: string) {
+        let current: string | undefined = styleId
+        const visited = new Set<string>()
         while (current && !visited.has(current)) {
             visited.add(current)
             const style = this.styles[current]
@@ -113,7 +180,7 @@ export class DocxParser {
             // Check font family on the style
             if (style.runProps?.fontFamily) {
                 const fontFamily = style.runProps.fontFamily.toLowerCase()
-                const monospacePatterns: any[] = [
+                const monospacePatterns: string[] = [
                     "courier",
                     "consolas",
                     "monaco",
@@ -128,7 +195,7 @@ export class DocxParser {
                     "droid sans mono",
                     "monospace"
                 ]
-                if (monospacePatterns.some((p: any) => fontFamily.includes(p))) {
+                if (monospacePatterns.some(p => fontFamily.includes(p))) {
                     return true
                 }
             }
@@ -137,7 +204,7 @@ export class DocxParser {
         return false
     }
 
-    extractParagraphProperties(style: any) {
+    extractParagraphProperties(style: XMLElement): ParagraphProperties {
         const pPr = style.query("w:pPr")
         if (!pPr) {
             return {}
@@ -151,7 +218,7 @@ export class DocxParser {
         }
     }
 
-    extractIndentation(pPr: any) {
+    extractIndentation(pPr: XMLElement) {
         const ind = pPr.query("w:ind")
         if (!ind) {
             return {}
@@ -169,7 +236,7 @@ export class DocxParser {
         }
     }
 
-    extractNumbering(pPr: any) {
+    extractNumbering(pPr: XMLElement) {
         const numPr = pPr.query("w:numPr")
         if (!numPr) {
             return null
@@ -181,7 +248,7 @@ export class DocxParser {
         }
     }
 
-    extractRunProperties(rPr: any) {
+    extractRunProperties(rPr: XMLElement | undefined): RunProperties {
         if (!rPr) {
             return {}
         }

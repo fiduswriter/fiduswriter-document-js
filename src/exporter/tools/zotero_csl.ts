@@ -43,7 +43,10 @@ function generateCitationId(): string {
  * @returns Object mapping IDs to CSL-JSON entries
  */
 function convertToCSL(bibDB: BibDB, ids: number[]): Record<string, unknown> {
-    const exporter = new CSLExporter(bibDB.db as Record<string, any>, ids as unknown as string[])
+    const exporter = new CSLExporter(
+        bibDB.db as Record<string, unknown>,
+        ids as unknown as string[]
+    )
     return exporter.parse()
 }
 

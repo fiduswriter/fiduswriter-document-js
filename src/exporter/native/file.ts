@@ -2,8 +2,9 @@ import download from "downloadjs"
 import {shortFileTitle, gettext} from "fwtoolkit"
 
 import {ShrinkFidus} from "./shrink.js"
-import {createSlug} from "../tools/file.js"
 import {ZipFidus} from "./zip.js"
+import {createSlug} from "../tools/file.js"
+import type {ShrinkDoc} from "./shrink.js"
 
 import type {BibDB, ExportDoc, ImageDB, TemplateFiles} from "../../types.js"
 
@@ -52,7 +53,7 @@ export class ExportFidusFile {
             0
         )
         const shrinker = new ShrinkFidus(
-            this.doc as any,
+            this.doc as unknown as ShrinkDoc,
             this.imageDB,
             this.bibDB,
             this.progressCallback

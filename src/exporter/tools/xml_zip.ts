@@ -1,4 +1,5 @@
 import {get} from "fwtoolkit"
+import type JSZip from "jszip"
 
 import {validateXml, xmlDOM, XMLElement} from "./xml.js"
 
@@ -11,7 +12,7 @@ export class XmlZip {
     docs: Record<string, XMLElement>
     extraFiles: Record<string, unknown>
     rawFile: Blob | false
-    zip: any
+    zip!: JSZip
     loadedBlob: Blob | undefined
 
     constructor(url: string, mimeType: string, loadedBlob?: Blob) {

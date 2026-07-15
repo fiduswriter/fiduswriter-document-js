@@ -1,6 +1,6 @@
 import {OdtCitationsParser} from "bibliojson"
 
-import {citationResultToNode} from "../citations.js"
+import {citationResultToNode, type CitationResult} from "../citations.js"
 import type {BibDB, FidusNode} from "../../types.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 
@@ -53,7 +53,7 @@ export function parseOdtReferenceMark(
         true, // retrieve
         true // retrieveMetadata
     )
-    return citationResultToNode(result as any, bibliography, bibDB)
+    return citationResultToNode(result as CitationResult, bibliography, bibDB)
 }
 
 /**
@@ -71,5 +71,5 @@ export function parseOdtBibliographyMark(
         bibMarkNode.outerXML,
         true // retrieve
     )
-    return citationResultToNode(result as any, bibliography)
+    return citationResultToNode(result as CitationResult, bibliography)
 }

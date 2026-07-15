@@ -30,7 +30,7 @@ function processOMML(omml: XMLElement, math: XMLElement): void {
     // Handle different OMML elements
     if (omml.tagName === "m:oMathPara") {
         math.setAttribute("display", "block")
-        omml.queryAll("m:oMath").forEach((omath: any) => {
+        omml.queryAll("m:oMath").forEach((omath: XMLElement) => {
             processOMML(omath, math)
         })
     } else if (omml.tagName === "m:oMath") {
@@ -132,9 +132,9 @@ function processChildren(
         return
     }
 
-    element.children.forEach((child: any) => {
+    element.children.forEach((child: XMLElement | string) => {
         if (typeof child === "object") {
-            processElement(child as XMLElement, parent)
+            processElement(child, parent)
         }
     })
 }
@@ -150,7 +150,7 @@ function createMathElement(
     const elem = xmlDOM(`<${tag}></${tag}>`)
 
     // Set attributes
-    Object.entries(attrs).forEach(([key, value]: any) => {
+    Object.entries(attrs).forEach(([key, value]: [string, unknown]) => {
         if (value !== undefined && value !== "") {
             elem.setAttribute(key, value)
         }
@@ -210,11 +210,11 @@ function processRun(element: XMLElement, parent: XMLElement): void {
         const mtext = createMathElement("mtext", {}, parent)
         const textContent = element
             .queryAll("m:t")
-            .map((t: any) => t.textContent)
+            .map((t: XMLElement) => t.textContent)
             .join("")
         mtext.textContent = nbsp(textContent)
     } else {
-        element.queryAll("m:t").forEach((t: any) => {
+        element.queryAll("m:t").forEach((t: XMLElement) => {
             const toParse = t.textContent
             const scr = getAttr(element, "m:rPr/m:scr", "m:val")
             const sty = getAttr(element, "m:rPr/m:sty", "m:val")
@@ -363,10 +363,10 @@ function processMatrix(element: XMLElement, parent: XMLElement): void {
 
     const mtable = createMathElement("mtable", attrs, parent)
 
-    element.queryAll("m:mr").forEach((mr: any) => {
+    element.queryAll("m:mr").forEach((mr: XMLElement) => {
         const mtr = createMathElement("mtr", {}, mtable)
 
-        mr.queryAll("m:e").forEach((me: any) => {
+        mr.queryAll("m:e").forEach((me: XMLElement) => {
             const mtd = createMathElement("mtd", {}, mtr)
             processElement(me, mtd)
         })
@@ -502,7 +502,7 @@ function processDelimiter(element: XMLElement, parent: XMLElement): void {
 
     const mfenced = createMathElement("mfenced", attr, parent)
 
-    element.queryAll("m:e").forEach((me: any) => {
+    element.queryAll("m:e").forEach((me: XMLElement) => {
         const row = createMathElement("mrow", {}, mfenced)
         processElement(me, row)
     })
@@ -514,7 +514,7 @@ function processDelimiter(element: XMLElement, parent: XMLElement): void {
 function processEqArr(element: XMLElement, parent: XMLElement): void {
     const mtable = createMathElement("mtable", {}, parent)
 
-    element.queryAll("m:e").forEach((me: any) => {
+    element.queryAll("m:e").forEach((me: XMLElement) => {
         const mtr = createMathElement("mtr", {}, mtable)
         const mtd = createMathElement("mtd", {}, mtr)
 
@@ -540,7 +540,7 @@ function processFunction(element: XMLElement, parent: XMLElement): void {
     const outer = createMathElement("mrow", {}, parent)
     const row1 = createMathElement("mrow", {}, outer)
 
-    element.queryAll("m:fName").forEach((fn: any) => {
+    element.queryAll("m:fName").forEach((fn: XMLElement) => {
         processElement(fn, row1)
     })
 
@@ -865,7 +865,7 @@ function outputScript(
 function outputNAryMO(
     element: XMLElement,
     parent: XMLElement,
-    grow: any = false
+    grow = false
 ): void {
     const mo = createMathElement(
         "mo",
@@ -892,7 +892,7 @@ function createEqArrRow(
     if (cur.tagName === "m:r") {
         const allMt = cur
             .queryAll("m:t")
-            .map((t: any) => t.textContent)
+            .map((t: XMLElement) => t.textContent)
             .join("")
         const nor = forceFalse(getAttr(cur, "m:rPr/m:nor", "m:val") || "false")
 
@@ -916,7 +916,7 @@ function createEqArrRow(
     if (nextSibling) {
         const allMt = cur
             .queryAll("m:t")
-            .map((t: any) => t.textContent)
+            .map((t: XMLElement) => t.textContent)
             .join("")
         const amp = countAmp(allMt)
         createEqArrRow(parent, src, nextSibling, (align + (amp % 2)) % 2)
@@ -1199,10 +1199,18 @@ function toNonCombining(ch: string): string {
     return combiMap[ch] || ch
 }
 
+interface TokenAttributesOptions {
+    scr?: string
+    sty?: string
+    nor?: boolean
+    charToPrint?: number
+    tokenType?: "mi" | "mo" | "mn"
+}
+
 /**
  * Create MathML token attributes based on token settings
  */
-function tokenAttributes(options: any): Record<string, string> {
+function tokenAttributes(options: TokenAttributesOptions): Record<string, string> {
     const {scr, sty, nor, charToPrint = 0, tokenType} = options
     const attr: Record<string, string> = {}
 

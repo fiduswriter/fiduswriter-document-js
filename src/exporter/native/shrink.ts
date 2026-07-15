@@ -10,7 +10,7 @@ export type ProgressCallback = (
     percentage?: number | null
 ) => void
 
-interface ShrinkDoc {
+export interface ShrinkDoc {
     content: FidusNode
     [key: string]: unknown
 }

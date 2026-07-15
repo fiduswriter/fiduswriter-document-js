@@ -18,31 +18,131 @@ import {
     parseOdtReferenceMark
 } from "./citations.js"
 import {gettext} from "fwtoolkit"
-import type {BibDB, FidusDoc, ImageDBEntry} from "../../types.js"
+import type {
+    BibDB,
+    CommentData,
+    FidusDoc,
+    FidusMark,
+    FidusNode,
+    ImageDBEntry
+} from "../../types.js"
 
-function attr(node: unknown, name: string): string {
-    if (node && typeof node === "object" && "getAttribute" in node) {
-        return String((node as XMLElement).getAttribute(name) || "")
+interface TextProperties {
+    bold?: boolean
+    italic?: boolean
+    fontSize?: number
+    fontFamily?: string
+    color?: string
+    backgroundColor?: string
+    textDecoration?: string
+    textPosition?: string
+}
+
+interface ParagraphProperties {
+    marginTop?: number
+    marginBottom?: number
+    marginLeft?: number
+    marginRight?: number
+    textAlign?: string
+    lineHeight?: string
+    backgroundColor?: string
+    padding?: number
+    borderStyle?: string
+}
+
+interface SectionProperties {
+    columnCount?: string
+    columnGap?: number
+    backgroundColor?: string
+    margins?: {
+        top?: number
+        bottom?: number
+        left?: number
+        right?: number
     }
-    return ""
+}
+
+interface TableProperties {
+    align?: string
+    width?: number
+    relWidth?: string
+}
+
+interface StyleProperties {
+    parentStyleName?: string
+    isSection?: boolean
+    title?: string
+    family?: string
+    name?: string
+    isHeading?: boolean
+    outlineLevel?: string
+    textProperties?: TextProperties
+    paragraphProperties?: ParagraphProperties
+    sectionProperties?: SectionProperties
+    tableProperties?: TableProperties
+}
+
+interface TrackData {
+    type: "insertion" | "deletion"
+    user: number
+    username: string
+    date: number
+    approved?: boolean
+}
+
+interface TrackMark {
+    type: "insertion" | "deletion"
+    attrs: {
+        user: number
+        username: string
+        date: number
+        approved?: boolean
+    }
+}
+
+interface ReferenceableObject {
+    type: "heading" | "figure"
+    id: string
+    node: XMLElement
+}
+
+interface ExtractedContent {
+    content: FidusNode[]
+    containerNodes: XMLElement[]
+}
+
+interface Section {
+    title: string | null
+    content: FidusNode[]
+}
+
+function attr(node: XMLElement | undefined, name: string): string {
+    if (!node) {
+        return ""
+    }
+    return String(node.getAttribute(name) || "")
+}
+
+function isElement(child: XMLElement | string): child is XMLElement {
+    return typeof child !== "string"
 }
 
 export class OdtConvert {
     importId: string
     template: {content: FidusDoc}
-    bibliography: Record<string, any>
+    bibliography: Record<string, unknown>
     bibDB: BibDB
     images: Record<number, ImageDBEntry>
-    styles: Record<string, any>
+    styles: Record<string, StyleProperties>
     contentDoc: XMLElement | null
     stylesDoc: XMLElement | null
     metaDoc: XMLElement | null
     manifestDoc: XMLElement | null
-    tracks: Record<string, any>
-    comments: Record<string, any>
+    tracks: Record<string, TrackData>
+    comments: Record<string, CommentData>
     currentCommentIds: string[]
-    currentTracks: any[]
-    referenceableObjects: Record<string, any>
+    currentTracks: TrackMark[]
+    referenceableObjects: Record<string, ReferenceableObject>
 
     constructor(
         contentXml: string,
@@ -51,7 +151,7 @@ export class OdtConvert {
         manifestXml: string,
         importId: string,
         template: {content: FidusDoc},
-        bibliography: Record<string, any>,
+        bibliography: Record<string, unknown>,
         bibDb: BibDB
     ) {
         this.importId = importId
@@ -75,8 +175,8 @@ export class OdtConvert {
 
     init(): {
         content: FidusDoc
-        settings: Record<string, any>
-        comments: Record<string, any>
+        settings: Record<string, unknown>
+        comments: Record<string, CommentData>
     } {
         this.parseTrackedChanges()
         this.parseStyles()
@@ -113,10 +213,10 @@ export class OdtConvert {
         // This method takes all the deleted content and puts it back into the place where
         // it was previously. That way the structure is more similar to the output FW document
         // and is more easily converted.
-        const deletions: Record<string, any> = {}
+        const deletions: Record<string, XMLElement[]> = {}
 
         const changedRegions = trackedChangesEl.queryAll("text:changed-region")
-        changedRegions.forEach((region: any) => {
+        changedRegions.forEach(region => {
             const id = attr(region, "text:id")
 
             const insertion = region.query("text:insertion")
@@ -127,7 +227,7 @@ export class OdtConvert {
             }
             const changeInfo = region.query("office:change-info")
             if (changeInfo) {
-                const track: Record<string, any> = {
+                const track: TrackData = {
                     type: insertion ? "insertion" : "deletion",
                     user: 1,
                     username: changeInfo.query("dc:creator")?.textContent || "",
@@ -144,8 +244,8 @@ export class OdtConvert {
 
                 if (deletion) {
                     // Store deletion content for later use
-                    deletions[id] = deletion.children.filter(
-                        (child: any) => child.tagName !== "office:change-info"
+                    deletions[id] = deletion.children.filter(isElement).filter(
+                        child => child.tagName !== "office:change-info"
                     )
                 }
             }
@@ -153,7 +253,7 @@ export class OdtConvert {
 
         // Then find and replace all deletion change markers
         const changeMarkers = this.contentDoc!.queryAll("text:change")
-        changeMarkers.forEach((marker: any) => {
+        changeMarkers.forEach(marker => {
             const changeId = attr(marker, "text:change-id")
             const deletion = deletions[changeId]
             if (deletion) {
@@ -173,7 +273,7 @@ export class OdtConvert {
 
                     if (deletion.length === 1) {
                         // Single block - just insert the content
-                        deletion[0].children.forEach((content: any) => {
+                        deletion[0].children.filter(isElement).forEach(content => {
                             marker.parentElement!.insertBefore(content, marker)
                         })
                     } else {
@@ -182,11 +282,12 @@ export class OdtConvert {
                         parentElement.splitAtChildElement(
                             marker,
                             deletion[0].children
-                                ?.map((node: any) => node.toString())
+                                .filter(isElement)
+                                .map(node => node.toString())
                                 .join("") || "", // First block content to be added to current node
                             deletion
                                 .slice(1, -1)
-                                .map((node: any) => node.toString())
+                                .map(node => node.toString())
                                 .join(""), // Middle blocks
                             deletion[deletion.length - 1].toString() // Last block
                         )
@@ -203,19 +304,19 @@ export class OdtConvert {
             return
         }
         const styleNodes = this.stylesDoc.queryAll("style:style")
-        styleNodes.forEach((node: any) => {
+        styleNodes.forEach(node => {
             const styleName = attr(node, "style:name")
             this.styles[styleName] = this.parseStyle(node)
         })
         const contentStyleNodes = this.contentDoc!.queryAll("style:style")
-        contentStyleNodes.forEach((node: any) => {
+        contentStyleNodes.forEach(node => {
             const styleName = attr(node, "style:name")
             this.styles[styleName] = this.parseStyle(node)
         })
     }
 
-    parseStyle(styleNode: any) {
-        const properties: Record<string, any> = {
+    parseStyle(styleNode: XMLElement): StyleProperties {
+        const properties: StyleProperties = {
             // Basic style information
             parentStyleName: attr(styleNode, "style:parent-style-name"),
             isSection:
@@ -336,7 +437,7 @@ export class OdtConvert {
         return properties
     }
 
-    convertObject(node: any, attrs: any) {
+    convertObject(node: XMLElement, attrs: Record<string, unknown>): FidusNode | null {
         const mathEl = node.query("math")
         if (mathEl) {
             attrs = Object.assign(
@@ -358,7 +459,7 @@ export class OdtConvert {
             return
         }
         const annotations = this.contentDoc!.queryAll("office:annotation")
-        annotations.forEach((annotation: any) => {
+        annotations.forEach(annotation => {
             const username = annotation.query("dc:creator")?.textContent || ""
             const date = new Date(
                 annotation.query("dc:date")?.textContent || ""
@@ -376,8 +477,10 @@ export class OdtConvert {
                     date,
                     comment: annotation
                         .queryAll("text:p")
-                        .map((par: any) => this.convertBlockNode(par))
-                        .filter((par: any) => par)
+                        .map(par => this.convertBlockNode(par))
+                        .filter((par): par is FidusNode | FidusNode[] =>
+                            Boolean(par)
+                        )
                         .flat(),
                     answers: [],
                     resolved:
@@ -399,8 +502,10 @@ export class OdtConvert {
                         answer: annotation
                             .queryAll("text:p")
                             .slice(1)
-                            .map((par: any) => this.convertBlockNode(par))
-                            .filter((par: any) => par)
+                            .map(par => this.convertBlockNode(par))
+                            .filter((par): par is FidusNode | FidusNode[] =>
+                                Boolean(par)
+                            )
                             .flat()
                     })
                 }

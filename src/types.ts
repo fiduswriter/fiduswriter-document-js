@@ -183,12 +183,12 @@ export interface CSL {
     getStyle?: (styleId: string) => Promise<CSLStyle>
     getEngine?: (
         sys: unknown,
-        styleId: string,
+        styleId: string | object,
         lang: string
     ) => Promise<CiteprocInstance>
     getEngineSync?: (
         sys: unknown,
-        styleId: string,
+        styleId: string | object,
         lang: string
     ) => CiteprocInstance | undefined
 }

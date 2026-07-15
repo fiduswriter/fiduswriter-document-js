@@ -1,12 +1,15 @@
 import {gettext, longFilePath} from "fwtoolkit"
 
 import {ShrinkFidus} from "./shrink.js"
+import type {ShrinkDoc} from "./shrink.js"
 
 import type {
     BibDB,
+    BibDBEntries,
     E2EEOptions,
     FidusNode,
     ImageDB,
+    ImageDBEntries,
     ImportDocument,
     SaveCopyE2EE,
     User
@@ -69,7 +72,7 @@ export class SaveCopy {
         if (this.doc.e2ee) {
             shrinkerPromise = this._decryptDocument().then(decryptedDoc => {
                 const shrinker = new ShrinkFidus(
-                    decryptedDoc as any,
+                    decryptedDoc as unknown as ShrinkDoc,
                     this.imageDB,
                     this.bibDB,
                     this.progressCallback
@@ -78,7 +81,7 @@ export class SaveCopy {
             })
         } else {
             const shrinker = new ShrinkFidus(
-                this.doc as any,
+                this.doc as unknown as ShrinkDoc,
                 this.imageDB,
                 this.bibDB,
                 this.progressCallback
@@ -109,8 +112,12 @@ export class SaveCopy {
                         }
                         return this.importDocument(
                             encryptedDoc,
-                            {db: shrunkBibDB as any},
-                            {db: shrunkImageDB as any},
+                            {
+                                db: shrunkBibDB as unknown as BibDBEntries
+                            } as BibDB,
+                            {
+                                db: shrunkImageDB as unknown as ImageDBEntries
+                            } as ImageDB,
                             httpIncludes,
                             {
                                 user: this.newUser,
@@ -158,7 +165,7 @@ export class SaveCopy {
             )
         }
         if (this.bibDB && typeof this.bibDB.db === "string") {
-            this.bibDB.db = decryptedDoc.bibliography as any
+            this.bibDB.db = decryptedDoc.bibliography as BibDBEntries
         }
         if (this.imageDB && this.imageDB.db) {
             await Promise.all(
@@ -176,7 +183,7 @@ export class SaveCopy {
                                 (await this.e2ee!.decryptObject(
                                     copyright,
                                     key
-                                )) as Record<string, any>
+                                )) as Record<string, unknown>
                         } catch (_e) {
                             // If decryption fails, leave as-is
                         }

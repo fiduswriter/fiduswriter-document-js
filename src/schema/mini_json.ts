@@ -8,7 +8,7 @@ export function toMiniJSON(node: Node): Record<string, unknown> {
     // Adapted from https://github.com/ProseMirror/prosemirror-model/blob/6d970507cd0da48653d3b72f2731a71a144a364b/src/node.js#L340-L351
     const obj: Record<string, unknown> = {type: node.type.name}
     for (const attr in node.attrs) {
-        if (!deepEqual((node.type as any).attrs[attr].default, node.attrs[attr])) {
+        if (!deepEqual(node.type.spec.attrs?.[attr].default, node.attrs[attr])) {
             if (!obj.attrs) {
                 obj.attrs = {}
             }
@@ -38,7 +38,7 @@ function toMiniMarkJSON(mark: Mark): Record<string, unknown> {
     // Adapted from https://github.com/ProseMirror/prosemirror-model/blob/6d970507cd0da48653d3b72f2731a71a144a364b/src/mark.js#L76-L83
     const obj: Record<string, unknown> = {type: mark.type.name}
     for (const attr in mark.attrs) {
-        if (!deepEqual((mark.type as any).attrs[attr].default, mark.attrs[attr])) {
+        if (!deepEqual(mark.type.spec.attrs?.[attr].default, mark.attrs[attr])) {
             if (!obj.attrs) {
                 obj.attrs = {}
             }

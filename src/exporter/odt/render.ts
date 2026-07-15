@@ -1,9 +1,43 @@
 import {escapeText} from "fwtoolkit"
 import {BIBLIOGRAPHY_HEADERS} from "../../schema/i18n.js"
+import type {Contributor, DocSettings, FidusNode, Track} from "../../types.js"
 import {textContent} from "../tools/doc_content.js"
 import {xmlDOM} from "../tools/xml.js"
 import type {XMLElement} from "../tools/xml.js"
 import type {XmlZip} from "../tools/xml_zip.js"
+import type {ODTExporterCitations} from "./citations.js"
+import type {ODTExporterRichtext} from "./richtext.js"
+
+interface Tag {
+    title: string
+    content?: unknown[]
+    block?: XMLElement
+}
+
+interface TagContext {
+    tagName?: string
+    count?: number
+    content?: unknown[]
+    index?: number
+    first?: boolean
+    last?: boolean
+    item?: unknown
+    odd?: boolean
+    even?: boolean
+    [key: string]: unknown
+}
+
+interface CopyrightLicense {
+    title: string
+    url: string
+    start?: number
+}
+
+interface CopyrightSettings {
+    holder?: string
+    year?: number
+    licenses: CopyrightLicense[]
+}
 
 /**
  * Create Zotero bibliography reference mark name for ODT.
@@ -33,7 +67,7 @@ export class ODTExporterRender {
         })
     }
 
-    parseStructuredTags(block: XMLElement, tag: any): void {
+    parseStructuredTags(block: XMLElement, tag: Tag): void {
         let blockText = block.textContent
         const tagName = tag.title
 
@@ -91,7 +125,7 @@ export class ODTExporterRender {
         }
     }
 
-    processLoop(templateXml: string, items: any[], tagName: string, limit: number | null = null): string {
+    processLoop(templateXml: string, items: unknown[], tagName: string, limit: number | null = null): string {
         const effectiveItems = limit !== null ? items.slice(0, limit) : items
         const results: string[] = []
 
@@ -113,24 +147,25 @@ export class ODTExporterRender {
             if (typeof item === "string") {
                 itemXml = itemXml.replace(/%tag/g, escapeText(item))
             } else {
+                const contributor = item as Contributor
                 itemXml = itemXml
                     .replace(
                         /\{?%firstname\}?/g,
-                        escapeText(item.firstname || "")
+                        escapeText(contributor.firstname || "")
                     )
                     .replace(
                         /\{?%lastname\}?/g,
-                        escapeText(item.lastname || "")
+                        escapeText(contributor.lastname || "")
                     )
                     .replace(
                         /\{?%institution\}?/g,
-                        escapeText(item.institution || "")
+                        escapeText(contributor.institution || "")
                     )
-                    .replace(/\{?%email\}?/g, escapeText(item.email || ""))
-                    .replace(/\{?%id_type\}?/g, escapeText(item.id_type || ""))
+                    .replace(/\{?%email\}?/g, escapeText(contributor.email || ""))
+                    .replace(/\{?%id_type\}?/g, escapeText(contributor.id_type || ""))
                     .replace(
                         /\{?%id_value\}?/g,
-                        escapeText(item.id_value || "")
+                        escapeText(contributor.id_value || "")
                     )
             }
 
@@ -147,7 +182,7 @@ export class ODTExporterRender {
         return results.join("")
     }
 
-    processConditionals(text: string, ctx: any): string {
+    processConditionals(text: string, ctx: TagContext): string {
         let result = text
         let changed = true
         while (changed) {
@@ -193,7 +228,7 @@ export class ODTExporterRender {
                 }
                 const innerContent = result.slice(innerStart, pos)
 
-                const conditions: any[] = []
+                const conditions: Array<{expr: string | null; content: string}> = []
                 conditions.push({expr: ifExpr, content: ""})
 
                 const remaining = innerContent
@@ -248,7 +283,7 @@ export class ODTExporterRender {
         return result
     }
 
-    evaluateExpression(expr: string, ctx: any): any {
+    evaluateExpression(expr: string, ctx: TagContext): boolean {
         try {
             // Allow explicit tag name references (e.g., authors.count -> ctx.count)
             if (ctx.tagName) {
@@ -268,10 +303,10 @@ export class ODTExporterRender {
                 (_match, p1, p2, p3) => {
                     let val = ctx[p1]
                     if (p2 !== undefined && val !== undefined) {
-                        val = val[p2]
+                        val = (val as Record<string, unknown>)[p2]
                     }
                     if (p3 !== undefined && val !== undefined) {
-                        val = val[parseInt(p3)]
+                        val = (val as unknown[])[parseInt(p3)]
                     }
                     return JSON.stringify(val)
                 }
@@ -305,7 +340,7 @@ export class ODTExporterRender {
                 return false
             }
 
-            return new Function(`return (${evalExpr})`)()
+            return Boolean(new Function(`return (${evalExpr})`)())
         } catch (e) {
             console.warn("Error evaluating expression:", expr, e)
             return false
@@ -313,9 +348,9 @@ export class ODTExporterRender {
     }
 
     // Define the tags that are to be looked for in the document
-    getTagData(docContent: any, pmBib: any, settings: any): any[] {
-        const tags = docContent.content.map((node: any) => {
-            const tag: any = {}
+    getTagData(docContent: FidusNode, pmBib: FidusNode | false, settings: DocSettings): Tag[] {
+        const tags = docContent.content!.map((node: FidusNode) => {
+            const tag: Tag = {}
             switch (node.type) {
                 case "title":
                     tag.title = "title"
@@ -334,8 +369,8 @@ export class ODTExporterRender {
                     tag.title = node.attrs.id
                     // Return array of structured objects for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map((node: any) => {
-                              const c = node.attrs
+                        ? node.content.map((node: FidusNode) => {
+                              const c = node.attrs as Contributor
                               return {
                                   firstname: c.firstname || "",
                                   lastname: c.lastname || "",
@@ -351,7 +386,7 @@ export class ODTExporterRender {
                     tag.title = node.attrs.id
                     // Return array of tag strings for format with delimiter support
                     tag.content = node.content
-                        ? node.content.map((node: any) => node.attrs.tag)
+                        ? node.content.map((node: FidusNode) => (node.attrs!.tag as string))
                         : []
                     break
             }
@@ -373,17 +408,18 @@ export class ODTExporterRender {
                   ]
                 : [{type: "paragraph", content: [{type: "text", text: " "}]}]
         })
+        const copyright = settings.copyright as CopyrightSettings | undefined
         tags.push({
             title: "@copyright", // The '@' triggers handling as block
             content:
-                settings.copyright && settings.copyright.holder
+                copyright && copyright.holder
                     ? [
                           {
                               type: "paragraph",
                               content: [
                                   {
                                       type: "text",
-                                      text: `© ${settings.copyright.year ? settings.copyright.year : new Date().getFullYear()} ${settings.copyright.holder}`
+                                      text: `© ${copyright.year ? copyright.year : new Date().getFullYear()} ${copyright.holder}`
                                   }
                               ]
                           }
@@ -398,8 +434,8 @@ export class ODTExporterRender {
         tags.push({
             title: "@licenses", // The '@' triggers handling as block
             content:
-                settings.copyright && settings.copyright.licenses.length
-                    ? settings.copyright.licenses.map((license: any) => ({
+                copyright && copyright.licenses.length
+                    ? copyright.licenses.map((license: CopyrightLicense) => ({
                           type: "paragraph",
                           content: [
                               {
@@ -433,8 +469,8 @@ export class ODTExporterRender {
         return tags
     }
 
-    processMultiBlockStructuredTags(blocks: XMLElement[], tags: any[]): void {
-        const tagMap: Record<string, any> = {}
+    processMultiBlockStructuredTags(blocks: XMLElement[], tags: Tag[]): void {
+        const tagMap: Record<string, Tag> = {}
         tags.forEach(tag => {
             if (tag.title) {
                 tagMap[tag.title] = tag
@@ -518,7 +554,7 @@ export class ODTExporterRender {
         blocks: XMLElement[],
         beginIndex: number,
         endIndex: number,
-        tag: any,
+        tag: Tag,
         limit: number | null
     ): void {
         const tagName = tag.title
@@ -586,7 +622,7 @@ export class ODTExporterRender {
         ifIndex: number,
         endIndex: number,
         expr: string,
-        tagMap: Record<string, any>
+        tagMap: Record<string, Tag>
     ): void {
         const ifBlock = blocks[ifIndex]
 
@@ -597,7 +633,7 @@ export class ODTExporterRender {
         }
 
         // Determine which tag the expression references
-        let ctx: any = {count: 0, content: []}
+        let ctx: TagContext = {count: 0, content: []}
         for (const tagName in tagMap) {
             const safeTagName = tagName.replace(
                 /[.*+?^${}()|[\]\\]/g,
@@ -646,7 +682,7 @@ export class ODTExporterRender {
 
     // go through content.xml looking for tags and replace them with the given
     // replacements.
-    render(docContent: any, pmBib: any, settings: any, richtext: any, citations: any): void {
+    render(docContent: FidusNode, pmBib: FidusNode | false, settings: DocSettings, richtext: ODTExporterRichtext, citations: ODTExporterCitations): void {
         const tags = this.getTagData(docContent, pmBib, settings)
         const textEl = this.text as XMLElement
         const textBlocks = textEl.queryAll(["text:p", "text:h"])
@@ -660,7 +696,7 @@ export class ODTExporterRender {
                 return
             }
             const text = block.textContent
-            tags.forEach((tag: any) => {
+            tags.forEach((tag: Tag) => {
                 const tagString = tag.title
                 const hasInlineTag =
                     text.includes(`{${tagString}}`) ||
@@ -680,7 +716,7 @@ export class ODTExporterRender {
             })
 
             // Parse structured tags (BEGIN...END and IF...ENDIF)
-            tags.forEach((tag: any) => {
+            tags.forEach((tag: Tag) => {
                 if (tag.block) {
                     this.parseStructuredTags(tag.block, tag)
                 }
@@ -689,8 +725,8 @@ export class ODTExporterRender {
     }
 
     // Render Tags that only exchange inline content
-    inlineRender(tag: any): void {
-        const blockText = tag.block.textContent
+    inlineRender(tag: Tag): void {
+        const blockText = tag.block!.textContent
         const tagString = tag.title
 
         if (!blockText.includes(`{${tag.title}`)) {
@@ -712,22 +748,23 @@ export class ODTExporterRender {
 
             // Process each item with the format string
             const formattedItems = tag.content
-                .map((item: any) => {
+                .map((item: unknown) => {
                     if (typeof item === "string") {
                         // For tags (simple strings)
                         return format.replace(/%tag/g, item)
                     } else {
                         // For contributors (objects)
+                        const contributor = item as Contributor
                         return format
-                            .replace(/%firstname/g, item.firstname || "")
-                            .replace(/%lastname/g, item.lastname || "")
-                            .replace(/%institution/g, item.institution || "")
-                            .replace(/%email/g, item.email || "")
-                            .replace(/%id_type/g, item.id_type || "")
-                            .replace(/%id_value/g, item.id_value || "")
+                            .replace(/%firstname/g, contributor.firstname || "")
+                            .replace(/%lastname/g, contributor.lastname || "")
+                            .replace(/%institution/g, contributor.institution || "")
+                            .replace(/%email/g, contributor.email || "")
+                            .replace(/%id_type/g, contributor.id_type || "")
+                            .replace(/%id_value/g, contributor.id_value || "")
                     }
                 })
-                .filter((s: string) => s.trim() !== "")
+                .filter(s => s.trim() !== "")
 
             // Handle special delimiters for ODT
             let delimiterXml: string = delimiter
@@ -741,16 +778,16 @@ export class ODTExporterRender {
             fullText = blockText.replace(formatRegex, replacement)
         } else {
             // Fall back to simple string replacement (backward compatible)
-            let contentStr: any = tag.content || ""
+            let contentStr: string | unknown[] = tag.content || ""
             if (Array.isArray(contentStr)) {
                 if (contentStr.length === 0) {
                     contentStr = ""
                 } else if (typeof contentStr[0] === "string") {
-                    contentStr = contentStr.join(", ")
+                    contentStr = (contentStr as string[]).join(", ")
                 } else {
                     // Contributors - backward compatible formatting
-                    contentStr = contentStr
-                        .map((item: any) => {
+                    contentStr = (contentStr as Contributor[])
+                        .map((item: Contributor) => {
                             const nameParts: string[] = []
                             let affiliation: string | false = false
                             if (item.firstname) {
@@ -782,7 +819,7 @@ export class ODTExporterRender {
                 }
             }
             const texts = blockText.split(`{${tagString}}`)
-            fullText = texts[0] + contentStr + texts[1]
+            fullText = texts[0] + (contentStr as string) + texts[1]
         }
 
         // Escape text but restore ODT XML line break tags
@@ -797,21 +834,21 @@ export class ODTExporterRender {
     }
 
     // Render tags that exchange text blocks
-    blockRender(tag: any, richtext: any, citations: any): void {
-        const section = tag.block.hasAttribute("text:style-name")
-            ? tag.block.getAttribute("text:style-name")
+    blockRender(tag: Tag, richtext: ODTExporterRichtext, citations: ODTExporterCitations): void {
+        const section = tag.block!.hasAttribute("text:style-name")
+            ? (tag.block!.getAttribute("text:style-name") as string)
             : "Text_20_body"
         const outXML = tag.content
             ? tag.content
-                  .map((content: any, contentIndex: number) =>
+                  .map((content: unknown, contentIndex: number) =>
                       richtext.run(
-                          content,
+                          content as FidusNode,
                           {
-                              citationType: citations.citFm.citationType,
+                              citationType: citations.citFm?.citationType || "",
                               section,
                               tag: tag.title.slice(1)
                           },
-                          tag,
+                          tag as unknown as FidusNode,
                           contentIndex
                       )
                   )

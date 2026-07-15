@@ -1,7 +1,7 @@
 import download from "downloadjs"
 
 import {gettext, shortFileTitle} from "fwtoolkit"
-import type {BibDB, CSL, ExportDoc, FidusNode, ImageDB} from "../../types.js"
+import type {BibDB, CSL, Contributor, ExportDoc, ExportMetadata, FidusNode, ImageDB} from "../../types.js"
 import type {ProgressCallback} from "../tools/progress.js"
 import {fixTables, removeHidden, textContent} from "../tools/doc_content.js"
 import {createSlug} from "../tools/file.js"
@@ -35,8 +35,8 @@ export class ODTExporter {
     csl: CSL
     templateBlob?: Blob
 
-    pmCits: any
-    docContent: any
+    pmCits: FidusNode[] | false
+    docContent: FidusNode
     docTitle: string
     mimeType: string
     progressCallback?: ProgressCallback
@@ -139,18 +139,18 @@ export class ODTExporter {
             })
     }
 
-    getBaseMetadata(): any {
-        const contributors = this.docContent.content.reduce(
-            (contributors: any[], part: any) => {
+    getBaseMetadata(): ExportMetadata {
+        const contributors = this.docContent.content!.reduce(
+            (contributors: Contributor[], part: FidusNode) => {
                 if (
                     part.type === "contributors_part" &&
-                    part.attrs.metadata &&
+                    part.attrs?.metadata &&
                     part.content
                 ) {
                     return contributors.concat(
-                        part.content.map((node: any) => ({
+                        part.content.map((node: FidusNode) => ({
                             ...node.attrs,
-                            role: part.attrs.metadata
+                            role: part.attrs!.metadata as string
                         }))
                     )
                 } else {
@@ -160,18 +160,19 @@ export class ODTExporter {
             []
         )
         return {
-            authors: contributors.filter((c: any) => c.role === "authors"),
+            authors: contributors.filter((c: Contributor) => c.role === "authors"),
             contributors,
-            keywords: this.docContent.content.reduce(
-                (keywords: string[], part: any) => {
+            keywords: this.docContent.content!.reduce(
+                (keywords: string[], part: FidusNode) => {
                     if (
                         part.type === "tags_part" &&
-                        part.attrs.metadata === "keywords" &&
+                        part.attrs?.metadata === "keywords" &&
                         part.content
                     ) {
                         return keywords.concat(
                             part.content.map(
-                                (keywordNode: any) => keywordNode.attrs.tag
+                                (keywordNode: FidusNode) =>
+                                    keywordNode.attrs!.tag as string
                             )
                         )
                     } else {
@@ -180,7 +181,7 @@ export class ODTExporter {
                 },
                 []
             ),
-            title: textContent(this.docContent.content[0]),
+            title: textContent(this.docContent.content![0]),
             language: this.doc.settings.language,
             citationStyle: this.doc.settings.citationstyle
         }

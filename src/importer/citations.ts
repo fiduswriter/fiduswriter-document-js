@@ -3,6 +3,7 @@
  */
 
 import type {BibDB, FidusNode} from "../types.js"
+import type {EntryObject} from "bibliojson"
 
 interface CitationEntry {
     entry_key: string
@@ -22,15 +23,15 @@ interface CitationMetadata {
     [key: string]: unknown
 }
 
-interface CitationResult {
+export interface CitationResult {
     isCitation: boolean
-    entries: Record<string, CitationEntry>
+    entries?: Record<string, CitationEntry> | Record<number, EntryObject>
     metadata?: CitationMetadata[]
 }
 
 function mergeBibEntries(
-    entries: Record<string, CitationEntry>,
-    bibliography: Record<string, CitationEntry>,
+    entries: Record<string, CitationEntry> | Record<number, EntryObject>,
+    bibliography: Record<string, unknown>,
     bibDB: BibDB | false
 ): Record<string, string> {
     const keyMap: Record<string, string> = {}
@@ -42,21 +43,28 @@ function mergeBibEntries(
         const entryKey = entry.entry_key
 
         // Check whether this entry_key is already in the bibliography.
-        const existing = Object.entries(bibliography).find(
-            ([, bibEntry]) => bibEntry && bibEntry.entry_key === entryKey
-        )
+        const existing = Object.entries(bibliography).find(([, bibEntry]) => {
+            if (
+                !bibEntry ||
+                typeof bibEntry !== "object" ||
+                Array.isArray(bibEntry)
+            ) {
+                return false
+            }
+            return (bibEntry as Record<string, unknown>).entry_key === entryKey
+        })
 
         if (existing) {
             keyMap[entryKey] = existing[0]
         } else {
             if (bibDB && Object.keys(entry.fields).length === 0) {
                 // Jabref citations don't contain any fields. Look up values in bibDB instead
-                const bibEntry = (Object.values(bibDB.db) as Array<Record<string, any>>).find(
+                const bibEntry = Object.values(bibDB.db).find(
                     bibEntry => bibEntry && bibEntry.entry_key === entryKey
                 )
                 if (bibEntry) {
                     entry.fields = JSON.parse(JSON.stringify(bibEntry.fields))
-                    entry.bib_type = bibEntry.bib_type as string
+                    entry.bib_type = bibEntry.bib_type
                 }
             }
             // TODO: add for jabref citations - according to entry_key import from user
@@ -72,7 +80,7 @@ function mergeBibEntries(
 
 export function citationResultToNode(
     result: CitationResult,
-    bibliography: Record<string, any>,
+    bibliography: Record<string, unknown>,
     bibDB: BibDB | false = false
 ): FidusNode | null {
     if (!result || !result.isCitation || !result.entries) {

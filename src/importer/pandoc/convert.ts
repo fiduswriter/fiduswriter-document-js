@@ -1,11 +1,125 @@
 import {parseCSL} from "bibliojson"
+import type {EntryObject} from "bibliojson"
 
 import {applyAnnotation, applyMarkToNodes, mergeTextNodes} from "./helpers.js"
 import {gettext} from "fwtoolkit"
 import type {BibDBEntry, FidusDoc, FidusNode, ImageDBEntry} from "../../types.js"
 
+type PandocAttr = [string, string[], [string, string][]]
+
+type PandocQuoteType = {t: "SingleQuote"} | {t: "DoubleQuote"}
+
+type PandocMathType = {t: string}
+
+interface PandocCitation {
+    citationId: string
+    citationPrefix: PandocInline[]
+    citationSuffix: PandocInline[]
+    citationMode: {t: string}
+    citationNoteNum: number
+    citationHash: number
+}
+
+type PandocMetaValue =
+    | {t: "MetaInlines"; c: PandocInline[]}
+    | {t: "MetaBlocks"; c: PandocBlock[]}
+    | {t: "MetaList"; c: PandocMetaValue[]}
+    | {t: "MetaString"; c: string}
+    | {t: "MetaMap"; c: Record<string, PandocMetaValue>}
+    | {t: "MetaBool"; c: boolean}
+    | {t: string; c?: unknown}
+
+type PandocInline =
+    | {t: "Str"; c: string}
+    | {t: "Space"}
+    | {t: "SoftBreak"}
+    | {t: "LineBreak"}
+    | {
+          t:
+              | "Emph"
+              | "Strong"
+              | "Underline"
+              | "Strikeout"
+              | "SmallCaps"
+              | "Superscript"
+              | "Subscript"
+          c: PandocInline[]
+      }
+    | {t: "Code"; c: [PandocAttr, string]}
+    | {t: "Link"; c: [PandocAttr, PandocInline[], [string, string]]}
+    | {t: "Image"; c: [PandocAttr, PandocInline[], [string, string]]}
+    | {t: "Note"; c: PandocBlock[]}
+    | {t: "Math"; c: [PandocMathType, string]}
+    | {t: "Quoted"; c: [PandocQuoteType, PandocInline[]]}
+    | {t: "RawInline"; c: [string, string]}
+    | {t: "Cite"; c: [PandocCitation[], PandocInline[]]}
+    | {t: "Span"; c: [PandocAttr, PandocInline[]]}
+
+type PandocListAttributes = [number, {t: string}, {t: string}]
+
+type PandocDefinitionItem = [PandocInline[], PandocBlock[][]]
+
+type PandocCaption = [PandocInline[], PandocBlock[]]
+
+type PandocRow = [PandocAttr, PandocCell[]]
+type PandocCell = [PandocAttr, unknown, number, number, PandocBlock[]]
+type PandocTableHead = [PandocAttr, PandocRow[]]
+type PandocTableBody = [PandocAttr, number, PandocRow[], PandocRow[]]
+type PandocTableFoot = [PandocAttr, PandocRow[]]
+type PandocTableContent = [
+    PandocAttr,
+    PandocCaption,
+    unknown[],
+    PandocTableHead,
+    PandocTableBody[],
+    PandocTableFoot
+]
+type PandocFigureContent = [PandocAttr, PandocCaption, PandocBlock[]]
+
+type PandocBlock =
+    | {t: "CodeBlock"; c: [PandocAttr, string]}
+    | {t: "Div"; c: [PandocAttr, PandocBlock[]]}
+    | {t: "Para" | "Plain"; c: PandocInline[]}
+    | {t: "Header"; c: [number, PandocAttr, PandocInline[]]}
+    | {t: "BlockQuote"; c: PandocBlock[]}
+    | {t: "BulletList"; c: PandocBlock[][]}
+    | {t: "DefinitionList"; c: PandocDefinitionItem[]}
+    | {t: "OrderedList"; c: [PandocListAttributes, PandocBlock[][]]}
+    | {t: "Table"; c: PandocTableContent}
+    | {t: "Figure"; c: PandocFigureContent}
+    | {t: "RawBlock"; c: [string, string]}
+    | {t: "Null"}
+
+interface PandocDoc {
+    "pandoc-api-version": number[]
+    meta?: Record<string, PandocMetaValue>
+    blocks: PandocBlock[]
+}
+
+function isStr(inline: PandocInline): inline is PandocInline & {t: "Str"; c: string} {
+    return inline.t === "Str"
+}
+
+function isNote(inline: PandocInline): inline is PandocInline & {t: "Note"; c: PandocBlock[]} {
+    return inline.t === "Note"
+}
+
+function inlineText(inlines: PandocInline[]): string {
+    return inlines
+        .map(inline => {
+            if (inline.t === "Str") {
+                return inline.c
+            }
+            if (inline.t === "Space") {
+                return " "
+            }
+            return ""
+        })
+        .join("")
+}
+
 export class PandocConvert {
-    doc: any
+    doc: PandocDoc
     importId: string
     template: {content: FidusDoc}
     bibliography: Record<string, BibDBEntry>
@@ -14,7 +128,7 @@ export class PandocConvert {
     SMALL_IMAGE_THRESHOLD: number
 
     constructor(
-        doc: any,
+        doc: PandocDoc,
         importId: string,
         template: {content: FidusDoc},
         bibliography: Record<string, BibDBEntry>
@@ -26,17 +140,43 @@ export class PandocConvert {
 
         this.images = {}
 
-        this.language = this.doc.meta?.lang?.c?.[0]?.c || "en-US"
+        this.language = this.getLanguage()
 
         this.SMALL_IMAGE_THRESHOLD = 1.0 // Smaller images will be discarded (in inches)
     }
 
-    init(): {content: FidusDoc; settings: Record<string, any>} {
+    private getLanguage(): string {
+        const lang = this.doc.meta?.lang
+        if (lang?.t === "MetaInlines" && lang.c[0]?.t === "Str") {
+            return lang.c[0].c
+        }
+        return "en-US"
+    }
+
+    private metaInlines(key: string): PandocInline[] {
+        const value = this.doc.meta?.[key]
+        return value && value.t === "MetaInlines" ? value.c : []
+    }
+
+    private metaBlocks(key: string): PandocBlock[] {
+        const value = this.doc.meta?.[key]
+        return value && value.t === "MetaBlocks" ? value.c : []
+    }
+
+    private metaList(key: string): PandocMetaValue[] {
+        const value = this.doc.meta?.[key]
+        return value && value.t === "MetaList" ? value.c : []
+    }
+
+    init(): {content: FidusDoc; settings: Record<string, unknown>} {
         try {
             this.validatePandocFormat()
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Pandoc format validation failed:", error)
-            throw new Error("Invalid Pandoc document format: " + error.message)
+            throw new Error(
+                "Invalid Pandoc document format: " +
+                    (error instanceof Error ? error.message : String(error))
+            )
         }
 
         return {
@@ -74,7 +214,7 @@ export class PandocConvert {
         // Basic validation of block structure
         if (
             !this.doc.blocks.every(
-                (block: any) =>
+                block =>
                     block &&
                     typeof block === "object" &&
                     typeof block.t === "string" &&
@@ -103,19 +243,20 @@ export class PandocConvert {
         document.content.push({
             type: "title",
             content: this.convertInlines(
-                this.doc.meta?.title?.c || [{t: "Str", c: "Untitled"}]
+                this.metaInlines("title") || [{t: "Str", c: "Untitled"}]
             )
         })
         // Add subtitle if present
-        if (this.doc.meta?.subtitle?.c) {
+        const subtitleInlines = this.metaInlines("subtitle")
+        if (subtitleInlines.length) {
             const templatePart = templateParts.find(
-                (part: any) => part.attrs.metadata === "subtitle"
+                part => part.attrs?.metadata === "subtitle"
             )
             document.content.push({
                 type: "heading_part",
                 attrs: {
-                    title: templatePart?.attrs?.title || "Subtitle",
-                    id: templatePart?.attrs?.id || "subtitle",
+                    title: (templatePart?.attrs?.title as string) || "Subtitle",
+                    id: (templatePart?.attrs?.id as string) || "subtitle",
                     metadata: "subtitle"
                 },
                 content: [
@@ -124,25 +265,26 @@ export class PandocConvert {
                         attrs: {
                             id: "H" + Math.random().toString(36).substr(2, 7)
                         },
-                        content: this.convertInlines(this.doc.meta.subtitle.c)
+                        content: this.convertInlines(subtitleInlines)
                     }
                 ]
             })
         }
 
         // Add authors if present
-        if (this.doc.meta?.author?.c) {
+        const authorMeta = this.metaList("author")
+        if (authorMeta.length) {
             const templatePart = templateParts.find(
-                (part: any) => part.attrs.metadata === "authors"
+                part => part.attrs?.metadata === "authors"
             )
             document.content.push({
                 type: "contributors_part",
                 attrs: {
-                    title: templatePart?.attrs?.title || "Authors",
-                    id: templatePart?.attrs?.id || "authors",
+                    title: (templatePart?.attrs?.title as string) || "Authors",
+                    id: (templatePart?.attrs?.id as string) || "authors",
                     metadata: "authors"
                 },
-                content: this.doc.meta.author.c.map((author: any) => ({
+                content: authorMeta.map(author => ({
                     type: "contributor",
                     attrs: this.convertContributor(author)
                 }))
@@ -150,30 +292,33 @@ export class PandocConvert {
         }
 
         // Add abstract if present
-        if (this.doc.meta?.abstract?.c) {
+        const abstractBlocks = this.metaBlocks("abstract")
+        if (abstractBlocks.length) {
             const templatePart = templateParts.find(
-                (part: any) => part.attrs.metadata === "abstract"
+                part => part.attrs?.metadata === "abstract"
             )
             document.content.push({
                 type: "richtext_part",
                 attrs: {
-                    title: templatePart?.attrs?.title || gettext("Abstract"),
-                    id: templatePart?.attrs?.id || "abstract",
+                    title:
+                        (templatePart?.attrs?.title as string) ||
+                        gettext("Abstract"),
+                    id: (templatePart?.attrs?.id as string) || "abstract",
                     metadata: "abstract"
                 },
-                content: this.convertBlocks(this.doc.meta.abstract.c)
+                content: this.convertBlocks(abstractBlocks)
             })
         }
 
         const templatePart = templateParts.find(
-            (part: any) => !part.attrs.metadata && part.type === "richtext_part"
+            part => !part.attrs?.metadata && part.type === "richtext_part"
         )
         // Add main body content
         document.content.push({
             type: "richtext_part",
             attrs: {
-                title: templatePart?.attrs?.title || "Body",
-                id: templatePart?.attrs?.id || "body",
+                title: (templatePart?.attrs?.title as string) || "Body",
+                id: (templatePart?.attrs?.id as string) || "body",
                 marks: ["strong", "em", "link"]
             },
             content: this.convertBlocks(this.doc.blocks)
@@ -182,7 +327,7 @@ export class PandocConvert {
         return document
     }
 
-    convertContributor(author: any): Record<string, string> {
+    convertContributor(author: PandocMetaValue): Record<string, string> {
         const attrs: Record<string, string> = {
             firstname: "",
             lastname: "",
@@ -191,41 +336,45 @@ export class PandocConvert {
         }
 
         // Extract name components
-        if (author.c) {
-            const textParts = author.c
-                .filter((part: any) => part.t === "Str")
-                .map((part: any) => part.c)
+        if (author.t === "MetaInlines" && author.c) {
+            const textParts = author.c.filter(isStr).map(part => part.c)
 
             if (textParts.length > 1) {
-                attrs.lastname = textParts.pop()
+                const lastName = textParts.pop()
+                if (lastName !== undefined) {
+                    attrs.lastname = lastName
+                }
                 attrs.firstname = textParts.join(" ")
             } else if (textParts.length === 1) {
                 attrs.lastname = textParts[0]
             }
 
             // Extract email from notes if present
-            const note = author.c.find((part: any) => part.t === "Note")
-            if (note) {
-                attrs.email = this.convertInlines(note.c[0].c)
-                    .map((node: any) => node.text)
-                    .join("")
+            const note = author.c.find(isNote)
+            if (note && note.c.length) {
+                const firstBlock = note.c[0]
+                if (firstBlock.t === "Para") {
+                    attrs.email = this.convertInlines(firstBlock.c)
+                        .map(node => node.text)
+                        .join("")
+                }
             }
         }
 
         return attrs
     }
 
-    convertBlocks(blocks: any[]): FidusNode[] {
+    convertBlocks(blocks: PandocBlock[] | undefined): FidusNode[] {
         if (!blocks) {
             return []
         }
         return blocks
-            .map((block: any) => this.convertBlock(block))
+            .map(block => this.convertBlock(block))
             .flat()
-            .filter((block: FidusNode | null): block is FidusNode => Boolean(block))
+            .filter((block): block is FidusNode => Boolean(block))
     }
 
-    convertBlock(block: any): FidusNode[] {
+    convertBlock(block: PandocBlock): FidusNode[] {
         switch (block.t) {
             case "CodeBlock": {
                 const [attrs, code] = block.c
@@ -239,16 +388,12 @@ export class PandocConvert {
                 let title = ""
                 let category = ""
 
-                const captionPair = keyValuePairs.find(
-                    (pair: any[]) => pair[0] === "caption"
-                )
+                const captionPair = keyValuePairs.find(pair => pair[0] === "caption")
                 if (captionPair) {
                     title = captionPair[1]
                 }
 
-                const categoryPair = keyValuePairs.find(
-                    (pair: any[]) => pair[0] === "category"
-                )
+                const categoryPair = keyValuePairs.find(pair => pair[0] === "category")
                 if (categoryPair) {
                     category = categoryPair[1]
                 } else if (title) {
@@ -273,7 +418,7 @@ export class PandocConvert {
             }
             case "Div":
                 // Handle special figure containers
-                if (block.attr?.classes?.includes("figure")) {
+                if (block.c[0][1].includes("figure")) {
                     return [this.convertFigure(block)]
                 }
                 // Ignore otherwise. Could be bibliography
@@ -283,7 +428,7 @@ export class PandocConvert {
             case "Plain": {
                 // Process each inline, splitting into paragraphs and figures
                 const blocks: FidusNode[] = []
-                let currentInlines: any[] = []
+                let currentInlines: PandocInline[] = []
                 for (const inline of block.c) {
                     if (inline.t === "Image") {
                         // Convert accumulated inlines to a paragraph
@@ -337,24 +482,24 @@ export class PandocConvert {
                 return [
                     {
                         type: "bullet_list",
-                        content: block.c.map((item: any) => ({
+                        content: block.c.map(item => ({
                             type: "list_item",
                             content: this.convertBlocks(item)
                         }))
                     }
                 ]
             case "DefinitionList": {
-                return block.c.flatMap((item: any) => [
+                return block.c.flatMap(item => [
                     {
                         type: "paragraph",
                         content: applyMarkToNodes(
-                            this.convertInlines(item.term),
+                            this.convertInlines(item[0]),
                             "strong"
                         )
                     },
                     {
                         type: "bullet_list",
-                        content: item.definitions.map((def: any) => ({
+                        content: item[1].map(def => ({
                             type: "list_item",
                             content: this.convertBlocks(def)
                         }))
@@ -368,7 +513,7 @@ export class PandocConvert {
                         attrs: {
                             order: block.c[0][0]
                         },
-                        content: block.c[1].map((item: any) => ({
+                        content: block.c[1].map(item => ({
                             type: "list_item",
                             content: this.convertBlocks(item)
                         }))
@@ -384,18 +529,18 @@ export class PandocConvert {
         }
     }
 
-    convertInlines(inlines: any[]): FidusNode[] {
+    convertInlines(inlines: PandocInline[] | undefined): FidusNode[] {
         if (!inlines) {
             return []
         }
         // Convert each inline element, flatten, and merge adjacent text nodes with same marks
         const convertedNodes = inlines
-            .map((inline: any) => this.convertInline(inline))
-            .filter((inline: FidusNode | FidusNode[] | null): inline is FidusNode | FidusNode[] => Boolean(inline))
+            .map(inline => this.convertInline(inline))
+            .filter((node): node is FidusNode | FidusNode[] => Boolean(node))
             .flat()
 
         // Remove hard breaks at start and end
-        const filteredNodes = convertedNodes.filter((node: any, index: any, array: any) => {
+        const filteredNodes = convertedNodes.filter((node, index, array) => {
             if (node.type === "hard_break") {
                 // Remove if first or last node
                 if (index === 0 || index === array.length - 1) {
@@ -408,7 +553,7 @@ export class PandocConvert {
         return mergeTextNodes(filteredNodes)
     }
 
-    convertInline(inline: any): FidusNode | FidusNode[] | null {
+    convertInline(inline: PandocInline): FidusNode | FidusNode[] | null {
         if (!inline) {
             return null
         }
@@ -419,9 +564,7 @@ export class PandocConvert {
             case "Image": {
                 const imagePath = inline.c[2][0]
 
-                const widthInfo = inline.c[0][2].find(
-                    (attr: any[]) => attr[0] === "width"
-                )
+                const widthInfo = inline.c[0][2].find(attr => attr[0] === "width")
 
                 if (widthInfo) {
                     const width = parseFloat(widthInfo[1]) // in inches
@@ -459,6 +602,7 @@ export class PandocConvert {
                 let category = "none"
                 if (
                     caption.length &&
+                    caption[0].t === "Str" &&
                     ["Figure", "Table", "Photo"].includes(caption[0].c)
                 ) {
                     category = caption[0].c.toLowerCase()
@@ -544,16 +688,17 @@ export class PandocConvert {
                 )
             }
             case "Note": {
+                const firstBlock = inline.c[0]
                 if (
                     inline.c.length === 1 &&
-                    inline.c[0].t === "Para" &&
-                    inline.c[0].c.length === 2 &&
-                    inline.c[0].c[0].t === "Cite" &&
-                    inline.c[0].c[1].t === "Str" &&
-                    inline.c[0].c[1].c === "."
+                    firstBlock.t === "Para" &&
+                    firstBlock.c.length === 2 &&
+                    firstBlock.c[0].t === "Cite" &&
+                    firstBlock.c[1].t === "Str" &&
+                    firstBlock.c[1].c === "."
                 ) {
                     // This is a citation note rendered as a footnote.
-                    return this.convertInline(inline.c[0].c[0])
+                    return this.convertInline(firstBlock.c[0])
                 }
 
                 return {
@@ -583,18 +728,18 @@ export class PandocConvert {
                 ]
                 return mergeTextNodes(quotedNodes)
             }
-            case "RawBlock":
             case "RawInline": {
+                const [format, text] = inline.c
                 return [
                     {
                         type: "text",
-                        text: `[RAW CONTENT: ${inline.text}]`,
+                        text: `[RAW CONTENT: ${text}]`,
                         marks: [
                             {
                                 type: "annotation_tag",
                                 attrs: {
                                     type: "raw",
-                                    key: inline.format,
+                                    key: format,
                                     value: ""
                                 }
                             }
@@ -619,35 +764,38 @@ export class PandocConvert {
                         const lastBrace = jsonStr.lastIndexOf("}") + 1
                         const cslData = JSON.parse(
                             jsonStr.substring(0, lastBrace)
-                        )
+                        ) as {
+                            citationItems: Array<{
+                                itemData: Record<string, unknown> & {id?: string}
+                                prefix?: string
+                                locator?: string
+                            }>
+                        }
 
                         // Create citation references
-                        const citations = cslData.citationItems.map(
-                            (item: any) => {
-                                const id = String(item.itemData.id)
+                        const citations = cslData.citationItems.map(item => {
+                            const id = String(item.itemData.id)
 
-                                // find in bibliography
-                                let [bibKey] =
-                                    Object.entries(this.bibliography).find(
-                                        ([, entry]: [string, any]) =>
-                                            entry.entry_key === id
-                                    ) || []
-                                if (!bibKey) {
-                                    // Not yet present in bibliography. We'll parse the CSL data and add it.
-                                    const parseData = parseCSL({
-                                        [id]: item.itemData
-                                    })
-                                    const bibEntry = parseData["1"]
-                                    bibKey = `${Object.keys(this.bibliography).length + 1}`
-                                    this.bibliography[bibKey] = bibEntry as any
-                                }
-                                return {
-                                    id: bibKey,
-                                    prefix: item.prefix || "",
-                                    locator: item.locator || ""
-                                }
+                            // find in bibliography
+                            let [bibKey] =
+                                Object.entries(this.bibliography).find(
+                                    ([, entry]) => entry.entry_key === id
+                                ) || []
+                            if (!bibKey) {
+                                // Not yet present in bibliography. We'll parse the CSL data and add it.
+                                const parseData = parseCSL({
+                                    [id]: item.itemData
+                                } as Parameters<typeof parseCSL>[0])
+                                const bibEntry = parseData["1"] as EntryObject
+                                bibKey = `${Object.keys(this.bibliography).length + 1}`
+                                this.bibliography[bibKey] = bibEntry as BibDBEntry
                             }
-                        )
+                            return {
+                                id: bibKey,
+                                prefix: item.prefix || "",
+                                locator: item.locator || ""
+                            }
+                        })
 
                         return {
                             type: "citation",
@@ -669,8 +817,8 @@ export class PandocConvert {
         }
     }
 
-    extractImageWidth(attrs: any[]): number {
-        const widthAttr = attrs.find((attr: any[]) => attr[0] === "width")
+    extractImageWidth(attrs: PandocAttr[2]): number {
+        const widthAttr = attrs.find(attr => attr[0] === "width")
         if (widthAttr) {
             // Convert inch measurement to percentage (assuming max width is 8.5 inches)
             const widthInInches = parseFloat(widthAttr[1])
@@ -679,8 +827,8 @@ export class PandocConvert {
         return 100 // default width
     }
 
-    convertTable(table: any): FidusNode {
-        const attrs: Record<string, any> = {
+    convertTable(table: PandocBlock & {t: "Table"; c: PandocTableContent}): FidusNode {
+        const attrs: Record<string, unknown> = {
             width: 100,
             aligned: "center",
             layout: "fixed"
@@ -719,7 +867,7 @@ export class PandocConvert {
 
         // Extract table attributes
         const tableAttrs = table.c[0][2]
-        tableAttrs.forEach((attr: any[]) => {
+        tableAttrs.forEach(attr => {
             if (attr[0] === "width") {
                 attrs.width = parseInt(attr[1])
             } else if (attr[0] === "aligned") {
@@ -732,7 +880,7 @@ export class PandocConvert {
         const rows = table.c[3][1]
             .concat(
                 table.c[4]
-                    .map((tableBody: any) => tableBody[2].concat(tableBody[3]))
+                    .map(tableBody => tableBody[2].concat(tableBody[3]))
                     .flat()
             )
             .concat(table.c[5][1])
@@ -748,9 +896,9 @@ export class PandocConvert {
                 },
                 {
                     type: "table_body",
-                    content: rows.map((row: any) => ({
+                    content: rows.map(row => ({
                         type: "table_row",
-                        content: row[1].map((cell: any) => {
+                        content: row[1].map(cell => {
                             const cellContent = this.convertBlocks(cell[4])
                             if (cellContent.length === 0) {
                                 cellContent.push({type: "paragraph"})
@@ -792,9 +940,9 @@ export class PandocConvert {
         }
     }
 
-    convertFigure(figure: any): FidusNode {
-        const caption = figure.c[1]?.[1] || []
-        const attrs: Record<string, any> = {
+    convertFigure(figure: PandocBlock & {t: "Figure"; c: PandocFigureContent}): FidusNode {
+        const caption = figure.c[1][1] || []
+        const attrs: Record<string, unknown> = {
             aligned: "center",
             width: 100,
             figureCategory: "none",
@@ -803,7 +951,7 @@ export class PandocConvert {
 
         // Extract figure attributes
         const figureAttrs = figure.c[0][2]
-        figureAttrs.forEach((attr: any[]) => {
+        figureAttrs.forEach(attr => {
             if (attr[0] === "width") {
                 attrs.width = parseInt(attr[1])
             } else if (attr[0] === "aligned") {
@@ -813,7 +961,11 @@ export class PandocConvert {
             }
         })
 
-        const imagePath = figure.c[2][0].c[0].c[2][0]
+        let imagePath = ""
+        const firstContentBlock = figure.c[2][0]
+        if (firstContentBlock.t === "Para" && firstContentBlock.c[0]?.t === "Image") {
+            imagePath = firstContentBlock.c[0].c[2][0]
+        }
         const imageId = Math.floor(Math.random() * 1000000)
         const imageTitle = imagePath.split("/").pop()
 
@@ -846,16 +998,16 @@ export class PandocConvert {
                 {
                     type: "figure_caption",
                     content: this.convertBlocks(caption)
-                        .map((block: FidusNode) => block.content || [])
+                        .map(block => block.content || [])
                         .flat()
                 }
             ]
         }
     }
 
-    convertCitation(cite: any): FidusNode | null {
+    convertCitation(cite: PandocInline & {t: "Cite"; c: [PandocCitation[], PandocInline[]]}): FidusNode | null {
         const references = cite.c[0]
-            .map((ref: any) => {
+            .map(ref => {
                 // Handle empty bibliography case
                 if (
                     !this.bibliography ||
@@ -865,8 +1017,7 @@ export class PandocConvert {
                 }
 
                 const foundEntry = Object.entries(this.bibliography).find(
-                    ([, definition]: [string, any]) =>
-                        definition.entry_key === ref.citationId
+                    ([, definition]) => definition.entry_key === ref.citationId
                 )
 
                 if (!foundEntry) {
@@ -879,15 +1030,11 @@ export class PandocConvert {
                 }
                 return {
                     id: bibId,
-                    prefix: ref.citationPrefix
-                        .map((prefix: any) => prefix.c)
-                        .join(" "),
-                    locator: ref.citationSuffix
-                        .map((suffix: any) => suffix.c)
-                        .join(" ")
+                    prefix: inlineText(ref.citationPrefix),
+                    locator: inlineText(ref.citationSuffix)
                 }
             })
-            .filter((ref: any) => ref)
+            .filter((ref): ref is {id: string; prefix: string; locator: string} => Boolean(ref))
 
         if (!references.length) {
             return null

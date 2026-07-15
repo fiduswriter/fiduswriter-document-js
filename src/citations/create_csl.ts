@@ -12,26 +12,51 @@
 
 import {CSL} from "citeproc-plus/dist/index.js"
 
+interface CompactCslNode {
+    n?: string
+    a?: Record<string, unknown>
+    c?: Array<string | CompactCslNode>
+}
+
+interface ExpandedCslNode {
+    name: string
+    attrs: Record<string, unknown>
+    children: Array<string | ExpandedCslNode>
+}
+
 /**
  * Expand a compact CSL node ({ n, a, c } format) to the full format
  * ({ name, attrs, children }) expected by citeproc-js.
  * Mirrors the private e() function inside citeproc-plus.
  */
-function expandCslNode(node: any): any {
-    if (node.name) return node // already in full format
-    const result: any = {
-        name: node.n,
-        attrs: node.a ?? {},
-        children: [] as any[]
+function expandCslNode(node: CompactCslNode | ExpandedCslNode): ExpandedCslNode {
+    if ("name" in node) {
+        return node as ExpandedCslNode
     }
-    if (node.c) {
-        result.children = node.c.map((child: any) =>
+    const compact = node as CompactCslNode
+    const result: ExpandedCslNode = {
+        name: compact.n || "",
+        attrs: compact.a ?? {},
+        children: []
+    }
+    if (compact.c) {
+        result.children = compact.c.map(child =>
             typeof child === "string" ? child : expandCslNode(child)
         )
-    } else if (node.n === "term") {
+    } else if (compact.n === "term") {
         result.children = [""]
     }
     return result
+}
+
+interface CSLInstance {
+    styles: Record<string, object>
+    getStyle: (nameOrStyle: string | object) => Promise<object | null>
+    getLocale: (
+        style: {attrs?: Record<string, unknown>} | undefined,
+        lang: string,
+        forceLocale?: string
+    ) => Promise<object>
 }
 
 /**
@@ -50,7 +75,9 @@ export type StyleMap = Record<string, object | string>
  * which in turn uses static `import` statements for `.csljson` files that
  * Node.js cannot load as ES modules (unknown file extension).
  */
-export async function createCSL(styles: StyleMap = {}): Promise<InstanceType<typeof CSL>> {
+export async function createCSL(
+    styles: StyleMap = {}
+): Promise<InstanceType<typeof CSL>> {
     const csl = new CSL()
 
     // ── Resolve styles ────────────────────────────────────────────────────────
@@ -67,18 +94,22 @@ export async function createCSL(styles: StyleMap = {}): Promise<InstanceType<typ
         })
     )
 
-    Object.assign((csl as any).styles, resolvedStyles)
+    Object.assign((csl as CSLInstance).styles, resolvedStyles)
 
     // Override getStyle to serve from our resolved map, bypassing the
     // citeproc-plus CDN / bundle fetch.  When the argument is already a style
     // object (passed through by JATS / HTML exporters that clone and mutate
     // the style before handing it to FormatCitations) return it as-is,
     // mirroring the passthrough in citeproc-plus's own getStyle.
-    ;(csl as any).getStyle = (nameOrStyle: string | object): Promise<object | null> => {
+    ;(csl as CSLInstance).getStyle = (
+        nameOrStyle: string | object
+    ): Promise<object | null> => {
         if (typeof nameOrStyle === "object") {
             return Promise.resolve(nameOrStyle)
         }
-        return Promise.resolve((csl as any).styles[nameOrStyle] ?? null)
+        return Promise.resolve(
+            (csl as CSLInstance).styles[nameOrStyle] ?? null
+        )
     }
 
     // ── Node.js locale override ───────────────────────────────────────────────
@@ -109,7 +140,9 @@ export async function createCSL(styles: StyleMap = {}): Promise<InstanceType<typ
 
             // Extract  import varName from "./assets/HASH.csljson"  entries.
             const varToFile: Record<string, string> = {}
-            for (const m of bundleSrc.matchAll(/import (\w+) from"\.\/assets\/([\w.]+)"/g)) {
+            for (const m of bundleSrc.matchAll(
+                /import (\w+) from"\.\/assets\/([\w.]+)"/g
+            )) {
                 varToFile[m[1]] = m[2]
             }
 
@@ -126,16 +159,20 @@ export async function createCSL(styles: StyleMap = {}): Promise<InstanceType<typ
             }
 
             const assetsDir = resolve(distDir, "assets")
-            const localeCache: Record<string, any> = {}
+            const localeCache: Record<string, object> = {}
 
-            const loadLocale = async (name: string): Promise<any> => {
-                if (localeCache[name]) return localeCache[name]
+            const loadLocale = async (name: string): Promise<object> => {
+                if (localeCache[name]) {
+                    return localeCache[name]
+                }
                 // Fall back to en-US if the requested locale is not bundled.
                 const effectiveName = localeToVar[name] ? name : "en-US"
                 const varName = localeToVar[effectiveName]
                 const filename = varToFile[varName]
                 if (!filename) {
-                    throw new Error(`Locale "${effectiveName}" not found in citeproc-plus assets`)
+                    throw new Error(
+                        `Locale "${effectiveName}" not found in citeproc-plus assets`
+                    )
                 }
                 const filePath = resolve(assetsDir, filename)
                 const bytes = await readFile(filePath)
@@ -160,14 +197,14 @@ export async function createCSL(styles: StyleMap = {}): Promise<InstanceType<typ
                 return localeCache[effectiveName]
             }
 
-            ;(csl as any).getLocale = (
-                style: any,
+            ;(csl as CSLInstance).getLocale = (
+                style: {attrs?: Record<string, unknown>} | undefined,
                 lang: string,
                 forceLocale?: string
-            ): Promise<any> => {
+            ): Promise<object> => {
                 const name =
                     forceLocale ??
-                    style?.attrs?.["default-locale"] ??
+                    (style?.attrs?.["default-locale"] as string | undefined) ??
                     lang ??
                     "en-US"
                 return loadLocale(name)

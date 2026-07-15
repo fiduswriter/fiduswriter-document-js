@@ -14,7 +14,7 @@ interface CSLDate {
     literal?: string
 }
 
-interface CSLItem {
+export interface CSLItem {
     type?: string
     title?: string
     "container-title"?: string

@@ -2,6 +2,9 @@ import {Node} from "prosemirror-model"
 import {Mapping, RemoveMarkStep, Transform} from "prosemirror-transform"
 
 import {fnSchema} from "../schema/footnotes.js"
+import type {Track} from "../types.js"
+
+type TrackEntry = Track & {name?: string}
 
 import {deleteNode} from "./delete_node.js"
 
@@ -13,12 +16,12 @@ export function acceptAllNoInsertions(doc: Node): Node {
     doc.descendants((node, pos) => {
         const deletionTrack = node.attrs.track
                 ? node.attrs.track.find(
-                      (track: any) => track.type === "deletion"
+                      (track: Track) => track.type === "deletion"
                   )
                 : node.marks.find(mark => mark.type.name === "deletion"),
             insertionTrack = node.attrs.track
                 ? node.attrs.track.find(
-                      (track: any) => track.type === "insertion"
+                      (track: Track) => track.type === "insertion"
                   )
                 : node.marks.find(mark => mark.type.name === "insertion"),
             formatChangeMark = node.marks.find(
@@ -26,7 +29,7 @@ export function acceptAllNoInsertions(doc: Node): Node {
             ),
             blockChangeTrack = node.attrs.track
                 ? node.attrs.track.find(
-                      (track: any) => track.name === "block_change"
+                      (track: TrackEntry) => track.name === "block_change"
                   )
                 : false
 

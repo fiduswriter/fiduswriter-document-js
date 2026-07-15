@@ -5,6 +5,7 @@ import {NativeImporter} from "../native/importer.js"
 
 import type {
     E2EEOptions,
+    FidusDoc,
     FidusNode,
     NativeImporterBackend,
     User
@@ -74,7 +75,7 @@ export class DocxImporter {
                 const docx = new DocxConvert(
                     zip,
                     this.importId as string,
-                    this.template as {content: any},
+                    this.template as {content: FidusDoc},
                     bibliography
                 )
 

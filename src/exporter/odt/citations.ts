@@ -4,6 +4,7 @@ import {cslBibSchema} from "@fiduswriter/bibliography-manager/schema/csl_bib"
 import {FormatCitations} from "../../citations/format.js"
 import {fnSchema} from "../../schema/footnotes.js"
 import type {BibDB, CSL, DocSettings, FidusNode} from "../../types.js"
+import type {CitationInfo} from "../../citations/format.js"
 import {descendantNodes} from "../tools/doc_content.js"
 import type {ODTExporterStyles} from "./styles.js"
 
@@ -15,14 +16,14 @@ export class ODTExporterCitations {
     csl: CSL
     // If citInfos were found in a previous run, they are stored here
     // (for example: first citations in main document, then in footnotes)
-    origCitInfos: Record<string, unknown>[]
-    citInfos: Record<string, unknown>[]
+    origCitInfos: CitationInfo[]
+    citInfos: CitationInfo[]
     citationTexts: string[]
     pmCits: FidusNode[]
     citFm: FormatCitations | false
     pmBib: FidusNode | false
 
-    constructor(docContent: FidusNode, settings: DocSettings, styles: ODTExporterStyles, bibDB: BibDB, csl: CSL, origCitInfos: Record<string, unknown>[] = []) {
+    constructor(docContent: FidusNode, settings: DocSettings, styles: ODTExporterStyles, bibDB: BibDB, csl: CSL, origCitInfos: CitationInfo[] = []) {
         this.docContent = docContent
         this.settings = settings
         this.styles = styles
@@ -55,12 +56,12 @@ export class ODTExporterCitations {
 
         descendantNodes(this.docContent).forEach(node => {
             if (node.type === "citation" && node.attrs) {
-                this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
+                this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)) as CitationInfo)
             }
         })
         const citFm = new FormatCitations(
             this.csl,
-            this.citInfos as any,
+            this.citInfos,
             this.settings.citationstyle || "",
             "",
             this.bibDB,

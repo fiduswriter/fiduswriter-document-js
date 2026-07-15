@@ -3,7 +3,9 @@ import * as htmlPlugin from "prettier/plugins/html"
 import * as postcssPlugin from "prettier/plugins/postcss"
 import * as xmlPluginModule from "@prettier/plugin-xml"
 
-const xmlPlugin = (xmlPluginModule as any).default ?? xmlPluginModule
+const xmlPlugin =
+    (xmlPluginModule as {default?: typeof xmlPluginModule}).default ??
+    xmlPluginModule
 
 const baseOptions = {
     tabWidth: 4,

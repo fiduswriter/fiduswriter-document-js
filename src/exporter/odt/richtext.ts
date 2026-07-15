@@ -1,10 +1,42 @@
 import {escapeText} from "fwtoolkit"
 import {getCat} from "../../schema/i18n.js"
+import type {
+    BibDB,
+    CommentData,
+    DocSettings,
+    FidusMark,
+    FidusNode,
+    Track
+} from "../../types.js"
 import {createZoteroCitation} from "../tools/zotero_csl.js"
+import type {ODTExporterCitations} from "./citations.js"
+import type {ODTExporterFootnotes} from "./footnotes.js"
+import type {ODTExporterImages} from "./images.js"
+import type {ODTExporterMath} from "./math.js"
+import type {ODTExporterStyles} from "./styles.js"
+import type {ODTExporterTracks} from "./track.js"
+
+interface CommentRange {
+    start?: FidusNode
+    end?: FidusNode
+    content?: CommentData
+}
+
+interface RunOptions {
+    comments?: Record<string, CommentRange>
+    blockDelete?: Track
+    blockInsert?: Track & {trackId?: string}
+    section?: string
+    tag?: string
+    inFootnote?: boolean
+    listStyles?: string[]
+    citationType?: string
+    [key: string]: unknown
+}
 
 const TEXT_TYPES: Record<
     string,
-    {tag: string; attrs: (options: any) => string}
+    {tag: string; attrs: (options: RunOptions) => string}
 > = {
     heading1: {tag: "text:h", attrs: _options => 'text:outline-level="1"'},
     heading2: {tag: "text:h", attrs: _options => 'text:outline-level="2"'},
@@ -61,8 +93,8 @@ function generateZoteroId(): string {
 }
 
 function createZoteroCitationMark(
-    references: any[],
-    bibDB: any,
+    references: Array<{id: number; [key: string]: unknown}>,
+    bibDB: BibDB,
     formattedCitation: string,
     citationId: string | null = null
 ): string | null {
@@ -84,14 +116,14 @@ function createZoteroCitationMark(
 }
 
 export class ODTExporterRichtext {
-    comments: Record<string, any>
-    settings: any
-    styles: any
-    tracks: any
-    footnotes: any
-    citations: any
-    math: any
-    images: any
+    comments: Record<string, CommentData>
+    settings: DocSettings
+    styles: ODTExporterStyles
+    tracks: ODTExporterTracks
+    footnotes: ODTExporterFootnotes
+    citations: ODTExporterCitations
+    math: ODTExporterMath
+    images: ODTExporterImages
 
     imgCounter: number
     fnCounter: number // real footnotes
@@ -102,14 +134,14 @@ export class ODTExporterRichtext {
     citationCounter: number // Track which citation we're processing
 
     constructor(
-        comments: Record<string, any>,
-        settings: any,
-        styles: any,
-        tracks: any,
-        footnotes: any,
-        citations: any,
-        math: any,
-        images: any
+        comments: Record<string, CommentData>,
+        settings: DocSettings,
+        styles: ODTExporterStyles,
+        tracks: ODTExporterTracks,
+        footnotes: ODTExporterFootnotes,
+        citations: ODTExporterCitations,
+        math: ODTExporterMath,
+        images: ODTExporterImages
     ) {
         this.comments = comments
         this.styles = styles

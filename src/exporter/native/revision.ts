@@ -1,4 +1,5 @@
 import {ShrinkFidus} from "./shrink.js"
+import type {ShrinkDoc} from "./shrink.js"
 import {ZipFidus} from "./zip.js"
 
 import type {
@@ -54,7 +55,7 @@ export class SaveRevision {
     init(): Promise<unknown> {
         this.progressCallback?.(gettext("Saving revision..."), 0)
         const shrinker = new ShrinkFidus(
-            this.doc as any,
+            this.doc as unknown as ShrinkDoc,
             this.imageDB,
             this.bibDB,
             this.progressCallback
@@ -77,7 +78,7 @@ export class SaveRevision {
             })
             .then(blob => {
                 this.progressCallback?.(gettext("Uploading revision..."), 95)
-                return this.uploadRevision(blob, this.doc as any)
+                return this.uploadRevision(blob, this.doc as Record<string, unknown>)
             })
             .then(result => {
                 this.progressCallback?.(gettext("Revision saved."), 100)

@@ -5,8 +5,10 @@ import type {XMLElement} from "../tools/xml.js"
 import {DOCXExporterCitations} from "./citations.js"
 import {DOCXExporterImages} from "./images.js"
 import {DOCXExporterLists} from "./lists.js"
+import type {DOCXExporterMath} from "./math.js"
 import {DOCXExporterRels} from "./rels.js"
-import {DOCXExporterRichtext} from "./richtext.js"
+import type {DOCXExporterRichtext} from "./richtext.js"
+import type {DOCXExporterTables} from "./tables.js"
 
 const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:footnotes xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14 wp14">
@@ -64,8 +66,8 @@ export class DOCXExporterFootnotes {
     citations: DOCXExporterCitations
     csl: CSL
     lists: DOCXExporterLists
-    math: any
-    tables: any
+    math: DOCXExporterMath
+    tables: DOCXExporterTables
     rels: DOCXExporterRels
 
     pmBib: FidusNode | false
@@ -82,7 +84,7 @@ export class DOCXExporterFootnotes {
     ctFilePath: string
     settingsFilePath: string
     styleFilePath: string
-    richtext: any
+    richtext: DOCXExporterRichtext
 
     constructor(
         doc: ExportDoc,
@@ -94,8 +96,8 @@ export class DOCXExporterFootnotes {
         citations: DOCXExporterCitations,
         csl: CSL,
         lists: DOCXExporterLists,
-        math: any,
-        tables: any,
+        math: DOCXExporterMath,
+        tables: DOCXExporterTables,
         rels: DOCXExporterRels
     ) {
         this.doc = doc
@@ -245,9 +247,9 @@ export class DOCXExporterFootnotes {
     createXml(): Promise<void> {
         this.richtext = new DOCXExporterRichtext(
             this.doc,
+            this.settings,
             this.lists,
             this,
-            this.settings,
             this.math,
             this.tables,
             this.fnRels,

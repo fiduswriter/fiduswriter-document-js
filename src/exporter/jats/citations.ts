@@ -1,9 +1,11 @@
 import {CSLExporter} from "bibliojson"
 
 import {FormatCitations} from "../../citations/format.js"
+import type {CitationInfo} from "../../citations/format.js"
 
 import type {BibDB, CSL, ExportDoc} from "../../types.js"
 import {jatsBib} from "./bibliography.js"
+import type {CSLItem} from "./bibliography.js"
 
 interface CitationLayout {
     prefix?: string
@@ -72,8 +74,8 @@ export class JATSExporterCitations {
                 citationLayout.delimiter = "{{delimiter}}"
                 const citFm = new FormatCitations(
                     this.csl,
-                    this.citInfos as any,
-                    modStyle as any,
+                    this.citInfos as unknown as CitationInfo[],
+                    modStyle as object,
                     "",
                     this.bibDB,
                     false,
@@ -100,13 +102,13 @@ export class JATSExporterCitations {
                 }
                 const entryIds = bibliography[0].entry_ids.map(id => String(id))
                 const cslItems = new CSLExporter(
-                    this.bibDB.db as Record<string, any>,
+                    this.bibDB.db as Record<string, Record<string, unknown>>,
                     entryIds
                 ).parse() as Record<string, Record<string, unknown>>
                 bibliography[0].entry_ids.forEach((id, index) => {
                     this.jatsIdConvert[id] = index + 1
                     this.jatsBib += jatsBib(
-                        (cslItems[String(id)] || {}) as any,
+                        (cslItems[String(id)] || {}) as CSLItem,
                         index + 1
                     )
                 })

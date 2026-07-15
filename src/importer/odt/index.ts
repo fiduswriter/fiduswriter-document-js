@@ -6,10 +6,12 @@ import {NativeImporter} from "../native/importer.js"
 import type {
     BibDB,
     E2EEOptions,
+    FidusDoc,
     FidusNode,
     NativeImporterBackend,
     User
 } from "../../types.js"
+import type JSZip from "jszip"
 
 interface OdtImporterOptions {
     getTemplate: (importId: string | number | null) => Promise<Record<string, unknown>>
@@ -86,7 +88,7 @@ export class OdtImporter {
                     return Promise.resolve(this.output)
                 }
 
-                const imageFiles: Record<string, any> = {}
+                const imageFiles: Record<string, JSZip.JSZipObject> = {}
                 zip.forEach((relativePath, zipEntry) => {
                     if (relativePath.startsWith("Pictures/")) {
                         imageFiles[relativePath] = zipEntry
@@ -141,7 +143,7 @@ export class OdtImporter {
             metaXml || "",
             manifestXml || "",
             this.importId as string,
-            this.template as {content: any},
+            this.template as {content: FidusDoc},
             bibliography,
             this.bibDB
         )
@@ -149,8 +151,8 @@ export class OdtImporter {
         let convertedDoc
         try {
             convertedDoc = converter.init()
-        } catch (error: any) {
-            this.output.statusText = error.message
+        } catch (error: unknown) {
+            this.output.statusText = error instanceof Error ? error.message : String(error)
             console.error(error)
             return Promise.resolve(this.output)
         }

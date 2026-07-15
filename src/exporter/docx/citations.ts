@@ -4,6 +4,7 @@ import {cslBibSchema} from "@fiduswriter/bibliography-manager/schema/csl_bib"
 import {FormatCitations} from "../../citations/format.js"
 import {fnSchema} from "../../schema/footnotes.js"
 import type {BibDB, CSL, DocSettings, FidusNode} from "../../types.js"
+import type {CitationInfo} from "../../citations/format.js"
 import {descendantNodes} from "../tools/doc_content.js"
 import type {XMLElement} from "../tools/xml.js"
 import type {XmlZip} from "../tools/xml_zip.js"
@@ -14,9 +15,9 @@ export class DOCXExporterCitations {
     bibDB: BibDB
     csl: CSL
     xml: XmlZip
-    origCitInfos: Record<string, unknown>[]
+    origCitInfos: CitationInfo[]
 
-    citInfos: Record<string, unknown>[]
+    citInfos: CitationInfo[]
     citationTexts: string[]
     pmCits: FidusNode[]
     citFm: FormatCitations | false
@@ -24,7 +25,7 @@ export class DOCXExporterCitations {
     styleXML: XMLElement | null
     styleFilePath: string
 
-    constructor(docContent: FidusNode, settings: DocSettings, bibDB: BibDB, csl: CSL, xml: XmlZip, origCitInfos: Record<string, unknown>[] = []) {
+    constructor(docContent: FidusNode, settings: DocSettings, bibDB: BibDB, csl: CSL, xml: XmlZip, origCitInfos: CitationInfo[] = []) {
         this.docContent = docContent
         this.settings = settings
         this.bibDB = bibDB
@@ -63,12 +64,12 @@ export class DOCXExporterCitations {
 
         descendantNodes(this.docContent).forEach(node => {
             if (node.type === "citation" && node.attrs) {
-                this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)))
+                this.citInfos.push(JSON.parse(JSON.stringify(node.attrs)) as CitationInfo)
             }
         })
         const citFm = new FormatCitations(
             this.csl,
-            this.citInfos as any,
+            this.citInfos,
             this.settings.citationstyle || "",
             "",
             this.bibDB,

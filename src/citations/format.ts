@@ -8,7 +8,7 @@ import type {
 } from "../types.js"
 import {citeprocSys} from "./citeproc_sys.js"
 
-interface CitationInfo {
+export export export interface CitationInfo {
     format: string
     references: Array<{id: number; [key: string]: unknown}>
 }
@@ -34,7 +34,7 @@ export class FormatCitations {
     constructor(
         csl: CSL,
         allCitationInfos: CitationInfo[],
-        citationStyle: string,
+        citationStyle: string | object,
         bibliographyHeader: string,
         bibDB: BibDB,
         synchronous = false,

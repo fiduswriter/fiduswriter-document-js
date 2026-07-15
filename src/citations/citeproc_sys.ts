@@ -25,7 +25,7 @@ export class citeprocSys {
         if (!this.items[id]) {
             if (this.bibDB.db[id]) {
                 const cslGetter = new CSLExporter(
-                    this.bibDB.db as Record<string, any>,
+                    this.bibDB.db as Record<string, Record<string, unknown>>,
                     [id]
                 )
                 const cslOutput = cslGetter.parse() as Record<
