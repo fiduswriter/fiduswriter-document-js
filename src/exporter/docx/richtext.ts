@@ -79,7 +79,7 @@ interface DocxCommentRange {
 interface RunOptions {
     comments?: Record<string, DocxCommentRange>
     section?: string
-    list_type?: string | null
+    list_type?: number | false | null
     list_depth?: number
     paragraphId?: string | number
     inFootnote?: boolean
@@ -329,7 +329,7 @@ export class DOCXExporterRichtext {
                         }
                         </w:rPr>`
                     }
-                    if (blockChange) {
+                    if (blockChange && blockChange.before) {
                         start += `
                         <w:pPrChange w:id="${++this.changeCounter}" w:author="${escapeText(blockChange.username)}" w:date="${new Date(blockChange.date * 60000).toISOString().split(".")[0]}Z">
                             <w:pPr>
@@ -383,7 +383,7 @@ export class DOCXExporterRichtext {
                             }
                             </w:rPr>
                             ${
-                                blockChange
+                                blockChange && blockChange.before
                                     ? blockChange.before.type === "paragraph"
                                         ? `<w:pPrChange w:id="${++this.changeCounter}" w:author="${escapeText(blockChange.username)}" w:date="${new Date(blockChange.date * 60000).toISOString().split(".")[0]}Z"/>`
                                         : `<w:pPrChange w:id="${++this.changeCounter}" w:author="${escapeText(blockChange.username)}" w:date="${new Date(blockChange.date * 60000).toISOString().split(".")[0]}Z">
@@ -406,10 +406,17 @@ export class DOCXExporterRichtext {
                 break
             case "code_block": {
                 // Handle code blocks with category support
-                const category = node.attrs.category
+                const attrs = node.attrs
+                const category = attrs?.category
+                const id = attrs?.id
                 let categoryLabel = ""
 
-                if (category && node.attrs.id) {
+                if (
+                    typeof category === "string" &&
+                    category &&
+                    id !== undefined &&
+                    id !== ""
+                ) {
                     const categoryCounter = options.inFootnote
                         ? this.fncategoryCounter
                         : this.categoryCounter
@@ -421,15 +428,17 @@ export class DOCXExporterRichtext {
                         category,
                         this.settings.language
                     )
-                    const title = node.attrs.title
-                        ? `: ${escapeText(node.attrs.title)}`
-                        : ""
+                    const title =
+                        typeof attrs?.title === "string"
+                            ? `: ${escapeText(attrs.title)}`
+                            : ""
+                    const idStr = String(id)
 
                     // Create category label paragraph with SEQ field for numbering
                     categoryLabel = `
                         <w:p>
                             <w:pPr><w:pStyle w:val="Caption"/></w:pPr>
-                            <w:bookmarkStart w:name="${node.attrs.id}" w:id="${++this.bookmarkCounter}"/>
+                            <w:bookmarkStart w:name="${idStr}" w:id="${++this.bookmarkCounter}"/>
                             <w:r>
                                 <w:t xml:space="preserve">${categoryLabelText} </w:t>
                             </w:r>
@@ -473,7 +482,7 @@ export class DOCXExporterRichtext {
                         }
                         </w:rPr>`
                     }
-                    if (blockChange) {
+                    if (blockChange && blockChange.before) {
                         start += `
                         <w:pPrChange w:id="${++this.changeCounter}" w:author="${escapeText(blockChange.username)}" w:date="${new Date(blockChange.date * 60000).toISOString().split(".")[0]}Z">
                             <w:pPr>
@@ -642,6 +651,9 @@ export class DOCXExporterRichtext {
                     start += "</w:rPr></w:rPrChange>"
                 }
                 start += "</w:rPr>"
+                if (node.text === undefined) {
+                    break
+                }
                 if (options.footnoteRefMissing) {
                     start += "<w:footnoteRef /><w:tab />"
                     options.footnoteRefMissing = false
@@ -664,16 +676,23 @@ export class DOCXExporterRichtext {
                 break
             }
             case "cross_reference": {
-                const title = node.attrs.title
-                const id = node.attrs.id
-                let marks = node.marks.slice()
+                const attrs = node.attrs
+                if (!attrs) {
+                    break
+                }
+                const title =
+                    typeof attrs.title === "string" ? attrs.title : ""
+                const id = attrs.id
+                let marks = node.marks ? node.marks.slice() : []
                 if (title && id) {
                     const hyperlink = {
                         type: "link",
                         attrs: {href: `#${id}`, title}
                     }
-                    marks = marks.filter((mark: FidusMark) => mark.type !== "link")
-                    marks.push(hyperlink)
+                    marks = marks.filter(
+                        (mark: FidusMark) => mark.type !== "link"
+                    )
+                    marks.push(hyperlink as FidusMark)
                 }
                 content += this.transformRichtext(
                     {
@@ -742,17 +761,23 @@ export class DOCXExporterRichtext {
                                 </w:r>
                             </w:p>
                         </w:footnote>`
-                    } else {
+                    } else if (cit?.content) {
                         const fnContents = this.transformRichtext(cit, {
                             footnoteRefMissing: true,
                             section: "Footnote"
                         })
                         fnXML = `<w:footnote w:id="${this.fnCounter}">${fnContents}</w:footnote>`
+                    } else {
+                        fnXML = `<w:footnote w:id="${this.fnCounter}"><w:p/></w:footnote>`
                     }
 
-                    const xml = this.footnotes.xml
+                    const footnotesXml =
+                        this.footnotes.xml.docs[this.footnotes.filePath]
+                    if (!footnotesXml) {
+                        throw new Error("Footnotes XML not loaded")
+                    }
                     const lastId = this.fnCounter - 1
-                    const footnotes = xml.queryAll("w:footnote")
+                    const footnotes = footnotesXml.queryAll("w:footnote")
                     footnotes.forEach((footnote: XMLElement) => {
                         const id = Number.parseInt(
                             String(footnote.getAttribute("w:id"))
@@ -787,7 +812,7 @@ export class DOCXExporterRichtext {
                             <w:r>
                                 <w:fldChar w:fldCharType="end"/>
                             </w:r>`
-                    } else {
+                    } else if (cit?.content) {
                         // Fallback to formatted text only
                         for (let i = 0; i < cit.content.length; i++) {
                             content += this.transformRichtext(
