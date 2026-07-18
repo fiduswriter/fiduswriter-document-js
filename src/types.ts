@@ -6,6 +6,10 @@
  * ProseMirror schema while staying serialisable.
  */
 
+import type {Node} from "prosemirror-model"
+import type {EditorState, Selection} from "prosemirror-state"
+import type {EditorView} from "prosemirror-view"
+
 /** A generic JSON value. */
 export type JSONValue =
     | string
@@ -300,3 +304,79 @@ export type ImportDocument = (
     httpIncludes: Array<{url: string; filename: string}>,
     options: Record<string, unknown>
 ) => Promise<{doc: Record<string, unknown>; docInfo: Record<string, unknown>}>
+
+/* ------------------------------------------------------------------ */
+/*  State-plugin types — used by editor and bibliography-manager      */
+/* ------------------------------------------------------------------ */
+
+export interface PartNodeAttrs {
+    id: string
+    item_title: string
+    hidden?: boolean
+    locking?: string
+    deleted?: boolean
+    [key: string]: unknown
+}
+
+export interface AddButtonOptions {
+    idTypes?: string[]
+    onAdd?: (node: Node, view: EditorView, idTypes: string[]) => void
+}
+
+export interface AddButtonLike {
+    init(): void
+    hasFocus(): boolean
+    focus(): void
+}
+
+export interface AddButtonConstructor {
+    new (
+        dom: HTMLElement,
+        getNode: () => Node,
+        getPos: () => number | undefined,
+        view: EditorView,
+        options?: AddButtonOptions
+    ): AddButtonLike
+}
+
+export interface ContributorsPartOptions {
+    AddButton?: AddButtonConstructor
+    onAddContributor?: (node: Node, view: EditorView, idTypes: string[]) => void
+    addDeletedPartWidget?: (
+        dom: HTMLElement,
+        view: EditorView,
+        getPos: () => number | undefined
+    ) => void
+}
+
+export interface TagInputRefs {
+    tagInputView: EditorView
+    mainView: EditorView
+    getPos: () => number | undefined
+}
+
+export type CreateTagEditor = (
+    view: EditorView,
+    getPos: () => number | undefined,
+    getNode: () => Node
+) => [HTMLElement, EditorView]
+
+export interface TagsPartOptions {
+    createTagEditor?: CreateTagEditor
+    addDeletedPartWidget?: (
+        dom: HTMLElement,
+        view: EditorView,
+        getPos: () => number | undefined
+    ) => void
+    shouldPreventTagInputFocus?: () => boolean
+}
+
+export type NextSelection = (
+    state: EditorState,
+    pos: number,
+    dir: number
+) => Selection | undefined
+
+export type GetNode = () => Node
+
+export type GetPos = () => number | undefined

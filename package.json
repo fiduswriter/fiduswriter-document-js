@@ -99,6 +99,18 @@
     "./citations/*": {
       "types": "./dist/citations/*.d.ts",
       "default": "./dist/citations/*.js"
+    },
+    "./state_plugins": {
+      "types": "./dist/state_plugins/index.d.ts",
+      "default": "./dist/state_plugins/index.js"
+    },
+    "./state_plugins/contributor_input": {
+      "types": "./dist/state_plugins/contributor_input/index.d.ts",
+      "default": "./dist/state_plugins/contributor_input/index.js"
+    },
+    "./state_plugins/tag_input": {
+      "types": "./dist/state_plugins/tag_input/index.d.ts",
+      "default": "./dist/state_plugins/tag_input/index.js"
     }
   },
   "directories": {
@@ -143,6 +155,7 @@
     "orderedmap": "^2.1.1",
     "prettier": "^3.5.3",
     "prosemirror-commands": "^1.7.1",
+    "prosemirror-gapcursor": "^1.3.2",
     "prosemirror-history": "^1.5.0",
     "prosemirror-keymap": "^1.2.3",
     "prosemirror-model": "^1.25.0",
@@ -151,7 +164,8 @@
     "prosemirror-state": "^1.4.4",
     "prosemirror-tables": "^1.6.4",
     "prosemirror-transform": "^1.12.0",
-    "prosemirror-view": "^1.41.9"
+    "prosemirror-view": "^1.41.9",
+    "w3c-keyname": "2.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
