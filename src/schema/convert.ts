@@ -113,6 +113,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 1.1: // Fidus Writer 3.1
             returnDoc = convertDocV11(returnDoc)
@@ -128,6 +129,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 1.2: // Fidus Writer 3.2
             returnDoc = convertDocV12(returnDoc)
@@ -142,6 +144,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 1.3: // Fidus Writer 3.3 prerelease
             returnDoc = convertDocV13(returnDoc, bibliography)
@@ -155,6 +158,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 2.0: // Fidus Writer 3.3
             returnDoc = convertDocV20(returnDoc)
@@ -167,6 +171,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 2.1: // Fidus Writer 3.4
             returnDoc = convertDocV21(returnDoc)
@@ -178,6 +183,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 2.2: // Fidus Writer 3.5.7
             returnDoc = convertDocV22(returnDoc)
@@ -188,6 +194,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 2.3: // Fidus Writer 3.5.10
             returnDoc = convertDocV23(returnDoc)
@@ -197,6 +204,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.0: // Fidus Writer 3.6
             returnDoc = convertDocV30(returnDoc)
@@ -205,6 +213,7 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.1: // Fidus Writer 3.7
             returnDoc = convertDocV31(returnDoc)
@@ -212,26 +221,34 @@ export const updateDoc = <T>(
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.2: // Fidus Writer 3.8
             returnDoc = convertDocV32(returnDoc)
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.3: // Fidus Writer 3.9
             returnDoc = convertDocV33(returnDoc)
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.4: // Fidus Writer 3.10
             returnDoc = convertDocV34(returnDoc)
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.5: // Fidus Writer 4.0
             returnDoc = convertDocV35(returnDoc)
+            returnDoc = convertDocV36(returnDoc)
             break
         case 3.6: // Fidus Writer 4.1
+            returnDoc = convertDocV36(returnDoc)
+            break
+        case 3.7: // Fidus Writer 5.0
             break
     }
     return returnDoc as T
@@ -1421,4 +1438,44 @@ const convertDocV35 = (doc: ConvertedDoc): ConvertedDoc => {
     // be moved from a 4.1 to an 4.0 system, but 3.5 files should be readable
     // as 3.6 files.
     return JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+}
+
+const STYLE_MAP_V36: Record<string, string> = {
+    "chicago-note-bibliography": "chicago-notes-bibliography",
+    "oxford-university-press-humsoc": "oxford-guide-to-style-notes"
+}
+
+const convertNodeV36 = (node: ConvertNode): void => {
+    if (node.attrs) {
+        if (
+            node.type === "article" &&
+            node.attrs.citationstyle &&
+            typeof node.attrs.citationstyle === "string" &&
+            STYLE_MAP_V36[node.attrs.citationstyle as string]
+        ) {
+            node.attrs.citationstyle =
+                STYLE_MAP_V36[node.attrs.citationstyle as string]
+        }
+        if (
+            node.type === "article" &&
+            Array.isArray(node.attrs.citationstyles)
+        ) {
+            node.attrs.citationstyles = (
+                node.attrs.citationstyles as string[]
+            ).map(s => STYLE_MAP_V36[s] || s)
+        }
+    }
+    if (node.content) {
+        node.content.forEach(childNode => {
+            convertNodeV36(childNode)
+        })
+    }
+}
+
+const convertDocV36 = (doc: ConvertedDoc): ConvertedDoc => {
+    const returnDoc = JSON.parse(JSON.stringify(doc)) as ConvertedDoc
+    if (returnDoc.content) {
+        convertNodeV36(returnDoc.content as ConvertNode)
+    }
+    return returnDoc
 }

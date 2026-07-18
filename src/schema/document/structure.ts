@@ -21,11 +21,11 @@ export const doc = {
                 "american-anthropological-association",
                 "apa",
                 "chicago-author-date",
-                "chicago-note-bibliography",
+                "chicago-notes-bibliography",
                 "harvard-cite-them-right", // previously harvard1
                 "modern-language-association", // previously mla
                 "nature",
-                "oxford-university-press-humsoc"
+                "oxford-guide-to-style-notes"
             ]
         },
         language: {
