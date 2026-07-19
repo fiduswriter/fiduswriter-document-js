@@ -1204,6 +1204,10 @@ export class DocxConvert {
                         contentReceiver.push(citationNode)
                     }
                 }
+            } else if (child.tagName === "w:pPr") {
+                // Paragraph properties are block-level metadata; ignore when
+                // extracting inline content.
+                return
             } else {
                 console.warn("unhandled node", child)
             }

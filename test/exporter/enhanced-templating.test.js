@@ -1,4 +1,4 @@
-import {beforeAll, describe, expect, it} from "@jest/globals"
+import {beforeAll, describe, expect, it, jest} from "@jest/globals"
 import {xmlDOM} from "../../src/exporter/tools/xml.js"
 
 let DOCXExporterRender, ODTExporterRender
@@ -402,19 +402,27 @@ describe("Enhanced Templating - DOCX", () => {
         })
 
         it("rejects unsafe expressions", () => {
-            const render = new DOCXExporterRender(null)
-            expect(
-                render.evaluateExpression("alert(1)", {
-                    tagName: "authors",
-                    count: 1
-                })
-            ).toBe(false)
-            expect(
-                render.evaluateExpression("process.exit()", {
-                    tagName: "authors",
-                    count: 1
-                })
-            ).toBe(false)
+            // The renderer warns when it rejects an unsafe expression.
+            // Silence the expected warnings so they don't look like test
+            // failures to future developers.
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+            try {
+                const render = new DOCXExporterRender(null)
+                expect(
+                    render.evaluateExpression("alert(1)", {
+                        tagName: "authors",
+                        count: 1
+                    })
+                ).toBe(false)
+                expect(
+                    render.evaluateExpression("process.exit()", {
+                        tagName: "authors",
+                        count: 1
+                    })
+                ).toBe(false)
+            } finally {
+                warnSpy.mockRestore()
+            }
         })
     })
 

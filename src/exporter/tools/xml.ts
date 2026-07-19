@@ -13,7 +13,7 @@ const fastXMLParserOptions = {
     trimValues: false
 }
 
-const isLeaf = (tagName: string | undefined): boolean =>
+export const isLeaf = (tagName: string | undefined): boolean =>
     ["#text", "__cdata", "#comment"].includes(tagName || "")
 
 type XMLNode = Record<string, unknown>

@@ -1,6 +1,6 @@
 import {MathMLToLaTeX} from "mathml-to-latex"
 
-import {xmlDOM} from "../../exporter/tools/xml.js"
+import {isLeaf, xmlDOM} from "../../exporter/tools/xml.js"
 import type {XMLElement} from "../../exporter/tools/xml.js"
 import {
     randomCommentId,
@@ -135,6 +135,10 @@ function attr(node: XMLElement | undefined, name: string): string {
 
 function isElement(child: XMLElement | string): child is XMLElement {
     return typeof child !== "string"
+}
+
+function isBlockElement(child: XMLElement | string): child is XMLElement {
+    return typeof child !== "string" && !isLeaf(child.tagName)
 }
 
 export class OdtConvert {
@@ -1138,7 +1142,7 @@ export class OdtConvert {
         }
 
         body.children
-            .filter(isElement)
+            .filter(isBlockElement)
             .forEach((node: XMLElement) => {
             const styleName = attr(node, "text:style-name")
             const title = this.getSectionTitle(node, styleName)
@@ -1254,7 +1258,7 @@ export class OdtConvert {
 
     convertContainer(container: XMLElement): FidusNode[] {
         return container.children
-            .filter(isElement)
+            .filter(isBlockElement)
             .map((node: XMLElement) => this.convertBlockNode(node))
             .filter((node): node is FidusNode | FidusNode[] => node !== null)
             .flat()
@@ -1485,6 +1489,13 @@ export class OdtConvert {
                         }
                         return null
                     }
+                    case "text:reference-mark-end":
+                        // Closing mark for a reference region we are not
+                        // treating as a citation/bibliography (e.g. mocked
+                        // parsers in tests, or plain reference marks). The
+                        // surrounding text has already been emitted, so just
+                        // drop the marker.
+                        return null
                     case "text:bibliography-mark":
                         return this.convertBibliographyMark(
                             child,
