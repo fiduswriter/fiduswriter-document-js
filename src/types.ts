@@ -177,13 +177,24 @@ export interface ImageDB {
  * bundled (and caller-registered) styles and locales and creates citeproc-js
  * engines.
  */
-import type {
-    CSL,
-    CSLNode,
-    CslSys,
-    CiteprocEngine
-} from "citeproc-plus/dist/index.js"
-export type {CSL, CSLNode, CslSys, CiteprocEngine}
+import type {CSL, CSLNode} from "citeproc-plus/dist/index.js"
+export type {CSL, CSLNode}
+
+/** citeproc-js sys object interface. */
+export interface CslSys {
+    [key: string]: unknown
+    retrieveItem: (id: string) => Record<string, unknown>
+    getAbbreviation: (
+        dummy: string,
+        obj: Record<string, Record<string, Record<string, string>>>,
+        jurisdiction: string,
+        vartype: string,
+        key: string
+    ) => void
+}
+
+/** Raw citeproc-js engine as returned by citeproc-plus before casting. */
+export type CiteprocEngine = unknown
 
 /** A minimal citeproc-js engine interface. */
 export interface CiteprocInstance {
