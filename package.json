@@ -1,6 +1,6 @@
 {
   "name": "@fiduswriter/document",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "description": "Fidus Writer document schema, importers and exporters",
   "repository": {
     "type": "git",
@@ -148,7 +148,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@fiduswriter/bibliography-manager": "^0.1.6",
+    "@fiduswriter/bibliography-manager": "^0.1.17",
     "@prettier/plugin-xml": "^3.4.2",
     "@vivliostyle/print": "^2.42.0",
     "bibliojson": "^4.0.3",
@@ -202,7 +202,8 @@
       "prettier --write"
     ],
     "*.{ts,js,mjs}": [
-      "eslint --fix"
+      "eslint --fix",
+      "sh -c 'npm run typecheck'"
     ]
   }
 }
