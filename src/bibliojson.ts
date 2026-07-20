@@ -1,1 +1,1 @@
-export * from "@fiduswriter/bibliography-manager/bibliojson"
+export * from "bibliojson"

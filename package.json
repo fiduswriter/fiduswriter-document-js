@@ -148,10 +148,9 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@fiduswriter/bibliography-manager": "^0.1.19",
     "@prettier/plugin-xml": "^3.4.2",
     "@vivliostyle/print": "^2.42.0",
-    "bibliojson": "^4.0.3",
+    "bibliojson": "^4.0.4",
     "citeproc-plus": "^2.0.4",
     "downloadjs": "^1.4.7",
     "fast-deep-equal": "^3.1.3",

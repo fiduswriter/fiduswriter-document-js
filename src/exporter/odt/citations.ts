@@ -1,8 +1,10 @@
-import {DOMParser, DOMSerializer} from "prosemirror-model"
+import {DOMParser, DOMSerializer, Schema} from "prosemirror-model"
 
-import {cslBibSchema} from "@fiduswriter/bibliography-manager/schema/csl_bib"
+import {cslBibSpec} from "bibliojson"
 import {FormatCitations} from "../../citations/format.js"
 import {fnSchema} from "../../schema/footnotes.js"
+
+const cslBibSchema = new Schema(cslBibSpec)
 import type {BibDB, CSL, DocSettings, FidusNode} from "../../types.js"
 import type {CitationInfo} from "../../citations/format.js"
 import {descendantNodes} from "../tools/doc_content.js"

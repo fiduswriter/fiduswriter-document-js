@@ -26,7 +26,6 @@ export default {
         "^bibliojson$": "<rootDir>/test/exporter/mocks/bibliojson.js",
         "^mathml-to-latex$": "<rootDir>/test/importer/mocks/mathml-to-latex.js",
         "^@fiduswriter/document/citations/format$": "<rootDir>/test/exporter/mocks/citations-format.js",
-        "^@fiduswriter/bibliography-manager/schema/csl_bib$": "<rootDir>/test/exporter/mocks/csl-bib-schema.js",
         "^@fiduswriter/document/mathlive/opf_includes$": "<rootDir>/test/exporter/mocks/empty-module.js",
         "^fwtoolkit/file/zip$": "<rootDir>/test/exporter/mocks/zip.js",
         "^fwtoolkit$": "<rootDir>/test/exporter/mocks/common.js",
