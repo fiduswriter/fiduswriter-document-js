@@ -81,35 +81,39 @@ Do **not** put in this repository:
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Compile TypeScript to dist/
-npm run build
+pnpm run build
 
 # Export schema.json
-npm run build-schema
+pnpm run build-schema
 
 # Bundle MathLive CSS/fonts into static-libs/
-npm run bundle-mathlive
+pnpm run bundle-mathlive
 
 # Run all three build steps
-npm run prepare
+pnpm run prepare
 
 # Run the Jest test suite
-npm test
+pnpm test
 
 # Run linting and formatting checks
-npm run lint
-npm run format:check
+pnpm run lint
+pnpm run format:check
 ```
 
-`npm run bundle-mathlive` is deterministic: the generated zip uses source file
+This repository uses pnpm for day-to-day development. Run `pnpm install` to
+install dependencies; `package-lock.json` is not tracked (pnpm maintains
+`pnpm-lock.yaml`).
+
+`pnpm run bundle-mathlive` is deterministic: the generated zip uses source file
 mtimes and a stable ordering, so identical source MathLive versions produce an
 identical `static-libs/zip/mathlive_style.zip`.
 
 ## Pre-commit / pre-publish
 
-- `npm run prepare` runs build, schema export, and MathLive bundling.
+- `pnpm run prepare` runs build, schema export, and MathLive bundling.
 - `npm publish` triggers `prepublishOnly`, which also runs build, schema export,
   and MathLive bundling.
 - There is no pre-commit hook in this repository; rely on CI and run tests
@@ -128,7 +132,7 @@ identical `static-libs/zip/mathlive_style.zip`.
 
 Tests live in `test/` and run with Jest.
 
-- Use `npm test` to run the full suite.
+- Use `pnpm test` to run the full suite.
 - Tests use `happy-dom` for DOM APIs where needed.
 - Import/export tests often round-trip fixture files.
 
@@ -138,11 +142,12 @@ The MathLive static bundle is committed into the repository under
 `static-libs/` so consumers (including the main Fidus Writer app and the CLI)
 do not need to run the bundler themselves.
 
-To update the bundle after upgrading the `mathlive` dependency:
+To update the bundle after upgrading the `mathlive` dependency, add the package
+with pnpm (`pnpm add` is pnpm's equivalent of `npm install <pkg>`):
 
 ```bash
-npm install mathlive@<version>
-npm run bundle-mathlive
+pnpm add mathlive@<version>
+pnpm run bundle-mathlive
 ```
 
 Verify with `git diff` that only `static-libs/` and possibly
@@ -162,8 +167,8 @@ When publishing a new version, update those consumers and run their tests.
 
 ## Release checklist
 
-- Ensure `npm run build` succeeds.
-- Ensure `npm test` passes.
+- Ensure `pnpm run build` succeeds.
+- Ensure `pnpm test` passes.
 - Update `package.json` version if needed (`npm version patch|minor|major`).
 - `npm publish` triggers `prepublishOnly`, which builds and bundles.
 - Push commits and tags.
