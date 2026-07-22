@@ -145,7 +145,8 @@
     "lint": "eslint src test",
     "lint:fix": "eslint src test --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "install-hooks": "husky"
   },
   "dependencies": {
     "@prettier/plugin-xml": "^3.4.2",
@@ -194,7 +195,9 @@
     "ts-jest-resolver": "^2.0.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.0"
+    "typescript-eslint": "^8.62.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8"
   },
   "lint-staged": {
     "*.{ts,js,mjs,css,md,json,html}": [
