@@ -131,7 +131,8 @@
     "static-libs/",
     "schema.json",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "locale/"
   ],
   "scripts": {
     "build": "tsc",
@@ -146,7 +147,9 @@
     "lint:fix": "eslint src test --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "install-hooks": "husky"
+    "install-hooks": "husky",
+    "compile-i18n": "node scripts/compile-i18n.js",
+    "extract-i18n": "node scripts/extract-i18n.js"
   },
   "dependencies": {
     "@prettier/plugin-xml": "^3.4.2",
@@ -156,7 +159,7 @@
     "downloadjs": "^1.4.7",
     "fast-deep-equal": "^3.1.3",
     "fast-xml-parser": "^5.9.3",
-    "fwtoolkit": "^0.2.1",
+    "fwtoolkit": "^0.2.3",
     "jszip": "^3.10.1",
     "mathlive": "^0.104.0",
     "mathml-to-latex": "^1.4.3",
@@ -187,17 +190,18 @@
     "@types/prosemirror-transform": "^1.5.0",
     "@xmldom/xmldom": "^0.9.10",
     "eslint": "^10.6.0",
+    "gettext-parser": "^9.1.1",
     "globals": "^15.15.0",
     "happy-dom": "^20.10.6",
+    "husky": "^9.1.7",
     "jest": "^30.4.2",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.5.3",
     "ts-jest": "^29.1.2",
     "ts-jest-resolver": "^2.0.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^17.0.8"
+    "typescript-eslint": "^8.62.0"
   },
   "lint-staged": {
     "*.{ts,js,mjs,css,md,json,html}": [
