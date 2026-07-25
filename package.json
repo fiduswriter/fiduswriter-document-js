@@ -132,7 +132,7 @@
     "schema.json",
     "README.md",
     "LICENSE",
-    "locale/"
+    "locale/*/messages.json"
   ],
   "scripts": {
     "build": "tsc",
