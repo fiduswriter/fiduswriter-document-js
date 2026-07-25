@@ -2,9 +2,28 @@
   "name": "@fiduswriter/document",
   "version": "0.2.33",
   "description": "Fidus Writer document schema, importers and exporters",
+  "keywords": [
+    "fiduswriter",
+    "document",
+    "prosemirror",
+    "schema",
+    "docx",
+    "odt",
+    "epub",
+    "html",
+    "latex",
+    "jats",
+    "pandoc",
+    "import",
+    "export"
+  ],
+  "homepage": "https://fiduswriter.codeberg.page/fiduswriter-document/",
+  "bugs": {
+    "url": "https://codeberg.org/fiduswriter/fiduswriter-document-js/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "ssh://git@codeberg.org/fiduswriter/fiduswriter-document.git"
+    "url": "ssh://git@codeberg.org/fiduswriter/fiduswriter-document-js.git"
   },
   "license": "AGPL-3.0",
   "author": "Johannes Wilm",
