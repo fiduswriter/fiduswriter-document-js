@@ -85,7 +85,7 @@ export class HTMLExporter {
         // * a filename and contents - which means they will be included as a separate file
         // * only contents - which means they will be incldued inside <style></style> tags in the document header
         // * only filename - which means they will be referenced as a separate file. You need to add the file yourself.
-        this.styleSheets = [{url: staticUrl("css/document.css")}]
+        this.styleSheets = [{url: staticUrl("css/editor/document.css")}]
     }
 
     async init(): Promise<void> {

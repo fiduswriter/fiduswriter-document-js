@@ -46,7 +46,7 @@ export class PrintExporter extends HTMLExporter {
             contents?: string
             filename?: string
         }> = [
-            {url: staticUrl("css/document.css")},
+            {url: staticUrl("css/editor/document.css")},
             {
                 contents: `a.footnote, a.affiliation {
                     -adapt-template: url(data:application/xml,${encodeURI(
