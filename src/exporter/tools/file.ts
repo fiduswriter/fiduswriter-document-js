@@ -2,7 +2,7 @@ import {gettext} from "fwtoolkit"
 import type {ImageDBEntry} from "../../types.js"
 
 export const createSlug = (str: string): string => {
-    if (str === "") {
+    if (!str) {
         str = gettext("Untitled")
     }
     str = str.replace(/[^a-zA-Z0-9\s]/g, "")
