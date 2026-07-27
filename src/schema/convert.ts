@@ -1448,7 +1448,7 @@ const STYLE_MAP_V36: Record<string, string> = {
 const convertNodeV36 = (node: ConvertNode): void => {
     if (node.attrs) {
         if (
-            node.type === "article" &&
+            node.type === "doc" &&
             node.attrs.citationstyle &&
             typeof node.attrs.citationstyle === "string" &&
             STYLE_MAP_V36[node.attrs.citationstyle as string]
@@ -1457,7 +1457,7 @@ const convertNodeV36 = (node: ConvertNode): void => {
                 STYLE_MAP_V36[node.attrs.citationstyle as string]
         }
         if (
-            node.type === "article" &&
+            node.type === "doc" &&
             Array.isArray(node.attrs.citationstyles)
         ) {
             node.attrs.citationstyles = (

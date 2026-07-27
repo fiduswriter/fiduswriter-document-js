@@ -148,8 +148,8 @@ export class PrintExporter extends HTMLExporter {
         const {html, metaData} = await this.converter.init()
 
         this.progressCallback?.(
-            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Preparing print view...")}`,
-            50
+            `${shortFileTitle(this.doc.title, this.doc.path || "")}: ${gettext("Print view ready. Opening print dialog...")}`,
+            100
         )
 
         const config: {title?: string; printCallback?: (iframeWin: Window) => void} = {
