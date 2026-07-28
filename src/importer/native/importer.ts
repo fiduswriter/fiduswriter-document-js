@@ -153,8 +153,16 @@ export class NativeImporter {
             switch (node.type) {
                 case "image":
                     if (node.attrs && node.attrs.image !== false) {
-                        node.attrs.image =
-                            imageTranslationTable[node.attrs.image as number | string]
+                        const oldId = node.attrs.image as number | string
+                        const newId = imageTranslationTable[oldId]
+                        if (newId !== undefined) {
+                            node.attrs.image = newId
+                        } else {
+                            console.warn(
+                                "NativeImporter: image reference not found in translation table.",
+                                {oldId, imageTranslationTable}
+                            )
+                        }
                     }
                     break
                 case "footnote":
