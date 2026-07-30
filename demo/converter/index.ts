@@ -12,7 +12,7 @@ initSettings({
     getCsrfToken: () => ""
 })
 
-import {createCSL} from "../../dist/citations/create_csl.js"
+import {createCSL} from "citeproc-plus"
 
 import {JATSExporter} from "../../dist/exporter/jats/index.js"
 import {HTMLExporter} from "../../dist/exporter/html/index.js"
