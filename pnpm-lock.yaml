@@ -30,8 +30,8 @@ importers:
         specifier: ^5.9.3
         version: 5.10.1
       fwtoolkit:
-        specifier: ^0.2.3
-        version: 0.2.3(prosemirror-commands@1.7.1)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.1)
+        specifier: ^0.2.8
+        version: 0.2.8(prosemirror-commands@1.7.1)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.1)
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -1394,8 +1394,8 @@ packages:
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
 
-  fwtoolkit@0.2.3:
-    resolution: {integrity: sha512-cuwom2YjYDh4nVrskYh+IXsDIwRB7eGzI2ouelK0tuSUqTpIIThXkN9jwJxFXE/r/BljMko1oojxOz6y9V1f3g==}
+  fwtoolkit@0.2.8:
+    resolution: {integrity: sha512-KcTu7+6pbBq3oqmW6/2hBYFls94iCeurUa6fBtkuvYmVWCVIdAQvEjf4MU0UVX0IaAmeiGBvuKB4Cih+gvA69w==}
     peerDependencies:
       prosemirror-commands: ^1.7.0
       prosemirror-history: ^1.4.0
@@ -2087,8 +2087,8 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  simple-datatables@10.2.0:
-    resolution: {integrity: sha512-Lq3k5JZ4WXT0G0dhIAUfYc3M+GRs9y8U15wfbF7i67/rPm8wa43Iyrac+yP+lXQVTy1MPCPvxvZ44P9N4k0OhQ==}
+  simple-datatables@10.3.0:
+    resolution: {integrity: sha512-/9XcZ/AzZWYNMTTwUcUqsNhZXD1KIHg4tWCUhRx5qPDOnRVG2gNdRDR1euNTCbQxfAypu78ucgWc/BOMFfuxAQ==}
 
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -3670,7 +3670,7 @@ snapshots:
 
   function-bind@1.1.2: {}
 
-  fwtoolkit@0.2.3(prosemirror-commands@1.7.1)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.1):
+  fwtoolkit@0.2.8(prosemirror-commands@1.7.1)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.1):
     dependencies:
       diff-dom: 5.2.1
       jszip: 3.10.1
@@ -3680,7 +3680,7 @@ snapshots:
       prosemirror-model: 1.25.11
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.1
-      simple-datatables: 10.2.0
+      simple-datatables: 10.3.0
       w3c-keyname: 2.2.8
 
   gensync@1.0.0-beta.2: {}
@@ -4561,7 +4561,7 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  simple-datatables@10.2.0:
+  simple-datatables@10.3.0:
     dependencies:
       dayjs: 1.11.21
       diff-dom: 5.2.1
